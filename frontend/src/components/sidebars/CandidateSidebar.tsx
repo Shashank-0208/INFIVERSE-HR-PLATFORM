@@ -1,8 +1,10 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useSidebar } from '../../context/SidebarContext'
 
 export default function CandidateSidebar() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { isCollapsed } = useSidebar()
   
   const navItems = [
     {
@@ -72,51 +74,63 @@ export default function CandidateSidebar() {
   }
 
   return (
-    <aside className="fixed left-0 top-16 w-64 h-[calc(100vh-4rem)] bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 overflow-y-auto transition-all duration-300">
-      {/* User Info */}
-      <div className="p-6 border-b border-gray-200 dark:border-slate-800">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg">
-            {localStorage.getItem('user_name')?.charAt(0).toUpperCase() || 'C'}
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900 dark:text-white">
-              {localStorage.getItem('user_name') || 'Candidate'}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Candidate</p>
-          </div>
-        </div>
-      </div>
-
+    <aside 
+      className={`fixed left-0 top-16 h-[calc(100vh-4rem)] bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 overflow-y-auto transition-all duration-300 ${
+        isCollapsed ? 'w-20' : 'w-64'
+      }`}
+    >
       {/* Navigation */}
-      <nav className="p-4 space-y-1">
+      <nav className="p-3 space-y-1 pb-32">
         {navItems.map((item) => (
           <Link
             key={item.path}
             to={item.path}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+            title={isCollapsed ? item.title : undefined}
+            className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-3 py-3 rounded-xl transition-all duration-200 ${
               isActive(item.path)
                 ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30'
                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800'
             }`}
           >
-            {item.icon}
-            <span className="font-medium">{item.title}</span>
+            <span className="flex-shrink-0">{item.icon}</span>
+            {!isCollapsed && <span className="font-medium truncate">{item.title}</span>}
           </Link>
         ))}
       </nav>
 
-      {/* Logout Button */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          <span className="font-medium">Logout</span>
-        </button>
+      {/* User Info & Logout */}
+      <div className="absolute bottom-0 left-0 right-0 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        {/* User Details */}
+        <div className={`p-3 ${isCollapsed ? 'flex justify-center' : ''}`}>
+          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+              {localStorage.getItem('user_name')?.charAt(0).toUpperCase() || 'C'}
+            </div>
+            {!isCollapsed && (
+              <div className="overflow-hidden">
+                <p className="font-semibold text-gray-900 dark:text-white truncate text-sm">
+                  {localStorage.getItem('user_name') || 'Candidate'}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {localStorage.getItem('user_email') || 'candidate@infiverse.hr'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* Logout Button */}
+        <div className="p-3 pt-0">
+          <button
+            onClick={handleLogout}
+            title={isCollapsed ? 'Logout' : undefined}
+            className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} w-full px-3 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-medium shadow-lg shadow-red-500/30 transition-all duration-200`}
+          >
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            {!isCollapsed && <span>Logout</span>}
+          </button>
+        </div>
       </div>
     </aside>
   )

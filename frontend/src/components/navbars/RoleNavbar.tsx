@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useTheme } from '../../context/ThemeContext'
+import { useSidebar } from '../../context/SidebarContext'
 
 interface RoleNavbarProps {
   role: 'candidate' | 'recruiter' | 'client'
@@ -10,21 +11,37 @@ const roleConfig = {
     gradient: 'from-blue-500 to-cyan-500',
     title: 'Candidate Portal',
     homePath: '/candidate/dashboard',
+    icon: (
+      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    ),
   },
   recruiter: {
     gradient: 'from-emerald-500 to-teal-500',
     title: 'Recruiter Console',
     homePath: '/recruiter',
+    icon: (
+      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    ),
   },
   client: {
     gradient: 'from-purple-500 to-pink-500',
     title: 'Client Dashboard',
     homePath: '/client',
+    icon: (
+      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+    ),
   },
 }
 
 export default function RoleNavbar({ role }: RoleNavbarProps) {
   const { theme, toggleTheme } = useTheme()
+  const { isCollapsed, toggleSidebar } = useSidebar()
   const navigate = useNavigate()
   const config = roleConfig[role]
 
@@ -38,31 +55,35 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
 
   return (
     <nav className="fixed top-0 left-0 right-0 h-16 backdrop-blur-xl bg-white/95 dark:bg-slate-900/95 border-b border-gray-200/50 dark:border-slate-700/50 z-50 shadow-sm transition-all duration-300">
-      <div className="flex items-center justify-between h-full px-6">
-        {/* Logo & Brand */}
-        <Link to={config.homePath} className="flex items-center space-x-3 group">
-          <div className={`w-10 h-10 bg-gradient-to-br ${config.gradient} rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <div>
-            <span className="text-xl font-bold">
-              <span className="bg-gradient-to-r from-emerald-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                Infiverse
+      <div className="flex items-center justify-between h-full px-4">
+        {/* Logo - Click to Toggle Sidebar */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleSidebar}
+            className="flex items-center space-x-3 group"
+            title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          >
+            <div className={`w-10 h-10 bg-gradient-to-br ${config.gradient} rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-all duration-300 ${isCollapsed ? 'rotate-180' : ''}`}>
+              {config.icon}
+            </div>
+            <div className="hidden sm:block text-left">
+              <span className="text-xl font-bold">
+                <span className="bg-gradient-to-r from-emerald-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                  Infiverse
+                </span>
+                <span className="text-gray-900 dark:text-white"> HR</span>
               </span>
-              <span className="text-gray-900 dark:text-white"> HR</span>
-            </span>
-            <p className={`text-xs bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent font-medium`}>
-              {config.title}
-            </p>
-          </div>
-        </Link>
+              <p className={`text-xs bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent font-medium`}>
+                {config.title}
+              </p>
+            </div>
+          </button>
+        </div>
         
         {/* Right Side Actions */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           {/* Search Bar */}
-          <div className="hidden md:flex items-center">
+          <div className="hidden lg:flex items-center">
             <div className="relative">
               <input
                 type="text"
@@ -99,32 +120,6 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
             </svg>
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
           </button>
-          
-          {/* User Menu */}
-          <div className="flex items-center space-x-3 pl-3 border-l border-gray-200 dark:border-slate-700">
-            <div className={`w-9 h-9 bg-gradient-to-br ${config.gradient} rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform duration-300 cursor-pointer`}>
-              <span className="text-white font-semibold text-sm">
-                {localStorage.getItem('user_name')?.charAt(0).toUpperCase() || role.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <div className="hidden sm:block">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                {localStorage.getItem('user_name') || role.charAt(0).toUpperCase() + role.slice(1)}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {localStorage.getItem('user_email') || `${role}@infiverse.hr`}
-              </p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200 text-gray-500 hover:text-red-600 dark:hover:text-red-400"
-              title="Logout"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
-          </div>
         </div>
       </div>
     </nav>

@@ -1,22 +1,100 @@
-import { BrowserRouter } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import AppRoutes from './routes'
-import Navbar from './components/Navbar'
-import Sidebar from './components/Sidebar'
+import SplashScreen from './components/SplashScreen'
+import RoleSelection from './pages/RoleSelection'
+import AuthPage from './pages/auth/AuthPage'
 import { ThemeProvider } from './context/ThemeContext'
 
+// Layouts
+import CandidateLayout from './components/layouts/CandidateLayout'
+import RecruiterLayout from './components/layouts/RecruiterLayout'
+import ClientLayout from './components/layouts/ClientLayout'
+
+// Candidate Pages
+import CandidateDashboard from './pages/candidate/Dashboard'
+import CandidateProfile from './pages/candidate/Profile'
+import AppliedJobs from './pages/candidate/AppliedJobs'
+import InterviewTaskPanel from './pages/candidate/InterviewTaskPanel'
+import CandidateFeedback from './pages/candidate/Feedback'
+
+// Recruiter Pages
+import RecruiterDashboard from './pages/recruiter/Dashboard'
+import JobCreation from './pages/recruiter/JobCreation'
+import ApplicantsMatching from './pages/recruiter/ApplicantsMatching'
+import FeedbackForm from './pages/recruiter/FeedbackForm'
+import AutomationPanel from './pages/recruiter/AutomationPanel'
+
+// Client Pages
+import ClientDashboard from './pages/client/Dashboard'
+import ShortlistReview from './pages/client/ShortlistReview'
+
 function App() {
+  const [showSplash, setShowSplash] = useState(true)
+
+  useEffect(() => {
+    // Check if splash has been shown in this session
+    const splashShown = sessionStorage.getItem('splashShown')
+    if (splashShown) {
+      setShowSplash(false)
+    }
+  }, [])
+
+  const handleSplashComplete = () => {
+    sessionStorage.setItem('splashShown', 'true')
+    setShowSplash(false)
+  }
+
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <div className="min-h-screen bg-gray-50 dark:bg-[#121212] text-gray-900 dark:text-gray-100 transition-colors duration-300">
-          <Navbar />
-          <div className="flex">
-            <Sidebar />
-            <main className="flex-1 ml-64 mt-16 p-8 animate-fade-in">
-              <AppRoutes />
-            </main>
-          </div>
+      {showSplash ? (
+        <SplashScreen onComplete={handleSplashComplete} />
+      ) : (
+        <BrowserRouter>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<RoleSelection />} />
+            <Route path="/auth/:role" element={<AuthPage />} />
+
+            {/* Candidate Routes with Layout */}
+            <Route path="/candidate" element={<CandidateLayout />}>
+              <Route index element={<Navigate to="/candidate/dashboard" replace />} />
+              <Route path="dashboard" element={<CandidateDashboard />} />
+              <Route path="profile" element={<CandidateProfile />} />
+              <Route path="jobs" element={<CandidateDashboard />} />
+              <Route path="applied-jobs" element={<AppliedJobs />} />
+              <Route path="interviews" element={<InterviewTaskPanel />} />
+              <Route path="feedback" element={<CandidateFeedback />} />
+            </Route>
+
+            {/* Recruiter Routes with Layout */}
+            <Route path="/recruiter" element={<RecruiterLayout />}>
+              <Route index element={<RecruiterDashboard />} />
+              <Route path="create-job" element={<JobCreation />} />
+              <Route path="jobs" element={<RecruiterDashboard />} />
+              <Route path="candidates" element={<RecruiterDashboard />} />
+              <Route path="screening" element={<RecruiterDashboard />} />
+              <Route path="applicants/:jobId" element={<ApplicantsMatching />} />
+              <Route path="feedback/:candidateId" element={<FeedbackForm />} />
+              <Route path="automation" element={<AutomationPanel />} />
+              <Route path="reports" element={<RecruiterDashboard />} />
+            </Route>
+
+            {/* Client Routes with Layout */}
+            <Route path="/client" element={<ClientLayout />}>
+              <Route index element={<ClientDashboard />} />
+              <Route path="jobs" element={<ClientDashboard />} />
+              <Route path="shortlisted" element={<ClientDashboard />} />
+              <Route path="shortlist/:jobId" element={<ShortlistReview />} />
+              <Route path="interviews" element={<ClientDashboard />} />
+              <Route path="hired" element={<ClientDashboard />} />
+              <Route path="analytics" element={<ClientDashboard />} />
+              <Route path="settings" element={<ClientDashboard />} />
+            </Route>
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
           <Toaster
             position="top-right"
             toastOptions={{
@@ -44,8 +122,8 @@ function App() {
               },
             }}
           />
-        </div>
-      </BrowserRouter>
+        </BrowserRouter>
+      )}
     </ThemeProvider>
   )
 }

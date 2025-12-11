@@ -1,0 +1,123 @@
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+
+export default function CandidateSidebar() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  
+  const navItems = [
+    {
+      title: 'Dashboard',
+      path: '/candidate/dashboard',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+      ),
+    },
+    {
+      title: 'My Profile',
+      path: '/candidate/profile',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+    },
+    {
+      title: 'Browse Jobs',
+      path: '/candidate/jobs',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      ),
+    },
+    {
+      title: 'Applied Jobs',
+      path: '/candidate/applied-jobs',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+      ),
+    },
+    {
+      title: 'Interviews',
+      path: '/candidate/interviews',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+    },
+    {
+      title: 'Feedback',
+      path: '/candidate/feedback',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+        </svg>
+      ),
+    },
+  ]
+
+  const isActive = (path: string) => location.pathname === path
+
+  const handleLogout = () => {
+    localStorage.removeItem('user_role')
+    localStorage.removeItem('user_email')
+    localStorage.removeItem('user_name')
+    localStorage.removeItem('isAuthenticated')
+    navigate('/')
+  }
+
+  return (
+    <aside className="fixed left-0 top-16 w-64 h-[calc(100vh-4rem)] bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 overflow-y-auto transition-all duration-300">
+      {/* User Info */}
+      <div className="p-6 border-b border-gray-200 dark:border-slate-800">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg">
+            {localStorage.getItem('user_name')?.charAt(0).toUpperCase() || 'C'}
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900 dark:text-white">
+              {localStorage.getItem('user_name') || 'Candidate'}
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Candidate</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="p-4 space-y-1">
+        {navItems.map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              isActive(item.path)
+                ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            {item.icon}
+            <span className="font-medium">{item.title}</span>
+          </Link>
+        ))}
+      </nav>
+
+      {/* Logout Button */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          <span className="font-medium">Logout</span>
+        </button>
+      </div>
+    </aside>
+  )
+}

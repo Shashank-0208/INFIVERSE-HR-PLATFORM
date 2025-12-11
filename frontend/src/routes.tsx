@@ -8,7 +8,6 @@ import FeedbackForm from './pages/recruiter/FeedbackForm'
 import AutomationPanel from './pages/recruiter/AutomationPanel'
 
 // Candidate Pages
-import CandidateLogin from './pages/candidate/Login'
 import CandidateProfile from './pages/candidate/Profile'
 import AppliedJobs from './pages/candidate/AppliedJobs'
 import InterviewTaskPanel from './pages/candidate/InterviewTaskPanel'
@@ -21,9 +20,6 @@ import ShortlistReview from './pages/client/ShortlistReview'
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Default Route */}
-      <Route path="/" element={<Navigate to="/recruiter" replace />} />
-
       {/* Recruiter Routes */}
       <Route path="/recruiter" element={<RecruiterDashboard />} />
       <Route path="/recruiter/create-job" element={<JobCreation />} />
@@ -32,7 +28,7 @@ export default function AppRoutes() {
       <Route path="/recruiter/automation" element={<AutomationPanel />} />
 
       {/* Candidate Routes */}
-      <Route path="/candidate" element={<CandidateLogin />} />
+      <Route path="/candidate" element={<Navigate to="/candidate/profile" replace />} />
       <Route path="/candidate/profile" element={<CandidateProfile />} />
       <Route path="/candidate/applied-jobs" element={<AppliedJobs />} />
       <Route path="/candidate/interviews" element={<InterviewTaskPanel />} />
@@ -42,8 +38,8 @@ export default function AppRoutes() {
       <Route path="/client" element={<ClientDashboard />} />
       <Route path="/client/shortlist/:jobId" element={<ShortlistReview />} />
 
-      {/* 404 */}
-      <Route path="*" element={<Navigate to="/recruiter" replace />} />
+      {/* 404 - Redirect to role selection */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

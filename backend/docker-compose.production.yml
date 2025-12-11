@@ -1,0 +1,229 @@
+# BHIV HR Platform - Docker Compose Configuration
+# Version: 3.1.0 with Phase 3 Features
+# Updated: November 4, 2025
+# Status: Production Ready (Local Development)
+#
+# This file is for LOCAL DEVELOPMENT only
+# Production deployment is on Render with 5/5 services operational:
+# - Gateway: bhiv-hr-gateway-ltg0.onrender.com (✅ 79 endpoints)
+# - Agent: bhiv-hr-agent-nhgg.onrender.com (✅ 6 endpoints)
+# - HR Portal: bhiv-hr-portal-u670.onrender.com (✅ Healthy)
+# - Client Portal: bhiv-hr-client-portal-3iod.onrender.com (✅ Healthy)
+# - Candidate Portal: bhiv-hr-candidate-portal-abe6.onrender.com (✅ Live)
+# - Database: PostgreSQL 17 on Render (✅ Connected)
+#
+# Local Environment: All 6 services operational with Docker fixes applied
+# Database Schema: v4.2.0 with Phase 3 learning engine (13 tables)
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: bhiv_hr
+      POSTGRES_USER: bhiv_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./services/db/consolidated_schema.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bhiv_user -d bhiv_hr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  gateway:
+    build: ./services/gateway
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      API_KEY_SECRET: ${API_KEY_SECRET}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      AGENT_SERVICE_URL: ${AGENT_SERVICE_URL}
+      LANGGRAPH_SERVICE_URL: ${LANGGRAPH_SERVICE_URL}
+      CANDIDATE_JWT_SECRET_KEY: ${CANDIDATE_JWT_SECRET_KEY}
+      GATEWAY_SECRET_KEY: ${GATEWAY_SECRET_KEY}
+      LOG_LEVEL: ${LOG_LEVEL}
+      OBSERVABILITY_ENABLED: ${OBSERVABILITY_ENABLED}
+      PYTHON_VERSION: ${PYTHON_VERSION}
+      ENVIRONMENT: ${ENVIRONMENT}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  agent:
+    build: ./services/agent
+    ports:
+      - "9000:9000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      API_KEY_SECRET: ${API_KEY_SECRET}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CANDIDATE_JWT_SECRET_KEY: ${CANDIDATE_JWT_SECRET_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL}
+      OBSERVABILITY_ENABLED: ${OBSERVABILITY_ENABLED}
+      PYTHON_VERSION: ${PYTHON_VERSION}
+      ENVIRONMENT: ${ENVIRONMENT}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  portal:
+    build: ./services/portal
+    ports:
+      - "8501:8501"
+    environment:
+      GATEWAY_SERVICE_URL: ${GATEWAY_SERVICE_URL}
+      AGENT_SERVICE_URL: ${AGENT_SERVICE_URL}
+      LANGGRAPH_SERVICE_URL: ${LANGGRAPH_SERVICE_URL}
+      API_KEY_SECRET: ${API_KEY_SECRET}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CANDIDATE_JWT_SECRET_KEY: ${CANDIDATE_JWT_SECRET_KEY}
+      LOG_LEVEL: ${LOG_LEVEL}
+      PYTHON_VERSION: ${PYTHON_VERSION}
+      ENVIRONMENT: ${ENVIRONMENT}
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 600s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  client_portal:
+    build: ./services/client_portal
+    ports:
+      - "8502:8502"
+    environment:
+      GATEWAY_SERVICE_URL: ${GATEWAY_SERVICE_URL}
+      AGENT_SERVICE_URL: ${AGENT_SERVICE_URL}
+      LANGGRAPH_SERVICE_URL: ${LANGGRAPH_SERVICE_URL}
+      API_KEY_SECRET: ${API_KEY_SECRET}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CANDIDATE_JWT_SECRET_KEY: ${CANDIDATE_JWT_SECRET_KEY}
+      DATABASE_URL: ${DATABASE_URL}
+      LOG_LEVEL: ${LOG_LEVEL}
+      PYTHON_VERSION: ${PYTHON_VERSION}
+      ENVIRONMENT: ${ENVIRONMENT}
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8502/_stcore/health')"]
+      interval: 600s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  candidate_portal:
+    build: ./services/candidate_portal
+    ports:
+      - "8503:8503"
+    environment:
+      GATEWAY_SERVICE_URL: ${GATEWAY_SERVICE_URL}
+      API_KEY_SECRET: ${API_KEY_SECRET}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CANDIDATE_JWT_SECRET_KEY: ${CANDIDATE_JWT_SECRET_KEY}
+      DATABASE_URL: ${DATABASE_URL}
+      LANGGRAPH_SERVICE_URL: ${LANGGRAPH_SERVICE_URL}
+      LOG_LEVEL: ${LOG_LEVEL}
+      ENVIRONMENT: ${ENVIRONMENT}
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8503/_stcore/health')"]
+      interval: 600s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  langgraph:
+    build: ./services/langgraph
+    ports:
+      - "9001:9001"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      API_KEY_SECRET: ${API_KEY_SECRET}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CANDIDATE_JWT_SECRET_KEY: ${CANDIDATE_JWT_SECRET_KEY}
+      GATEWAY_SERVICE_URL: ${GATEWAY_SERVICE_URL}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_WHATSAPP_NUMBER: ${TWILIO_WHATSAPP_NUMBER}
+      GMAIL_EMAIL: ${GMAIL_EMAIL}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL}
+      ENVIRONMENT: ${ENVIRONMENT}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9001/health')"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+volumes:
+  postgres_data:

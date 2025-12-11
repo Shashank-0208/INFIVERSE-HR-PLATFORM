@@ -1,0 +1,255 @@
+# BHIV HR Platform - Render Deployment Configuration
+# DOCUMENTATION ONLY - Not executable deployment automation
+# This file documents the current Render deployment setup for reference
+
+services:
+  # PostgreSQL Database
+  database:
+    name: bhiv-hr-database
+    type: postgres
+    plan: free
+    region: oregon
+    database: bhiv_hr
+    user: bhiv_user
+    version: 17
+    storage: 1GB
+    status: ✅ Active
+    internal_url: "[DATABASE_INTERNAL_URL]"
+
+  # API Gateway Service
+  gateway:
+    name: bhiv-hr-gateway
+    type: web_service
+    plan: free
+    region: oregon
+    repository: https://github.com/Shashank-0208/BHIV-HR-PLATFORM
+    branch: main
+    root_directory: services/gateway
+    build_command: pip install -r requirements.txt
+    start_command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    public_url: bhiv-hr-gateway-ltg0.onrender.com
+    docs_url: bhiv-hr-gateway-ltg0.onrender.com/docs
+    status: ✅ Active
+    environment_variables:
+      - DATABASE_URL: [DATABASE_URL]
+      - API_KEY_SECRET: [API_KEY_SECRET]
+      - JWT_SECRET_KEY: [JWT_SECRET_KEY]
+      - CANDIDATE_JWT_SECRET_KEY: [CANDIDATE_JWT_SECRET_KEY]
+      - AGENT_SERVICE_URL: https://bhiv-hr-agent-nhgg.onrender.com
+      - LANGGRAPH_SERVICE_URL: https://bhiv-hr-langgraph.onrender.com
+    endpoints: 80
+    features:
+      - API Gateway with FastAPI
+      - 80 REST endpoints
+      - Authentication & Security
+      - Granular rate limiting by endpoint
+      - 2FA implementation with QR codes
+      - Password management
+      - Advanced monitoring & metrics
+
+  # AI Matching Engine
+  agent:
+    name: bhiv-hr-agent
+    type: web_service
+    plan: free
+    region: oregon
+    repository: https://github.com/Shashank-0208/BHIV-HR-PLATFORM
+    branch: main
+    root_directory: services/agent
+    build_command: pip install -r requirements.txt
+    start_command: uvicorn app:app --host 0.0.0.0 --port $PORT
+    public_url: bhiv-hr-agent-nhgg.onrender.com
+    docs_url: bhiv-hr-agent-nhgg.onrender.com/docs
+    status: ✅ Active
+    environment_variables:
+      - DATABASE_URL: [DATABASE_URL]
+      - API_KEY_SECRET: [API_KEY_SECRET]
+    features:
+      - AI-powered candidate matching
+      - Dynamic scoring algorithms
+      - Real-time matching (<0.02s)
+      - Semantic analysis
+      - Bias mitigation
+
+  # HR Portal
+  portal:
+    name: bhiv-hr-portal
+    type: web_service
+    plan: free
+    region: oregon
+    repository: https://github.com/Shashank-0208/BHIV-HR-PLATFORM
+    branch: main
+    root_directory: services/portal
+    build_command: pip install -r requirements.txt
+    start_command: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    public_url: bhiv-hr-portal-u670.onrender.com
+    status: ✅ Active
+    environment_variables:
+      - GATEWAY_SERVICE_URL: https://bhiv-hr-gateway-ltg0.onrender.com
+      - API_KEY_SECRET: [API_KEY_SECRET]
+      - JWT_SECRET_KEY: [JWT_SECRET_KEY]
+      - CANDIDATE_JWT_SECRET_KEY: [CANDIDATE_JWT_SECRET_KEY]
+    features:
+      - HR dashboard interface
+      - Candidate management
+      - Job posting & management
+      - AI matching interface
+      - Values assessment tools
+      - Analytics & reporting
+
+  # Client Portal
+  client_portal:
+    name: bhiv-hr-client-portal
+    type: web_service
+    plan: free
+    region: oregon
+    repository: https://github.com/Shashank-0208/BHIV-HR-PLATFORM
+    branch: main
+    root_directory: services/client_portal
+    build_command: pip install -r requirements.txt
+    start_command: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    public_url: bhiv-hr-client-portal-3iod.onrender.com
+    status: ✅ Active
+    environment_variables:
+      - GATEWAY_SERVICE_URL: https://bhiv-hr-gateway-ltg0.onrender.com
+      - API_KEY_SECRET: [API_KEY_SECRET]
+      - JWT_SECRET_KEY: [JWT_SECRET_KEY]
+      - DATABASE_URL: [DATABASE_URL]
+    features:
+      - Client authentication system
+      - Job posting interface
+      - Candidate review & selection
+      - Match results visualization
+      - Enterprise analytics
+    authentication:
+      - Username: TECH001
+      - Password: demo123
+      - Additional clients: STARTUP01, ENTERPRISE01
+
+  # LangGraph Workflow Service
+  langgraph:
+    name: bhiv-hr-langgraph
+    type: web_service
+    plan: free
+    region: oregon
+    repository: https://github.com/Shashank-0208/BHIV-HR-PLATFORM
+    branch: main
+    root_directory: services/langgraph
+    build_command: pip install -r requirements.txt
+    start_command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    public_url: bhiv-hr-langgraph.onrender.com
+    docs_url: bhiv-hr-langgraph.onrender.com/docs
+    status: ✅ Active
+    environment_variables:
+      - DATABASE_URL: [DATABASE_URL]
+      - API_KEY_SECRET: [API_KEY_SECRET]
+      - JWT_SECRET_KEY: [JWT_SECRET_KEY]
+      - CANDIDATE_JWT_SECRET_KEY: [CANDIDATE_JWT_SECRET_KEY]
+      - TWILIO_ACCOUNT_SID: [TWILIO_ACCOUNT_SID]
+      - TWILIO_AUTH_TOKEN: [TWILIO_AUTH_TOKEN]
+      - TWILIO_WHATSAPP_NUMBER: [TWILIO_WHATSAPP_NUMBER]
+      - GMAIL_EMAIL: [GMAIL_EMAIL]
+      - GMAIL_APP_PASSWORD: [GMAIL_APP_PASSWORD]
+      - TELEGRAM_BOT_TOKEN: [TELEGRAM_BOT_TOKEN]
+      - TELEGRAM_BOT_USERNAME: [TELEGRAM_BOT_USERNAME]
+      - GEMINI_API_KEY: [GEMINI_API_KEY]
+      - GEMINI_MODEL: gemini-pro
+    endpoints: 25
+    features:
+      - AI workflow automation
+      - Multi-channel notifications (Email, WhatsApp, Telegram)
+      - Real-time status tracking
+      - Automated sequences
+      - Direct API integration
+
+  # Candidate Portal
+  candidate_portal:
+    name: bhiv-hr-candidate-portal
+    type: web_service
+    plan: free
+    region: oregon
+    repository: https://github.com/Shashank-0208/BHIV-HR-PLATFORM
+    branch: main
+    root_directory: services/candidate_portal
+    build_command: pip install -r requirements.txt
+    start_command: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    public_url: bhiv-hr-candidate-portal-abe6.onrender.com
+    status: ✅ Active
+    environment_variables:
+      - GATEWAY_SERVICE_URL: https://bhiv-hr-gateway-ltg0.onrender.com
+      - API_KEY_SECRET: [API_KEY_SECRET]
+      - JWT_SECRET_KEY: [JWT_SECRET_KEY]
+      - CANDIDATE_JWT_SECRET_KEY: [CANDIDATE_JWT_SECRET_KEY]
+      - DATABASE_URL: [DATABASE_URL]
+    features:
+      - Candidate registration & authentication
+      - Job search and application
+      - Application tracking
+      - Profile management
+      - Dashboard analytics
+
+# Deployment Information
+deployment_info:
+  platform: Render
+  region: Oregon (US West)
+  total_services: 6
+  total_endpoints: 111
+  deployment_date: "2025-12-09"
+  repository: https://github.com/Shashank-0208/BHIV-HR-PLATFORM
+  deployment_method: GitHub integration
+  auto_deploy: enabled
+  uptime: 99.9%
+  
+# Cost Information
+cost_breakdown:
+  database: $0/month (Free tier)
+  gateway: $0/month (Free tier)
+  agent: $0/month (Free tier)
+  langgraph: $0/month (Free tier)
+  portal: $0/month (Free tier)
+  client_portal: $0/month (Free tier)
+  candidate_portal: $0/month (Free tier)
+  total_monthly: $0/month
+  
+# Performance & Limitations
+performance:
+  cold_start_time: 30-60 seconds
+  sleep_after_inactivity: 15 minutes
+  monthly_hours_limit: 750 hours total
+  concurrent_requests: Limited on free tier
+  uptime_target: 99.9%
+  
+# Monitoring & Health
+monitoring:
+  health_endpoints:
+    - bhiv-hr-gateway-ltg0.onrender.com/health
+    - bhiv-hr-agent-nhgg.onrender.com/health
+    - bhiv-hr-langgraph.onrender.com/health
+  metrics_endpoint: bhiv-hr-gateway-ltg0.onrender.com/metrics
+  logs_access: Render dashboard
+  alerts: Basic (upgrade for advanced)
+
+# Security Features
+security:
+  https_enabled: true
+  api_authentication: Bearer token
+  rate_limiting: Granular limits by endpoint and user tier
+  input_validation: XSS/SQL injection protection
+  security_headers: CSP, XSS, Frame Options
+  2fa_implementation: TOTP with QR code generation
+  password_policies: Enterprise-grade
+  dynamic_rate_adjustment: Based on system load
+
+# Backup & Recovery
+backup:
+  database_backups: Automatic (Render managed)
+  code_backup: GitHub repository
+  configuration_backup: This file + environment variables
+  recovery_time: < 5 minutes (redeploy from GitHub)load
+
+# Backup & Recovery
+backup:
+  database_backups: Automatic (Render managed)
+  code_backup: GitHub repository
+  configuration_backup: This file + environment variables
+  recovery_time: < 5 minutes (redeploy from GitHub)

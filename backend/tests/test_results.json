@@ -1,0 +1,673 @@
+{
+  "timestamp": "2025-12-09T19:12:56.385644",
+  "total": 111,
+  "passed": 15,
+  "results": [
+    {
+      "name": "GW-Root",
+      "ok": true,
+      "time": "0.65s",
+      "code": 200
+    },
+    {
+      "name": "GW-Health",
+      "ok": true,
+      "time": "0.61s",
+      "code": 200
+    },
+    {
+      "name": "GW-OpenAPI",
+      "ok": true,
+      "time": "0.54s",
+      "code": 200
+    },
+    {
+      "name": "GW-Docs",
+      "ok": true,
+      "time": "0.60s",
+      "code": 200
+    },
+    {
+      "name": "GW-TestDB",
+      "ok": false,
+      "time": "0.53s",
+      "code": 401
+    },
+    {
+      "name": "GW-CreateJob",
+      "ok": false,
+      "time": "0.54s",
+      "code": 401
+    },
+    {
+      "name": "GW-ListJobs",
+      "ok": false,
+      "time": "0.55s",
+      "code": 401
+    },
+    {
+      "name": "GW-ListCandidates",
+      "ok": false,
+      "time": "0.60s",
+      "code": 401
+    },
+    {
+      "name": "GW-CandidateStats",
+      "ok": false,
+      "time": "0.61s",
+      "code": 401
+    },
+    {
+      "name": "GW-SearchCandidates",
+      "ok": false,
+      "time": "0.55s",
+      "code": 401
+    },
+    {
+      "name": "GW-CandidatesByJob",
+      "ok": false,
+      "time": "0.54s",
+      "code": 401
+    },
+    {
+      "name": "GW-CandidateByID",
+      "ok": false,
+      "time": "0.55s",
+      "code": 401
+    },
+    {
+      "name": "GW-BulkUpload",
+      "ok": false,
+      "time": "0.68s",
+      "code": 401
+    },
+    {
+      "name": "GW-Schema",
+      "ok": false,
+      "time": "1.20s",
+      "code": 404
+    },
+    {
+      "name": "GW-Export",
+      "ok": false,
+      "time": "0.60s",
+      "code": 404
+    },
+    {
+      "name": "GW-TopMatches",
+      "ok": false,
+      "time": "0.60s",
+      "code": 401
+    },
+    {
+      "name": "GW-BatchMatch",
+      "ok": false,
+      "time": "0.65s",
+      "code": 401
+    },
+    {
+      "name": "GW-SubmitFeedback",
+      "ok": false,
+      "time": "0.68s",
+      "code": 401
+    },
+    {
+      "name": "GW-GetFeedback",
+      "ok": false,
+      "time": "0.62s",
+      "code": 401
+    },
+    {
+      "name": "GW-ListInterviews",
+      "ok": false,
+      "time": "0.67s",
+      "code": 401
+    },
+    {
+      "name": "GW-ScheduleInterview",
+      "ok": false,
+      "time": "0.69s",
+      "code": 401
+    },
+    {
+      "name": "GW-CreateOffer",
+      "ok": false,
+      "time": "0.74s",
+      "code": 401
+    },
+    {
+      "name": "GW-ListOffers",
+      "ok": false,
+      "time": "1.41s",
+      "code": 401
+    },
+    {
+      "name": "GW-ClientRegister",
+      "ok": false,
+      "time": "1.75s",
+      "code": 422
+    },
+    {
+      "name": "GW-ClientLogin",
+      "ok": true,
+      "time": "3.27s",
+      "code": 200
+    },
+    {
+      "name": "GW-RateLimitStatus",
+      "ok": false,
+      "time": "0.66s",
+      "code": 401
+    },
+    {
+      "name": "GW-BlockedIPs",
+      "ok": false,
+      "time": "0.71s",
+      "code": 401
+    },
+    {
+      "name": "GW-TestInputValidation",
+      "ok": false,
+      "time": "0.70s",
+      "code": 401
+    },
+    {
+      "name": "GW-ValidateEmail",
+      "ok": false,
+      "time": "0.72s",
+      "code": 401
+    },
+    {
+      "name": "GW-ValidatePhone",
+      "ok": false,
+      "time": "0.58s",
+      "code": 401
+    },
+    {
+      "name": "GW-SecurityHeaders",
+      "ok": false,
+      "time": "0.59s",
+      "code": 403
+    },
+    {
+      "name": "GW-PentestEndpoints",
+      "ok": false,
+      "time": "0.69s",
+      "code": 401
+    },
+    {
+      "name": "GW-TestXSS",
+      "ok": false,
+      "time": "0.56s",
+      "code": 404
+    },
+    {
+      "name": "GW-TestSQLInjection",
+      "ok": false,
+      "time": "0.57s",
+      "code": 404
+    },
+    {
+      "name": "GW-TestCSRF",
+      "ok": false,
+      "time": "0.53s",
+      "code": 404
+    },
+    {
+      "name": "GW-SecurityAudit",
+      "ok": false,
+      "time": "0.61s",
+      "code": 404
+    },
+    {
+      "name": "GW-SecurityReport",
+      "ok": false,
+      "time": "0.57s",
+      "code": 404
+    },
+    {
+      "name": "GW-CSPReport",
+      "ok": false,
+      "time": "0.58s",
+      "code": 404
+    },
+    {
+      "name": "GW-CSPViolations",
+      "ok": false,
+      "time": "0.56s",
+      "code": 404
+    },
+    {
+      "name": "GW-CSPPolicies",
+      "ok": false,
+      "time": "0.55s",
+      "code": 404
+    },
+    {
+      "name": "GW-CSPTestPolicy",
+      "ok": false,
+      "time": "0.53s",
+      "code": 404
+    },
+    {
+      "name": "GW-2FASetup",
+      "ok": false,
+      "time": "0.54s",
+      "code": 401
+    },
+    {
+      "name": "GW-2FAVerify",
+      "ok": false,
+      "time": "0.54s",
+      "code": 401
+    },
+    {
+      "name": "GW-2FALogin",
+      "ok": false,
+      "time": "0.57s",
+      "code": 403
+    },
+    {
+      "name": "GW-2FAStatus",
+      "ok": false,
+      "time": "0.55s",
+      "code": 401
+    },
+    {
+      "name": "GW-2FADisable",
+      "ok": false,
+      "time": "0.54s",
+      "code": 401
+    },
+    {
+      "name": "GW-2FABackupCodes",
+      "ok": false,
+      "time": "0.55s",
+      "code": 404
+    },
+    {
+      "name": "GW-2FATestToken",
+      "ok": false,
+      "time": "0.55s",
+      "code": 401
+    },
+    {
+      "name": "GW-2FAQRCode",
+      "ok": false,
+      "time": "0.54s",
+      "code": 404
+    },
+    {
+      "name": "GW-ValidatePassword",
+      "ok": false,
+      "time": "0.54s",
+      "code": 404
+    },
+    {
+      "name": "GW-GeneratePassword",
+      "ok": false,
+      "time": "0.52s",
+      "code": 404
+    },
+    {
+      "name": "GW-PasswordPolicy",
+      "ok": false,
+      "time": "0.54s",
+      "code": 404
+    },
+    {
+      "name": "GW-ChangePassword",
+      "ok": false,
+      "time": "0.54s",
+      "code": 404
+    },
+    {
+      "name": "GW-PasswordStrength",
+      "ok": false,
+      "time": "0.60s",
+      "code": 404
+    },
+    {
+      "name": "GW-PasswordTips",
+      "ok": false,
+      "time": "0.55s",
+      "code": 404
+    },
+    {
+      "name": "GW-CandidateRegister",
+      "ok": false,
+      "time": "1.69s",
+      "code": 200
+    },
+    {
+      "name": "GW-CandidateLogin",
+      "ok": true,
+      "time": "2.61s",
+      "code": 200
+    },
+    {
+      "name": "GW-CandidateProfile",
+      "ok": false,
+      "time": "0.53s",
+      "code": 401
+    },
+    {
+      "name": "GW-CandidateApply",
+      "ok": false,
+      "time": "0.55s",
+      "code": 401
+    },
+    {
+      "name": "GW-CandidateApplications",
+      "ok": false,
+      "time": "0.53s",
+      "code": 401
+    },
+    {
+      "name": "GW-AuthSetup2FA",
+      "ok": false,
+      "time": "0.52s",
+      "code": 401
+    },
+    {
+      "name": "GW-AuthVerify2FA",
+      "ok": false,
+      "time": "0.54s",
+      "code": 401
+    },
+    {
+      "name": "GW-AuthLogin",
+      "ok": false,
+      "time": "0.56s",
+      "code": 401
+    },
+    {
+      "name": "GW-Auth2FAStatus",
+      "ok": false,
+      "time": "0.59s",
+      "code": 401
+    },
+    {
+      "name": "GW-TestAICommunication",
+      "ok": false,
+      "time": "0.57s",
+      "code": 404
+    },
+    {
+      "name": "GW-GeminiAnalyze",
+      "ok": false,
+      "time": "0.53s",
+      "code": 404
+    },
+    {
+      "name": "GW-TriggerWorkflow",
+      "ok": false,
+      "time": "0.54s",
+      "code": 422
+    },
+    {
+      "name": "GW-WorkflowStatus",
+      "ok": false,
+      "time": "ERR",
+      "code": 0
+    },
+    {
+      "name": "GW-ListWorkflows",
+      "ok": false,
+      "time": "0.57s",
+      "code": 404
+    },
+    {
+      "name": "GW-WorkflowStats",
+      "ok": false,
+      "time": "0.62s",
+      "code": 404
+    },
+    {
+      "name": "GW-ResumeWorkflow",
+      "ok": false,
+      "time": "0.63s",
+      "code": 404
+    },
+    {
+      "name": "GW-CancelWorkflow",
+      "ok": false,
+      "time": "0.57s",
+      "code": 404
+    },
+    {
+      "name": "GW-WorkflowHistory",
+      "ok": false,
+      "time": "0.57s",
+      "code": 404
+    },
+    {
+      "name": "GW-RLPredict",
+      "ok": false,
+      "time": "0.58s",
+      "code": 404
+    },
+    {
+      "name": "GW-RLFeedback",
+      "ok": false,
+      "time": "0.55s",
+      "code": 404
+    },
+    {
+      "name": "GW-RLAnalytics",
+      "ok": false,
+      "time": "0.56s",
+      "code": 404
+    },
+    {
+      "name": "GW-RLPerformance",
+      "ok": false,
+      "time": "0.57s",
+      "code": 404
+    },
+    {
+      "name": "GW-Metrics",
+      "ok": true,
+      "time": "0.58s",
+      "code": 200
+    },
+    {
+      "name": "GW-MetricsDashboard",
+      "ok": true,
+      "time": "1.57s",
+      "code": 200
+    },
+    {
+      "name": "GW-HealthDetailed",
+      "ok": true,
+      "time": "1.55s",
+      "code": 200
+    },
+    {
+      "name": "AG-Root",
+      "ok": true,
+      "time": "1.08s",
+      "code": 200
+    },
+    {
+      "name": "AG-Health",
+      "ok": true,
+      "time": "1.12s",
+      "code": 200
+    },
+    {
+      "name": "AG-TestDB",
+      "ok": false,
+      "time": "0.59s",
+      "code": 403
+    },
+    {
+      "name": "AG-Match",
+      "ok": false,
+      "time": "1.11s",
+      "code": 403
+    },
+    {
+      "name": "AG-BatchMatch",
+      "ok": false,
+      "time": "0.57s",
+      "code": 403
+    },
+    {
+      "name": "AG-Analyze",
+      "ok": false,
+      "time": "1.08s",
+      "code": 403
+    },
+    {
+      "name": "LG-Root",
+      "ok": false,
+      "time": "ERR",
+      "code": 0
+    },
+    {
+      "name": "LG-Health",
+      "ok": false,
+      "time": "ERR",
+      "code": 0
+    },
+    {
+      "name": "LG-StartWorkflow",
+      "ok": false,
+      "time": "ERR",
+      "code": 0
+    },
+    {
+      "name": "LG-ResumeWorkflow",
+      "ok": false,
+      "time": "ERR",
+      "code": 0
+    },
+    {
+      "name": "LG-WorkflowStatus",
+      "ok": false,
+      "time": "ERR",
+      "code": 0
+    },
+    {
+      "name": "LG-ListWorkflows",
+      "ok": false,
+      "time": "9.54s",
+      "code": 401
+    },
+    {
+      "name": "LG-WorkflowStats",
+      "ok": false,
+      "time": "0.70s",
+      "code": 401
+    },
+    {
+      "name": "LG-SendNotification",
+      "ok": false,
+      "time": "1.18s",
+      "code": 401
+    },
+    {
+      "name": "LG-TestEmail",
+      "ok": false,
+      "time": "0.64s",
+      "code": 401
+    },
+    {
+      "name": "LG-TestWhatsApp",
+      "ok": false,
+      "time": "0.62s",
+      "code": 401
+    },
+    {
+      "name": "LG-TestTelegram",
+      "ok": false,
+      "time": "0.57s",
+      "code": 401
+    },
+    {
+      "name": "LG-TestWhatsAppButtons",
+      "ok": false,
+      "time": "0.64s",
+      "code": 401
+    },
+    {
+      "name": "LG-TestAutomatedSequence",
+      "ok": false,
+      "time": "0.68s",
+      "code": 401
+    },
+    {
+      "name": "LG-TriggerWorkflow",
+      "ok": false,
+      "time": "0.72s",
+      "code": 401
+    },
+    {
+      "name": "LG-BulkNotifications",
+      "ok": false,
+      "time": "1.20s",
+      "code": 401
+    },
+    {
+      "name": "LG-WhatsAppWebhook",
+      "ok": false,
+      "time": "0.69s",
+      "code": 401
+    },
+    {
+      "name": "LG-RLPredict",
+      "ok": false,
+      "time": "0.85s",
+      "code": 422
+    },
+    {
+      "name": "LG-RLFeedback",
+      "ok": false,
+      "time": "1.12s",
+      "code": 422
+    },
+    {
+      "name": "LG-RLAnalytics",
+      "ok": true,
+      "time": "1.06s",
+      "code": 200
+    },
+    {
+      "name": "LG-RLPerformanceByVersion",
+      "ok": true,
+      "time": "0.98s",
+      "code": 200
+    },
+    {
+      "name": "LG-RLHistory",
+      "ok": true,
+      "time": "0.94s",
+      "code": 200
+    },
+    {
+      "name": "LG-RLRetrain",
+      "ok": true,
+      "time": "0.94s",
+      "code": 200
+    },
+    {
+      "name": "LG-RLPerformance",
+      "ok": false,
+      "time": "0.83s",
+      "code": 401
+    },
+    {
+      "name": "LG-RLStartMonitoring",
+      "ok": false,
+      "time": "0.65s",
+      "code": 401
+    },
+    {
+      "name": "LG-TestIntegration",
+      "ok": false,
+      "time": "0.53s",
+      "code": 401
+    }
+  ]
+}

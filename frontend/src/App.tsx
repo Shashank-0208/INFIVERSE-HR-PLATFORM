@@ -15,6 +15,7 @@ import ClientLayout from './components/layouts/ClientLayout'
 // Candidate Pages
 import CandidateDashboard from './pages/candidate/Dashboard'
 import CandidateProfile from './pages/candidate/Profile'
+import JobSearch from './pages/candidate/JobSearch'
 import AppliedJobs from './pages/candidate/AppliedJobs'
 import InterviewTaskPanel from './pages/candidate/InterviewTaskPanel'
 import CandidateFeedback from './pages/candidate/Feedback'
@@ -63,7 +64,7 @@ function App() {
                 <Route index element={<Navigate to="/candidate/dashboard" replace />} />
                 <Route path="dashboard" element={<CandidateDashboard />} />
                 <Route path="profile" element={<CandidateProfile />} />
-                <Route path="jobs" element={<CandidateDashboard />} />
+                <Route path="jobs" element={<JobSearch />} />
                 <Route path="applied-jobs" element={<AppliedJobs />} />
                 <Route path="interviews" element={<InterviewTaskPanel />} />
                 <Route path="feedback" element={<CandidateFeedback />} />

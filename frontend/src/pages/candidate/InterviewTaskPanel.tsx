@@ -1,21 +1,32 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { getInterviews, getTasks, markTaskSubmitted } from '../../services/api'
-import Loading from '../../components/Loading'
+import { getInterviews, getTasks, submitTask, type Interview, type Task } from '../../services/api'
+
+type TabType = 'interviews' | 'tasks'
 
 export default function InterviewTaskPanel() {
-  const [interviews, setInterviews] = useState<any[]>([])
-  const [tasks, setTasks] = useState<any[]>([])
+  const [interviews, setInterviews] = useState<Interview[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<TabType>('interviews')
+  const [submitting, setSubmitting] = useState<string | null>(null)
+  const [submitModal, setSubmitModal] = useState<{ task: Task; url: string } | null>(null)
+
+  const candidateId = localStorage.getItem('candidate_id') || ''
 
   useEffect(() => {
     loadData()
   }, [])
 
   const loadData = async () => {
+    if (!candidateId) {
+      toast.error('Please login to view interviews and tasks')
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
-      const candidateId = localStorage.getItem('candidate_id') || 'demo-candidate'
       const [interviewsData, tasksData] = await Promise.all([
         getInterviews(candidateId),
         getTasks(candidateId)
@@ -24,191 +35,414 @@ export default function InterviewTaskPanel() {
       setTasks(tasksData)
     } catch (error) {
       console.error('Failed to load data:', error)
+      toast.error('Failed to load data')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleMarkSubmitted = async (taskId: string) => {
+  const handleSubmitTask = async () => {
+    if (!submitModal) return
+
+    setSubmitting(submitModal.task.id)
     try {
-      await markTaskSubmitted(taskId)
-      toast.success('Task marked as submitted!')
+      await submitTask(submitModal.task.id, submitModal.url)
+      toast.success('Task submitted successfully!')
+      setSubmitModal(null)
       loadData()
     } catch (error) {
-      toast.error('Failed to update task status')
+      toast.error('Failed to submit task')
+    } finally {
+      setSubmitting(null)
     }
   }
 
-  const formatDateTime = (date: string, time: string) => {
-    const dateObj = new Date(date)
-    return `${dateObj.toLocaleDateString('en-US', { 
+  const getInterviewStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      scheduled: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      completed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+      cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+      rescheduled: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    }
+    return colors[status] || colors.scheduled
+  }
+
+  const getTaskStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+      in_progress: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      submitted: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+      reviewed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+    }
+    return colors[status] || colors.pending
+  }
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('en-US', { 
       weekday: 'short', 
       month: 'short', 
-      day: 'numeric' 
-    })} at ${time}`
+      day: 'numeric',
+      year: 'numeric'
+    })
   }
 
-  if (loading) {
-    return <Loading message="Loading interviews and tasks..." />
+  const isUpcoming = (dateStr: string) => {
+    return new Date(dateStr) > new Date()
   }
+
+  const upcomingInterviews = interviews.filter(i => i.status === 'scheduled' && isUpcoming(i.scheduled_date))
+  const pastInterviews = interviews.filter(i => i.status !== 'scheduled' || !isUpcoming(i.scheduled_date))
+  const pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'in_progress')
+  const completedTasks = tasks.filter(t => t.status === 'submitted' || t.status === 'reviewed')
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Interviews & Tasks</h1>
-        <p className="text-gray-400">Manage your upcoming interviews and assigned tasks</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-8 text-white">
+        <h1 className="text-3xl font-bold mb-2">Interviews & Tasks 📅</h1>
+        <p className="text-indigo-100 text-lg">Manage your interviews and complete assigned tasks</p>
       </div>
 
-      {/* Upcoming Interviews */}
-      <div className="card mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">Upcoming Interviews</h2>
-          <span className="px-3 py-1 bg-blue-900 text-blue-300 rounded-full text-sm font-medium">
-            {interviews.length} Scheduled
-          </span>
-        </div>
-
-        {interviews.length === 0 ? (
-          <div className="text-center py-8">
-            <svg
-              className="w-16 h-16 mx-auto text-gray-600 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-            <p className="text-gray-400">No upcoming interviews</p>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-slate-700">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <span className="text-lg">📅</span>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{upcomingInterviews.length}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Upcoming Interviews</p>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {interviews.map((interview) => (
-              <div
-                key={interview.id}
-                className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-800 rounded-lg p-6"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-white mb-1">{interview.jobTitle}</h3>
-                    <p className="text-gray-400">{interview.company}</p>
-                  </div>
-                  <span className="px-3 py-1 bg-green-900 text-green-300 rounded-full text-xs font-medium">
-                    {interview.status}
-                  </span>
-                </div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-slate-700">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              <span className="text-lg">✅</span>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{pastInterviews.length}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Completed</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-slate-700">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <span className="text-lg">📝</span>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{pendingTasks.length}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Pending Tasks</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-slate-700">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+              <span className="text-lg">🎯</span>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{completedTasks.length}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Tasks Submitted</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="flex items-center space-x-3">
-                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-gray-300">
-                      {formatDateTime(interview.date, interview.time)}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-gray-300">Video Interview</span>
-                  </div>
-                </div>
+      {/* Tab Navigation */}
+      <div className="bg-white dark:bg-slate-800 rounded-xl p-2 shadow-sm border border-gray-100 dark:border-slate-700">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('interviews')}
+            className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
+              activeTab === 'interviews'
+                ? 'bg-blue-500 text-white'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700'
+            }`}
+          >
+            📅 Interviews ({interviews.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('tasks')}
+            className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
+              activeTab === 'tasks'
+                ? 'bg-blue-500 text-white'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700'
+            }`}
+          >
+            📝 Tasks ({tasks.length})
+          </button>
+        </div>
+      </div>
 
-                <a
-                  href={interview.meetingLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                  <span>Join Meeting</span>
-                </a>
+      {/* Content */}
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white dark:bg-slate-800 rounded-xl p-6 animate-pulse">
+              <div className="h-5 bg-gray-200 dark:bg-slate-700 rounded w-1/3 mb-3"></div>
+              <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-1/2"></div>
+            </div>
+          ))}
+        </div>
+      ) : activeTab === 'interviews' ? (
+        /* Interviews Tab */
+        <div className="space-y-6">
+          {/* Upcoming Interviews */}
+          {upcomingInterviews.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Upcoming Interviews</h3>
+              <div className="space-y-4">
+                {upcomingInterviews.map(interview => (
+                  <div
+                    key={interview.id}
+                    className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl p-6 border border-blue-100 dark:border-blue-800"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h4 className="text-xl font-bold text-gray-900 dark:text-white">{interview.job_title}</h4>
+                        <p className="text-gray-600 dark:text-gray-400">{interview.company || 'Company'}</p>
+                        <div className="flex flex-wrap items-center gap-4 mt-3 text-sm">
+                          <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            {formatDate(interview.scheduled_date)}
+                          </span>
+                          {interview.scheduled_time && (
+                            <span className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {interview.scheduled_time}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            {interview.interview_type || 'Video Call'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getInterviewStatusColor(interview.status)}`}>
+                          {interview.status.charAt(0).toUpperCase() + interview.status.slice(1)}
+                        </span>
+                        {interview.meeting_link && (
+                          <a
+                            href={interview.meeting_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            Join Meeting
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    {interview.notes && (
+                      <div className="mt-4 pt-4 border-t border-blue-100 dark:border-blue-800">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          <span className="font-medium">Notes:</span> {interview.notes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
 
-      {/* Assigned Tasks */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">Assigned Tasks</h2>
-          <span className="px-3 py-1 bg-yellow-900 text-yellow-300 rounded-full text-sm font-medium">
-            {tasks.filter(t => t.status === 'pending').length} Pending
-          </span>
+          {/* Past Interviews */}
+          {pastInterviews.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Past Interviews</h3>
+              <div className="space-y-4">
+                {pastInterviews.map(interview => (
+                  <div
+                    key={interview.id}
+                    className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-slate-700"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-gray-900 dark:text-white">{interview.job_title}</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{interview.company || 'Company'}</p>
+                        <p className="text-sm text-gray-400 mt-1">{formatDate(interview.scheduled_date)}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getInterviewStatusColor(interview.status)}`}>
+                        {interview.status.charAt(0).toUpperCase() + interview.status.slice(1)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {interviews.length === 0 && (
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-12 text-center shadow-sm border border-gray-100 dark:border-slate-700">
+              <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No interviews scheduled</h3>
+              <p className="text-gray-500 dark:text-gray-400">Your scheduled interviews will appear here</p>
+            </div>
+          )}
         </div>
-
-        {tasks.length === 0 ? (
-          <div className="text-center py-8">
-            <svg
-              className="w-16 h-16 mx-auto text-gray-600 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
-            <p className="text-gray-400">No tasks assigned</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {tasks.map((task) => (
-              <div
-                key={task.id}
-                className="bg-gray-700 border border-gray-600 rounded-lg p-6"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-white mb-1">{task.taskTitle}</h3>
-                    <p className="text-gray-400 text-sm">{task.jobTitle}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    task.status === 'pending' 
-                      ? 'bg-yellow-900 text-yellow-300' 
-                      : 'bg-green-900 text-green-300'
-                  }`}>
-                    {task.status}
-                  </span>
-                </div>
-
-                <p className="text-gray-300 mb-4">{task.description}</p>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3 text-sm">
-                    <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-gray-400">
-                      Deadline: {new Date(task.deadline).toLocaleDateString()}
-                    </span>
-                  </div>
-
-                  {task.status === 'pending' && (
-                    <button
-                      onClick={() => handleMarkSubmitted(task.id)}
-                      className="btn-success"
+      ) : (
+        /* Tasks Tab */
+        <div className="space-y-6">
+          {/* Pending Tasks */}
+          {pendingTasks.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Pending Tasks</h3>
+              <div className="space-y-4">
+                {pendingTasks.map(task => {
+                  const isOverdue = new Date(task.deadline) < new Date()
+                  return (
+                    <div
+                      key={task.id}
+                      className={`bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border ${
+                        isOverdue ? 'border-red-200 dark:border-red-800' : 'border-gray-100 dark:border-slate-700'
+                      }`}
                     >
-                      Mark as Submitted
-                    </button>
-                  )}
-                </div>
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-start gap-3">
+                            <span className="text-2xl">📝</span>
+                            <div>
+                              <h4 className="text-lg font-bold text-gray-900 dark:text-white">{task.title}</h4>
+                              <p className="text-gray-600 dark:text-gray-400 text-sm">{task.job_title || 'Assignment'}</p>
+                            </div>
+                          </div>
+                          <p className="text-gray-600 dark:text-gray-400 mt-3">{task.description}</p>
+                          <div className="flex items-center gap-4 mt-4 text-sm">
+                            <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-600' : 'text-amber-600 dark:text-amber-400'}`}>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {isOverdue ? 'Overdue: ' : 'Deadline: '}{formatDate(task.deadline)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getTaskStatusColor(task.status)}`}>
+                            {task.status.replace('_', ' ').charAt(0).toUpperCase() + task.status.replace('_', ' ').slice(1)}
+                          </span>
+                          <button
+                            onClick={() => setSubmitModal({ task, url: '' })}
+                            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg transition-colors"
+                          >
+                            Submit Task
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Completed Tasks */}
+          {completedTasks.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Completed Tasks</h3>
+              <div className="space-y-4">
+                {completedTasks.map(task => (
+                  <div
+                    key={task.id}
+                    className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-slate-700"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">✅</span>
+                        <div>
+                          <h4 className="font-semibold text-gray-900 dark:text-white">{task.title}</h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">{task.job_title || 'Assignment'}</p>
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${getTaskStatusColor(task.status)}`}>
+                        {task.status.replace('_', ' ').charAt(0).toUpperCase() + task.status.replace('_', ' ').slice(1)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {tasks.length === 0 && (
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-12 text-center shadow-sm border border-gray-100 dark:border-slate-700">
+              <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No tasks assigned</h3>
+              <p className="text-gray-500 dark:text-gray-400">Your assigned tasks will appear here</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Submit Task Modal */}
+      {submitModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-100 dark:border-slate-700">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Submit Task</h2>
+                  <p className="text-gray-600 dark:text-gray-400">{submitModal.task.title}</p>
+                </div>
+                <button
+                  onClick={() => setSubmitModal(null)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Submission URL (GitHub, Drive, etc.)
+              </label>
+              <input
+                type="url"
+                value={submitModal.url}
+                onChange={(e) => setSubmitModal({ ...submitModal, url: e.target.value })}
+                placeholder="https://github.com/your-repo"
+                className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div className="p-6 border-t border-gray-100 dark:border-slate-700 flex gap-3">
+              <button
+                onClick={() => setSubmitModal(null)}
+                className="flex-1 py-3 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitTask}
+                disabled={!submitModal.url || submitting === submitModal.task.id}
+                className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-lg transition-colors"
+              >
+                {submitting === submitModal.task.id ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

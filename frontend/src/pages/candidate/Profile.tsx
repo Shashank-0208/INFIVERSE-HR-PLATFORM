@@ -93,13 +93,14 @@ export default function CandidateProfile() {
   }
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">My Profile</h1>
-        <p className="text-gray-400">Update your professional information</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-8 text-white">
+        <h1 className="text-3xl font-bold mb-2">My Profile 👤</h1>
+        <p className="text-blue-100 text-lg">Update your professional information and stand out to employers</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="card max-w-4xl">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormInput
             label="Full Name"

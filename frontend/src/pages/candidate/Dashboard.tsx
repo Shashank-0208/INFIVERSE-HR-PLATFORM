@@ -1,38 +1,115 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
+import { 
+  getCandidateDashboardStats, 
+  getCandidateApplications, 
+  getInterviews,
+  type DashboardStats,
+  type Application,
+  type Interview 
+} from '../../services/api'
 
 export default function CandidateDashboard() {
   const navigate = useNavigate()
   const userName = localStorage.getItem('user_name') || 'Candidate'
+  const candidateId = localStorage.getItem('candidate_id') || ''
 
-  const stats = [
-    { label: 'Applied Jobs', value: '12', icon: '📝', color: 'from-blue-500 to-cyan-500' },
-    { label: 'Interviews Scheduled', value: '3', icon: '📅', color: 'from-emerald-500 to-teal-500' },
-    { label: 'Profile Views', value: '48', icon: '👁️', color: 'from-purple-500 to-pink-500' },
-    { label: 'Shortlisted', value: '5', icon: '⭐', color: 'from-amber-500 to-orange-500' },
+  const [stats, setStats] = useState<DashboardStats>({
+    total_applications: 0,
+    interviews_scheduled: 0,
+    profile_views: 0,
+    shortlisted: 0,
+    offers_received: 0
+  })
+  const [recentApplications, setRecentApplications] = useState<Application[]>([])
+  const [upcomingInterviews, setUpcomingInterviews] = useState<Interview[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  const loadDashboardData = async () => {
+    if (!candidateId) {
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+      const [statsData, applicationsData, interviewsData] = await Promise.all([
+        getCandidateDashboardStats(candidateId),
+        getCandidateApplications(candidateId),
+        getInterviews(candidateId)
+      ])
+      
+      setStats(statsData)
+      setRecentApplications(applicationsData.slice(0, 3))
+      setUpcomingInterviews(interviewsData.filter(i => i.status === 'scheduled').slice(0, 2))
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error)
+      toast.error('Failed to load dashboard data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const statCards = [
+    { label: 'Applied Jobs', value: stats.total_applications, icon: '📝', color: 'from-blue-500 to-cyan-500' },
+    { label: 'Interviews', value: stats.interviews_scheduled, icon: '📅', color: 'from-emerald-500 to-teal-500' },
+    { label: 'Shortlisted', value: stats.shortlisted, icon: '⭐', color: 'from-amber-500 to-orange-500' },
+    { label: 'Offers', value: stats.offers_received, icon: '🎉', color: 'from-purple-500 to-pink-500' },
   ]
 
-  const recentApplications = [
-    { id: 1, company: 'Tech Corp', position: 'Senior Developer', status: 'Under Review', date: '2024-12-10' },
-    { id: 2, company: 'StartupXYZ', position: 'Full Stack Engineer', status: 'Interview Scheduled', date: '2024-12-09' },
-    { id: 3, company: 'BigTech Inc', position: 'Software Architect', status: 'Shortlisted', date: '2024-12-08' },
-  ]
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      applied: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      screening: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+      shortlisted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+      interview: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+      offer: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+      rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    }
+    return colors[status.toLowerCase()] || colors.applied
+  }
 
-  const upcomingInterviews = [
-    { id: 1, company: 'StartupXYZ', position: 'Full Stack Engineer', date: '2024-12-15', time: '10:00 AM' },
-    { id: 2, company: 'Innovation Labs', position: 'Backend Developer', date: '2024-12-18', time: '2:00 PM' },
-  ]
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric' 
+    })
+  }
 
   return (
     <div className="space-y-8">
       {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-8 text-white">
-        <h1 className="text-3xl font-bold mb-2">Welcome back, {userName}! 👋</h1>
-        <p className="text-blue-100 text-lg">Track your job applications and upcoming interviews</p>
+      <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-8 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+        <div className="relative">
+          <h1 className="text-3xl font-bold mb-2">Welcome back, {userName}! 👋</h1>
+          <p className="text-blue-100 text-lg">Track your job applications and upcoming interviews</p>
+          <div className="mt-6 flex gap-4">
+            <button 
+              onClick={() => navigate('/candidate/jobs')}
+              className="px-6 py-2.5 bg-white text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition-colors"
+            >
+              Browse Jobs
+            </button>
+            <button 
+              onClick={() => navigate('/candidate/profile')}
+              className="px-6 py-2.5 bg-blue-400/30 text-white font-semibold rounded-lg hover:bg-blue-400/40 transition-colors border border-white/30"
+            >
+              Update Profile
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        {statCards.map((stat) => (
           <div
             key={stat.label}
             className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-lg transition-all duration-300"
@@ -41,7 +118,11 @@ export default function CandidateDashboard() {
               <span className="text-3xl">{stat.icon}</span>
               <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} opacity-20`} />
             </div>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
+            {loading ? (
+              <div className="h-8 bg-gray-200 dark:bg-slate-700 rounded animate-pulse w-16"></div>
+            ) : (
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
+            )}
             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{stat.label}</p>
           </div>
         ))}
@@ -60,33 +141,50 @@ export default function CandidateDashboard() {
               View All →
             </button>
           </div>
-          <div className="space-y-4">
-            {recentApplications.map((app) => (
-              <div
-                key={app.id}
-                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl animate-pulse">
+                  <div className="h-4 bg-gray-200 dark:bg-slate-600 rounded w-2/3 mb-2"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-slate-600 rounded w-1/3"></div>
+                </div>
+              ))}
+            </div>
+          ) : recentApplications.length === 0 ? (
+            <div className="text-center py-8">
+              <svg className="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-gray-500 dark:text-gray-400">No applications yet</p>
+              <button
+                onClick={() => navigate('/candidate/jobs')}
+                className="mt-3 text-blue-500 hover:text-blue-600 font-medium text-sm"
               >
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">{app.position}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{app.company}</p>
+                Start applying →
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {recentApplications.map((app) => (
+                <div
+                  key={app.id}
+                  onClick={() => navigate('/candidate/applied-jobs')}
+                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                >
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-white">{app.job_title}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{app.company || 'Company'}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(app.status)}`}>
+                      {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                    </span>
+                    <p className="text-xs text-gray-400 mt-1">{formatDate(app.applied_date)}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                      app.status === 'Shortlisted'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                        : app.status === 'Interview Scheduled'
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                    }`}
-                  >
-                    {app.status}
-                  </span>
-                  <p className="text-xs text-gray-400 mt-1">{app.date}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Upcoming Interviews */}
@@ -100,33 +198,66 @@ export default function CandidateDashboard() {
               View All →
             </button>
           </div>
-          <div className="space-y-4">
-            {upcomingInterviews.map((interview) => (
-              <div
-                key={interview.id}
-                className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl border border-blue-100 dark:border-blue-800"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">{interview.position}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{interview.company}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-blue-600 dark:text-blue-400">{interview.date}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{interview.time}</p>
-                  </div>
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2].map(i => (
+                <div key={i} className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl animate-pulse">
+                  <div className="h-4 bg-blue-100 dark:bg-blue-800 rounded w-2/3 mb-2"></div>
+                  <div className="h-3 bg-blue-100 dark:bg-blue-800 rounded w-1/3"></div>
                 </div>
-                <div className="mt-4 flex gap-2">
-                  <button className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors">
-                    Join Meeting
-                  </button>
-                  <button className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors">
-                    Reschedule
-                  </button>
+              ))}
+            </div>
+          ) : upcomingInterviews.length === 0 ? (
+            <div className="text-center py-8">
+              <svg className="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className="text-gray-500 dark:text-gray-400">No upcoming interviews</p>
+              <p className="text-xs text-gray-400 mt-1">Keep applying to get interviews!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {upcomingInterviews.map((interview) => (
+                <div
+                  key={interview.id}
+                  className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl border border-blue-100 dark:border-blue-800"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-900 dark:text-white">{interview.job_title}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{interview.company || 'Company'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-blue-600 dark:text-blue-400">
+                        {formatDate(interview.scheduled_date)}
+                      </p>
+                      {interview.scheduled_time && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{interview.scheduled_time}</p>
+                      )}
+                    </div>
+                  </div>
+                  {interview.meeting_link && (
+                    <div className="mt-4 flex gap-2">
+                      <a
+                        href={interview.meeting_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors text-center"
+                      >
+                        Join Meeting
+                      </a>
+                      <button 
+                        onClick={() => navigate('/candidate/interviews')}
+                        className="px-4 py-2 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors border border-gray-200 dark:border-slate-600"
+                      >
+                        Details
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -136,30 +267,30 @@ export default function CandidateDashboard() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <button
             onClick={() => navigate('/candidate/profile')}
-            className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-center"
+            className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-700/50 dark:to-slate-700 rounded-xl hover:shadow-md transition-all text-center group"
           >
-            <span className="text-2xl mb-2 block">📝</span>
+            <span className="text-2xl mb-2 block group-hover:scale-110 transition-transform">📝</span>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Update Profile</span>
           </button>
           <button
             onClick={() => navigate('/candidate/jobs')}
-            className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-center"
+            className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl hover:shadow-md transition-all text-center group"
           >
-            <span className="text-2xl mb-2 block">🔍</span>
+            <span className="text-2xl mb-2 block group-hover:scale-110 transition-transform">🔍</span>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Browse Jobs</span>
           </button>
           <button
             onClick={() => navigate('/candidate/applied-jobs')}
-            className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-center"
+            className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl hover:shadow-md transition-all text-center group"
           >
-            <span className="text-2xl mb-2 block">📋</span>
+            <span className="text-2xl mb-2 block group-hover:scale-110 transition-transform">📋</span>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Track Applications</span>
           </button>
           <button
             onClick={() => navigate('/candidate/feedback')}
-            className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-center"
+            className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl hover:shadow-md transition-all text-center group"
           >
-            <span className="text-2xl mb-2 block">💬</span>
+            <span className="text-2xl mb-2 block group-hover:scale-110 transition-transform">💬</span>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">View Feedback</span>
           </button>
         </div>

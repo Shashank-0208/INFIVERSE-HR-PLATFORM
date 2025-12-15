@@ -496,8 +496,8 @@ async def create_job(job: JobCreate, api_key: str = Depends(get_api_key)):
         }
 
 @app.get("/v1/jobs", tags=["Job Management"])
-async def list_jobs(auth = Depends(get_auth)):
-    """List All Active Jobs"""
+async def list_jobs():
+    """List All Active Jobs (Public Endpoint)"""
     try:
         engine = get_db_engine()
         with engine.connect() as connection:

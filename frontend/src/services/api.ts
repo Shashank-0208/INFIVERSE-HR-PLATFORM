@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { supabase } from '../lib/supabase'
 
 // API Base URL - Gateway service
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://bhiv-hr-gateway-ltg0.onrender.com'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -11,17 +12,13 @@ const api = axios.create({
   },
 })
 
-// Request interceptor for adding auth tokens
+// Request interceptor for adding Supabase auth tokens
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('auth_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    // Add API key if available
-    const apiKey = localStorage.getItem('api_key')
-    if (apiKey) {
-      config.headers['X-API-Key'] = apiKey
+  async (config) => {
+    // Get Supabase session token
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) {
+      config.headers.Authorization = `Bearer ${session.access_token}`
     }
     return config
   },
@@ -31,11 +28,14 @@ api.interceptors.request.use(
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem('candidate_id')
-      window.location.href = '/auth/candidate'
+      // Token expired, try to refresh
+      const { data: { session } } = await supabase.auth.refreshSession()
+      if (!session) {
+        // Redirect to login
+        window.location.href = '/'
+      }
     }
     return Promise.reject(error)
   }
@@ -479,6 +479,251 @@ export const getCandidateDashboardStats = async (candidateId: string): Promise<D
         offers_received: 0
       }
     }
+  }
+}
+
+// ==================== AI MATCHING ENGINE API ====================
+
+export interface MatchResult {
+  candidate_id: string
+  candidate_name: string
+  email: string
+  match_score: number
+  skills_match: number
+  experience_match: number
+  location_match: number
+  values_score?: number
+  matched_skills: string[]
+  missing_skills: string[]
+  recommendation: string
+}
+
+export interface MatchingStats {
+  total_candidates: number
+  avg_match_score: number
+  high_matches: number
+  medium_matches: number
+  low_matches: number
+}
+
+export const getTopMatches = async (jobId: string, limit: number = 10): Promise<MatchResult[]> => {
+  try {
+    const response = await api.get(`/v1/match/${jobId}/top?limit=${limit}`)
+    return response.data.matches || response.data || []
+  } catch (error) {
+    console.error('Error fetching top matches:', error)
+    throw error
+  }
+}
+
+export const runBatchMatching = async (jobId: string, candidateIds?: string[]) => {
+  try {
+    const response = await api.post('/v1/match/batch', {
+      job_id: jobId,
+      candidate_ids: candidateIds
+    })
+    return response.data
+  } catch (error) {
+    console.error('Error running batch matching:', error)
+    throw error
+  }
+}
+
+// ==================== ANALYTICS API ====================
+
+export interface SystemStats {
+  total_candidates: number
+  total_jobs: number
+  total_applications: number
+  total_interviews: number
+  hiring_rate: number
+  avg_time_to_hire: number
+}
+
+export interface SkillsAnalytics {
+  skill: string
+  count: number
+  demand: number
+}
+
+export interface HiringFunnel {
+  stage: string
+  count: number
+  percentage: number
+}
+
+export const getSystemStats = async (): Promise<SystemStats> => {
+  try {
+    const response = await api.get('/v1/candidates/stats')
+    return response.data
+  } catch (error) {
+    console.error('Error fetching system stats:', error)
+    // Return mock data for development
+    return {
+      total_candidates: 0,
+      total_jobs: 0,
+      total_applications: 0,
+      total_interviews: 0,
+      hiring_rate: 0,
+      avg_time_to_hire: 0
+    }
+  }
+}
+
+export const getSkillsAnalytics = async (): Promise<SkillsAnalytics[]> => {
+  try {
+    const response = await api.get('/v1/analytics/skills')
+    return response.data.skills || response.data || []
+  } catch (error) {
+    console.error('Error fetching skills analytics:', error)
+    return []
+  }
+}
+
+export const getHiringFunnel = async (): Promise<HiringFunnel[]> => {
+  try {
+    const response = await api.get('/v1/analytics/funnel')
+    return response.data.funnel || response.data || []
+  } catch (error) {
+    console.error('Error fetching hiring funnel:', error)
+    return []
+  }
+}
+
+// ==================== RECRUITER API ====================
+
+export interface RecruiterStats {
+  total_jobs: number
+  total_applicants: number
+  shortlisted: number
+  interviewed: number
+  offers_sent: number
+  hired: number
+}
+
+export const getRecruiterStats = async (): Promise<RecruiterStats> => {
+  try {
+    const response = await api.get('/v1/recruiter/stats')
+    return response.data
+  } catch {
+    // Calculate from jobs if dedicated endpoint doesn't exist
+    try {
+      const jobs = await getJobs()
+      return {
+        total_jobs: jobs.length,
+        total_applicants: jobs.reduce((sum: number, j: any) => sum + (j.applicants || 0), 0),
+        shortlisted: jobs.reduce((sum: number, j: any) => sum + (j.shortlisted || 0), 0),
+        interviewed: jobs.reduce((sum: number, j: any) => sum + (j.interviewed || 0), 0),
+        offers_sent: jobs.reduce((sum: number, j: any) => sum + (j.offers || 0), 0),
+        hired: jobs.reduce((sum: number, j: any) => sum + (j.hired || 0), 0)
+      }
+    } catch {
+      return {
+        total_jobs: 0,
+        total_applicants: 0,
+        shortlisted: 0,
+        interviewed: 0,
+        offers_sent: 0,
+        hired: 0
+      }
+    }
+  }
+}
+
+export const getAllCandidates = async (filters?: {
+  skills?: string
+  experience?: string
+  location?: string
+  search?: string
+}) => {
+  try {
+    const params = new URLSearchParams()
+    if (filters?.skills) params.append('skills', filters.skills)
+    if (filters?.experience) params.append('experience', filters.experience)
+    if (filters?.location) params.append('location', filters.location)
+    if (filters?.search) params.append('search', filters.search)
+    
+    const response = await api.get(`/v1/candidates?${params.toString()}`)
+    return response.data.candidates || response.data || []
+  } catch (error) {
+    console.error('Error fetching candidates:', error)
+    throw error
+  }
+}
+
+export const searchCandidates = async (query: string, filters?: {
+  skills?: string[]
+  min_experience?: number
+  max_experience?: number
+  location?: string
+}) => {
+  try {
+    const response = await api.get('/v1/candidates/search', {
+      params: { query, ...filters }
+    })
+    return response.data.candidates || response.data || []
+  } catch (error) {
+    console.error('Error searching candidates:', error)
+    throw error
+  }
+}
+
+// ==================== CLIENT PORTAL API ====================
+
+export interface ShortlistedCandidate {
+  id: string
+  name: string
+  email: string
+  job_title: string
+  match_score: number
+  skills: string[]
+  experience_years: number
+  status: 'pending_review' | 'approved' | 'rejected'
+  recruiter_notes?: string
+}
+
+export const getShortlistedCandidates = async (clientId?: string): Promise<ShortlistedCandidate[]> => {
+  try {
+    const params = clientId ? `?client_id=${clientId}` : ''
+    const response = await api.get(`/v1/client/shortlist${params}`)
+    return response.data.candidates || response.data || []
+  } catch (error) {
+    console.error('Error fetching shortlisted candidates:', error)
+    return []
+  }
+}
+
+export const reviewCandidate = async (candidateId: string, decision: 'approved' | 'rejected', notes?: string) => {
+  try {
+    const response = await api.post(`/v1/client/review/${candidateId}`, {
+      decision,
+      notes
+    })
+    return response.data
+  } catch (error) {
+    console.error('Error reviewing candidate:', error)
+    throw error
+  }
+}
+
+// ==================== HEALTH CHECK API ====================
+
+export const checkApiHealth = async () => {
+  try {
+    const response = await api.get('/health')
+    return { healthy: true, data: response.data }
+  } catch (error) {
+    return { healthy: false, error }
+  }
+}
+
+export const getDetailedHealth = async () => {
+  try {
+    const response = await api.get('/health/detailed')
+    return response.data
+  } catch (error) {
+    console.error('Error fetching health status:', error)
+    throw error
   }
 }
 

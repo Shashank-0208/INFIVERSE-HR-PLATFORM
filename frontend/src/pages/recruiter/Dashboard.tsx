@@ -1,34 +1,63 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { getJobs } from '../../services/api'
+import toast from 'react-hot-toast'
+import { getJobs, getRecruiterStats, getSystemStats, type Job, type RecruiterStats } from '../../services/api'
 import StatsCard from '../../components/StatsCard'
 import Table from '../../components/Table'
 import Loading from '../../components/Loading'
 
 export default function RecruiterDashboard() {
-  const [jobs, setJobs] = useState<any[]>([])
+  const [jobs, setJobs] = useState<Job[]>([])
+  const [stats, setStats] = useState<RecruiterStats>({
+    total_jobs: 0,
+    total_applicants: 0,
+    shortlisted: 0,
+    interviewed: 0,
+    offers_sent: 0,
+    hired: 0
+  })
   const [loading, setLoading] = useState(true)
+  const [apiStatus, setApiStatus] = useState<'online' | 'offline' | 'checking'>('checking')
 
   useEffect(() => {
-    loadJobs()
+    loadDashboardData()
   }, [])
 
-  const loadJobs = async () => {
+  const loadDashboardData = async () => {
     try {
       setLoading(true)
-      const data = await getJobs()
-      setJobs(data)
+      setApiStatus('checking')
+      
+      // Load jobs and stats in parallel
+      const [jobsData, statsData] = await Promise.all([
+        getJobs().catch(() => []),
+        getRecruiterStats().catch(() => ({
+          total_jobs: 0,
+          total_applicants: 0,
+          shortlisted: 0,
+          interviewed: 0,
+          offers_sent: 0,
+          hired: 0
+        }))
+      ])
+      
+      setJobs(jobsData)
+      setStats(statsData)
+      setApiStatus('online')
     } catch (error) {
-      console.error('Failed to load jobs:', error)
+      console.error('Failed to load dashboard data:', error)
+      setApiStatus('offline')
+      toast.error('Failed to connect to backend API')
     } finally {
       setLoading(false)
     }
   }
 
-  const totalApplicants = jobs.reduce((sum, job) => sum + job.applicants, 0)
-  const totalShortlisted = jobs.reduce((sum, job) => sum + job.shortlisted, 0)
-  const totalInterviewed = jobs.reduce((sum, job) => sum + job.interviewed, 0)
-  const totalOffers = jobs.reduce((sum, job) => sum + job.offers, 0)
+  // Calculate stats from jobs if backend stats unavailable
+  const totalApplicants = stats.total_applicants || jobs.reduce((sum, job: any) => sum + (job.applicants || 0), 0)
+  const totalShortlisted = stats.shortlisted || jobs.reduce((sum, job: any) => sum + (job.shortlisted || 0), 0)
+  const totalInterviewed = stats.interviewed || jobs.reduce((sum, job: any) => sum + (job.interviewed || 0), 0)
+  const totalOffers = stats.offers_sent || jobs.reduce((sum, job: any) => sum + (job.offers || 0), 0)
 
   return (
     <div className="space-y-8 animate-fade-in">

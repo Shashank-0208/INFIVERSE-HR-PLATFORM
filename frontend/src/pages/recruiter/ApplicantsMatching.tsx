@@ -1,17 +1,26 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { getCandidatesByJob, getJobById, shortlistCandidate, rejectCandidate } from '../../services/api'
+import { 
+  getTopMatches, 
+  getJobById, 
+  shortlistCandidate, 
+  rejectCandidate,
+  scheduleInterview,
+  type MatchResult,
+  type Job
+} from '../../services/api'
 import Table from '../../components/Table'
 import Loading from '../../components/Loading'
 
 export default function ApplicantsMatching() {
   const { jobId } = useParams()
   const navigate = useNavigate()
-  const [job, setJob] = useState<any>(null)
-  const [candidates, setCandidates] = useState<any[]>([])
+  const [job, setJob] = useState<Job | null>(null)
+  const [candidates, setCandidates] = useState<MatchResult[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedCandidate, setSelectedCandidate] = useState<any>(null)
+  const [selectedCandidate, setSelectedCandidate] = useState<MatchResult | null>(null)
+  const [matchingInProgress, setMatchingInProgress] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -20,17 +29,33 @@ export default function ApplicantsMatching() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [jobData, candidatesData] = await Promise.all([
-        getJobById(jobId!),
-        getCandidatesByJob(jobId!)
+      const [jobData, matchResults] = await Promise.all([
+        getJobById(jobId!).catch(() => null),
+        getTopMatches(jobId!, 20).catch(() => [])
       ])
       setJob(jobData)
-      setCandidates(candidatesData)
+      setCandidates(matchResults)
     } catch (error) {
       console.error('Failed to load data:', error)
       toast.error('Failed to load applicants')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleRunAIMatching = async () => {
+    try {
+      setMatchingInProgress(true)
+      toast.loading('Running AI matching...')
+      const results = await getTopMatches(jobId!, 20)
+      setCandidates(results)
+      toast.dismiss()
+      toast.success(`Found ${results.length} matches!`)
+    } catch (error) {
+      toast.dismiss()
+      toast.error('AI matching failed')
+    } finally {
+      setMatchingInProgress(false)
     }
   }
 
@@ -51,6 +76,22 @@ export default function ApplicantsMatching() {
       loadData()
     } catch (error) {
       toast.error('Failed to reject candidate')
+    }
+  }
+
+  const handleScheduleInterview = async (candidateId: string, candidateName: string) => {
+    try {
+      await scheduleInterview({
+        candidate_id: candidateId,
+        job_id: jobId!,
+        job_title: job?.title,
+        scheduled_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 week from now
+        interview_type: 'video',
+        status: 'scheduled'
+      })
+      toast.success(`Interview scheduled for ${candidateName}`)
+    } catch (error) {
+      toast.error('Failed to schedule interview')
     }
   }
 

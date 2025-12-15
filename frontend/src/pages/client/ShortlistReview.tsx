@@ -1,17 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { getJobById, getCandidatesByJob, shortlistCandidate, rejectCandidate } from '../../services/api'
+import { 
+  getJobById, 
+  getTopMatches, 
+  reviewCandidate,
+  type Job,
+  type MatchResult
+} from '../../services/api'
 import Table from '../../components/Table'
 import Loading from '../../components/Loading'
 
 export default function ShortlistReview() {
   const { jobId } = useParams()
   const navigate = useNavigate()
-  const [job, setJob] = useState<any>(null)
-  const [candidates, setCandidates] = useState<any[]>([])
+  const [job, setJob] = useState<Job | null>(null)
+  const [candidates, setCandidates] = useState<MatchResult[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedCandidate, setSelectedCandidate] = useState<any>(null)
+  const [selectedCandidate, setSelectedCandidate] = useState<MatchResult | null>(null)
   const [filter, setFilter] = useState<'all' | 'high' | 'medium'>('all')
 
   useEffect(() => {
@@ -21,12 +27,12 @@ export default function ShortlistReview() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [jobData, candidatesData] = await Promise.all([
-        getJobById(jobId!),
-        getCandidatesByJob(jobId!)
+      const [jobData, matchResults] = await Promise.all([
+        getJobById(jobId!).catch(() => null),
+        getTopMatches(jobId!, 20).catch(() => [])
       ])
       setJob(jobData)
-      setCandidates(candidatesData)
+      setCandidates(matchResults)
     } catch (error) {
       console.error('Failed to load data:', error)
       toast.error('Failed to load data')
@@ -37,7 +43,7 @@ export default function ShortlistReview() {
 
   const handleApprove = async (candidateId: string) => {
     try {
-      await shortlistCandidate(jobId!, candidateId)
+      await reviewCandidate(candidateId, 'approved', 'Approved by client for interview')
       toast.success('Candidate approved for interview')
       loadData()
     } catch (error) {
@@ -47,7 +53,7 @@ export default function ShortlistReview() {
 
   const handleReject = async (candidateId: string) => {
     try {
-      await rejectCandidate(jobId!, candidateId)
+      await reviewCandidate(candidateId, 'rejected', 'Rejected by client')
       toast.success('Candidate rejected')
       loadData()
     } catch (error) {
@@ -60,8 +66,8 @@ export default function ShortlistReview() {
   }
 
   const filteredCandidates = candidates.filter(c => {
-    if (filter === 'high') return c.matchScore >= 80
-    if (filter === 'medium') return c.matchScore >= 60 && c.matchScore < 80
+    if (filter === 'high') return c.match_score >= 80
+    if (filter === 'medium') return c.match_score >= 60 && c.match_score < 80
     return true
   })
 

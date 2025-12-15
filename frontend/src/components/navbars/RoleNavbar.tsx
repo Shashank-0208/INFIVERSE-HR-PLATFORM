@@ -1,6 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useSidebar } from '../../context/SidebarContext'
+import { useAuth } from '../../context/AuthContext'
+import ApiStatus from '../ApiStatus'
 
 interface RoleNavbarProps {
   role: 'candidate' | 'recruiter' | 'client'
@@ -42,14 +44,17 @@ const roleConfig = {
 export default function RoleNavbar({ role }: RoleNavbarProps) {
   const { theme, toggleTheme } = useTheme()
   const { isCollapsed, toggleSidebar } = useSidebar()
+  const { signOut, userName } = useAuth()
   const navigate = useNavigate()
   const config = roleConfig[role]
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut()
     localStorage.removeItem('user_role')
     localStorage.removeItem('user_email')
     localStorage.removeItem('user_name')
     localStorage.removeItem('isAuthenticated')
+    localStorage.removeItem('candidate_id')
     navigate('/')
   }
 
@@ -123,19 +128,33 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
 
           {/* User Profile */}
           <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-gray-200 dark:border-slate-700">
+            {/* API Status Indicator */}
+            <div className="hidden sm:block pr-2 border-r border-gray-200 dark:border-slate-700">
+              <ApiStatus />
+            </div>
             <div className={`w-8 h-8 bg-gradient-to-br ${config.gradient} rounded-full flex items-center justify-center shadow-md`}>
               <span className="text-white font-semibold text-sm">
-                {localStorage.getItem('user_name')?.charAt(0).toUpperCase() || role.charAt(0).toUpperCase()}
+                {userName?.charAt(0).toUpperCase() || localStorage.getItem('user_name')?.charAt(0).toUpperCase() || role.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="hidden md:block">
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                {localStorage.getItem('user_name') || role.charAt(0).toUpperCase() + role.slice(1)}
+                {userName || localStorage.getItem('user_name') || role.charAt(0).toUpperCase() + role.slice(1)}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {config.title}
               </p>
             </div>
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="ml-2 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              title="Logout"
+            >
+              <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>

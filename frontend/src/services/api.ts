@@ -62,12 +62,16 @@ export interface CandidateProfile {
   email: string
   phone?: string
   skills: string[]
-  experience_years: number
+  experience_years?: number
   totalExperience?: number
   education?: string
   educationLevel?: string
+  education_level?: string  // Backend field name
+  technical_skills?: string  // Backend field name
+  seniority_level?: string  // Backend field name
   location?: string
   resume_url?: string
+  resume_path?: string  // Backend field name
   expectedSalary?: number
   currentSalary?: number
   values_score?: {
@@ -276,7 +280,12 @@ export const getCandidateApplications = async (candidateId: string): Promise<App
 export const getCandidateProfile = async (candidateId: string): Promise<CandidateProfile | null> => {
   try {
     const response = await api.get(`/v1/candidates/${candidateId}`)
-    return response.data
+    // Backend returns { candidate: {...} } or { error: "..." }
+    if (response.data.error) {
+      console.warn('Backend returned error:', response.data.error)
+      return null
+    }
+    return response.data.candidate || response.data
   } catch (error: any) {
     // Handle 422 (UUID vs integer mismatch) or 404 (not found)
     if (error?.response?.status === 422 || error?.response?.status === 404) {

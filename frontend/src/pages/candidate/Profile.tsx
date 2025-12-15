@@ -10,6 +10,7 @@ export default function CandidateProfile() {
   const [profileLoading, setProfileLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [savedProfile, setSavedProfile] = useState<any>(null)
+  const [resumeFileName, setResumeFileName] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -26,6 +27,7 @@ export default function CandidateProfile() {
     // Get backend candidate ID (integer) for API calls
     const backendCandidateId = localStorage.getItem('backend_candidate_id')
     const candidateId = backendCandidateId || user?.id || localStorage.getItem('candidate_id')
+    console.log('Profile: Using candidate ID:', candidateId, '(backend_id:', backendCandidateId, ')')
     if (candidateId) {
       loadProfile(candidateId)
     } else {
@@ -36,17 +38,20 @@ export default function CandidateProfile() {
   const loadProfile = async (candidateId: string) => {
     try {
       setProfileLoading(true)
+      console.log('Profile: Loading profile for candidate:', candidateId)
       const data = await getCandidateProfile(candidateId)
+      console.log('Profile: Received data:', data)
       if (data) {
         setSavedProfile(data)
+        // Map backend field names to frontend state
         setFormData({
           name: data.name || '',
           email: data.email || '',
           phone: data.phone || '',
           location: data.location || '',
-          totalExperience: data.totalExperience?.toString() || '',
-          skills: Array.isArray(data.skills) ? data.skills.join(', ') : (data.skills || ''),
-          educationLevel: data.educationLevel || '',
+          totalExperience: (data.experience_years || data.totalExperience)?.toString() || '',
+          skills: data.technical_skills || (Array.isArray(data.skills) ? data.skills.join(', ') : (data.skills || '')),
+          educationLevel: data.education_level || data.educationLevel || '',
           expectedSalary: data.expectedSalary?.toString() || '',
           resume: null,
         })
@@ -74,6 +79,7 @@ export default function CandidateProfile() {
         return
       }
       setFormData({ ...formData, resume: file })
+      setResumeFileName(file.name)
     }
   }
 
@@ -86,25 +92,45 @@ export default function CandidateProfile() {
       const backendCandidateId = localStorage.getItem('backend_candidate_id')
       const candidateId = backendCandidateId || user?.id || localStorage.getItem('candidate_id') || 'demo-candidate'
       
-      // In production, handle file upload separately
+      console.log('Profile Update: Using candidate ID:', candidateId)
+      
+      // Map frontend fields to backend API field names
       const profileData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        location: formData.location,
-        skills: formData.skills.split(',').map(s => s.trim()),
-        totalExperience: parseFloat(formData.totalExperience) || 0,
-        expectedSalary: parseInt(formData.expectedSalary) || 0,
-        educationLevel: formData.educationLevel,
+        name: formData.name || undefined,
+        phone: formData.phone || undefined,
+        location: formData.location || undefined,
+        technical_skills: formData.skills || undefined,  // Backend expects technical_skills (string)
+        experience_years: formData.totalExperience ? parseInt(formData.totalExperience) : undefined,  // Backend expects experience_years (int)
+        education_level: formData.educationLevel || undefined,  // Backend expects education_level
+        seniority_level: undefined,  // Backend supports this field
       }
       
-      await updateCandidateProfile(candidateId, profileData)
+      // Remove undefined fields
+      const cleanedData = Object.fromEntries(
+        Object.entries(profileData).filter(([_, v]) => v !== undefined)
+      )
+      
+      console.log('Profile Update: Sending data:', cleanedData)
+      
+      const response = await updateCandidateProfile(candidateId, cleanedData)
+      console.log('Profile Update: Response:', response)
+      
       toast.success('Profile updated successfully!')
       
-      // Update savedProfile with the submitted data so info section shows it
+      // Update savedProfile with both frontend display names and backend field names
       setSavedProfile({
         ...savedProfile,
-        ...profileData,
+        name: formData.name,
+        phone: formData.phone,
+        location: formData.location,
+        technical_skills: formData.skills,
+        experience_years: formData.totalExperience ? parseInt(formData.totalExperience) : 0,
+        education_level: formData.educationLevel,
+        // Also keep frontend field names for display compatibility
+        skills: formData.skills,
+        totalExperience: formData.totalExperience ? parseInt(formData.totalExperience) : 0,
+        educationLevel: formData.educationLevel,
+        resumeFileName: resumeFileName || savedProfile?.resumeFileName,
       })
       
       setIsEditing(false)
@@ -229,8 +255,8 @@ export default function CandidateProfile() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">Total Experience</p>
                   </div>
                   <p className="text-gray-900 dark:text-white font-medium text-lg">
-                    {(savedProfile?.totalExperience || savedProfile?.total_experience || formData.totalExperience) 
-                      ? `${savedProfile?.totalExperience || savedProfile?.total_experience || formData.totalExperience} years` 
+                    {(savedProfile?.experience_years || savedProfile?.totalExperience || savedProfile?.total_experience || formData.totalExperience) 
+                      ? `${savedProfile?.experience_years || savedProfile?.totalExperience || savedProfile?.total_experience || formData.totalExperience} years` 
                       : 'Not specified'}
                   </p>
                 </div>
@@ -256,7 +282,7 @@ export default function CandidateProfile() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {(() => {
-                      const skills = savedProfile?.skills || formData.skills
+                      const skills = savedProfile?.technical_skills || savedProfile?.skills || formData.skills
                       const skillArray = Array.isArray(skills) ? skills : (skills?.split(',') || [])
                       return skillArray.length > 0 ? skillArray.map((skill: string, index: number) => (
                         <span
@@ -277,7 +303,7 @@ export default function CandidateProfile() {
                     </svg>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Resume</p>
                   </div>
-                  <p className="text-gray-900 dark:text-white font-medium">
+                  <div className="text-gray-900 dark:text-white font-medium">
                     {(savedProfile?.resume_url || savedProfile?.resume) ? (
                       <a href={savedProfile.resume_url || savedProfile.resume} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-2">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -285,8 +311,29 @@ export default function CandidateProfile() {
                         </svg>
                         View Resume
                       </a>
-                    ) : 'No resume uploaded'}
-                  </p>
+                    ) : (savedProfile?.resumeFileName || resumeFileName) ? (
+                      <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                          <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M10.92,12.31C10.68,11.54 10.15,9.08 11.55,9.04C12.95,9 12.03,12.16 12.03,12.16C12.42,13.65 14.05,14.72 14.05,14.72C14.55,14.57 17.4,14.24 17,15.72C16.57,17.2 13.5,15.81 13.5,15.81C11.55,15.95 10.09,16.47 10.09,16.47C8.96,18.58 7.64,19.5 7.1,18.61C6.43,17.5 9.23,16.07 9.23,16.07C10.68,13.72 10.9,12.35 10.92,12.31Z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900 dark:text-white text-sm">
+                            {savedProfile?.resumeFileName || resumeFileName}
+                          </p>
+                          <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Uploaded successfully
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-gray-500">No resume uploaded</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

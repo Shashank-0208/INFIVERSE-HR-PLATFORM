@@ -761,6 +761,32 @@ export const searchCandidates = async (query: string, filters?: {
   }
 }
 
+// ==================== BULK UPLOAD API ====================
+
+export interface BulkCandidate {
+  name: string
+  email: string
+  cv_url?: string
+  phone?: string
+  experience_years?: number
+  status?: string
+  job_id: number
+  location?: string
+  technical_skills?: string
+  designation?: string
+  education_level?: string
+}
+
+export const bulkUploadCandidates = async (candidates: BulkCandidate[]) => {
+  try {
+    const response = await api.post('/v1/candidates/bulk', { candidates })
+    return response.data
+  } catch (error) {
+    console.error('Error uploading candidates:', error)
+    throw error
+  }
+}
+
 // ==================== CLIENT PORTAL API ====================
 
 export interface ShortlistedCandidate {

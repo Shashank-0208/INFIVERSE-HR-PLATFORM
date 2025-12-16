@@ -1,9 +1,46 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { triggerAutomation } from '../../services/api'
 
 export default function AutomationPanel() {
   const [loading, setLoading] = useState<string | null>(null)
+  const [serviceStatus, setServiceStatus] = useState<'checking' | 'online' | 'offline'>('checking')
+  const [testing, setTesting] = useState(false)
+  
+  // Multi-channel test form
+  const [testForm, setTestForm] = useState({
+    candidate_name: 'Test Candidate',
+    candidate_email: '',
+    candidate_phone: '',
+    job_title: 'Software Engineer',
+    message: 'Your application has been updated',
+    channels: ['email'] as string[]
+  })
+
+  useEffect(() => {
+    checkServiceStatus()
+  }, [])
+
+  const checkServiceStatus = async () => {
+    setServiceStatus('checking')
+    try {
+      const langgraphUrl = import.meta.env.VITE_LANGGRAPH_URL || 'http://localhost:8003'
+      const response = await fetch(`${langgraphUrl}/health`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_API_KEY || ''}`
+        }
+      })
+      
+      if (response.ok) {
+        setServiceStatus('online')
+      } else {
+        setServiceStatus('offline')
+      }
+    } catch (error) {
+      setServiceStatus('offline')
+    }
+  }
 
   const automations = [
     {
@@ -95,67 +132,317 @@ export default function AutomationPanel() {
     }
   }
 
+  const handleMultiChannelTest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!testForm.candidate_email) {
+      toast.error('Please enter candidate email')
+      return
+    }
+
+    setTesting(true)
+    try {
+      const langgraphUrl = import.meta.env.VITE_LANGGRAPH_URL || 'http://localhost:8003'
+      const response = await fetch(`${langgraphUrl}/tools/send-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_API_KEY || ''}`
+        },
+        body: JSON.stringify({
+          candidate_name: testForm.candidate_name,
+          candidate_email: testForm.candidate_email,
+          candidate_phone: testForm.candidate_phone,
+          job_title: testForm.job_title,
+          message: testForm.message,
+          channels: testForm.channels,
+          application_status: 'updated'
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toast.success('Multi-channel test completed!')
+        console.log('Test result:', result)
+      } else {
+        throw new Error('Test failed')
+      }
+    } catch (error) {
+      console.error('Test error:', error)
+      toast.error('Failed to send test notification. Service may be offline.')
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const handleSequenceTest = async (sequenceType: string) => {
+    setTesting(true)
+    try {
+      const langgraphUrl = import.meta.env.VITE_LANGGRAPH_URL || 'http://localhost:8003'
+      const testData = {
+        candidate_name: 'John Doe',
+        candidate_email: 'john.doe@example.com',
+        candidate_phone: '+1234567890',
+        job_title: 'Software Engineer',
+        sequence_type: sequenceType
+      }
+
+      const response = await fetch(`${langgraphUrl}/test/send-automated-sequence`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_API_KEY || ''}`
+        },
+        body: JSON.stringify(testData)
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toast.success(`${sequenceType} notification sent!`)
+        console.log('Sequence result:', result)
+      } else {
+        throw new Error('Test failed')
+      }
+    } catch (error) {
+      console.error('Sequence test error:', error)
+      toast.error('Failed to send test sequence. Service may be offline.')
+    } finally {
+      setTesting(false)
+    }
+  }
+
   return (
-    <div>
-      <div className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 dark:from-green-500/10 dark:to-emerald-500/10 backdrop-blur-xl border border-green-300/20 dark:border-green-500/20">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Automation Panel</h1>
-        <p className="text-gray-400">Trigger automated notifications and workflows</p>
+    <div className="space-y-8 animate-fade-in">
+      {/* Header */}
+      <div className="p-6 rounded-2xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 dark:from-green-500/10 dark:to-emerald-500/10 backdrop-blur-xl border border-green-300/20 dark:border-green-500/20">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">📧 Communication System Testing</h1>
+        <p className="text-gray-600 dark:text-gray-400">Test email, WhatsApp, and Telegram notifications</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {automations.map((automation) => (
-          <div key={automation.id} className="card hover:shadow-xl transition-shadow">
-            <div className="flex items-start justify-between mb-4">
-              <div className={`w-14 h-14 bg-gradient-to-br ${colorClasses[automation.color as keyof typeof colorClasses]} rounded-lg flex items-center justify-center text-white`}>
-                {automation.icon}
-              </div>
+      {/* Communication Service Status */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">📊 Communication Service Status</h2>
+          <button
+            onClick={checkServiceStatus}
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            🔄 Refresh
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {serviceStatus === 'checking' && (
+            <>
+              <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+              <span className="text-gray-600 dark:text-gray-400">Checking service status...</span>
+            </>
+          )}
+          {serviceStatus === 'online' && (
+            <>
+              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              <span className="text-green-600 dark:text-green-400 font-medium">✅ LangGraph Communication Service: Online</span>
+            </>
+          )}
+          {serviceStatus === 'offline' && (
+            <>
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <span className="text-red-600 dark:text-red-400 font-medium">❌ LangGraph Communication Service: Offline</span>
+            </>
+          )}
+        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+          ℹ️ Note: Individual test endpoints are not available. Use the multi-channel test below.
+        </p>
+      </div>
+
+      {/* Multi-Channel Notification Test */}
+      <div className="card">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">📢 Test Multi-Channel Notification</h2>
+        
+        <form onSubmit={handleMultiChannelTest} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Candidate Name
+              </label>
+              <input
+                type="text"
+                value={testForm.candidate_name}
+                onChange={(e) => setTestForm({ ...testForm, candidate_name: e.target.value })}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                required
+              />
             </div>
-            
-            <h3 className="text-lg font-bold text-white mb-2">{automation.title}</h3>
-            <p className="text-gray-400 text-sm mb-4">{automation.description}</p>
-            
-            <button
-              onClick={() => handleTrigger(automation.id, automation.title)}
-              disabled={loading === automation.id}
-              className="w-full btn-primary"
-            >
-              {loading === automation.id ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Triggering...
-                </span>
-              ) : (
-                'Trigger Now'
-              )}
-            </button>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Candidate Email *
+              </label>
+              <input
+                type="email"
+                value={testForm.candidate_email}
+                onChange={(e) => setTestForm({ ...testForm, candidate_email: e.target.value })}
+                placeholder="candidate@example.com"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Candidate Phone
+              </label>
+              <input
+                type="tel"
+                value={testForm.candidate_phone}
+                onChange={(e) => setTestForm({ ...testForm, candidate_phone: e.target.value })}
+                placeholder="+1234567890"
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Job Title
+              </label>
+              <input
+                type="text"
+                value={testForm.job_title}
+                onChange={(e) => setTestForm({ ...testForm, job_title: e.target.value })}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
           </div>
-        ))}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Notification Message
+            </label>
+            <textarea
+              value={testForm.message}
+              onChange={(e) => setTestForm({ ...testForm, message: e.target.value })}
+              rows={3}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Channels
+            </label>
+            <div className="flex gap-4">
+              {['email', 'whatsapp', 'telegram'].map(channel => (
+                <label key={channel} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={testForm.channels.includes(channel)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setTestForm({ ...testForm, channels: [...testForm.channels, channel] })
+                      } else {
+                        setTestForm({ ...testForm, channels: testForm.channels.filter(c => c !== channel) })
+                      }
+                    }}
+                    className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300 capitalize">{channel}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={testing || testForm.channels.length === 0}
+            className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+          >
+            {testing ? '📢 Sending...' : '📢 Send Multi-Channel Test'}
+          </button>
+        </form>
       </div>
 
-      {/* Automation History */}
-      <div className="mt-8 card">
-        <h2 className="text-xl font-bold text-white mb-4">Recent Automation History</h2>
-        <div className="space-y-3">
-          {[
-            { type: 'Shortlist Notification', time: '2 hours ago', status: 'success', count: 15 },
-            { type: 'Interview Notification', time: '5 hours ago', status: 'success', count: 8 },
-            { type: 'Offer Notification', time: '1 day ago', status: 'success', count: 3 },
-            { type: 'Task Reminder', time: '2 days ago', status: 'success', count: 12 },
-          ].map((item, idx) => (
-            <div key={idx} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className={`w-2 h-2 rounded-full ${item.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`} />
-                <div>
-                  <p className="text-white font-medium">{item.type}</p>
-                  <p className="text-gray-400 text-sm">{item.count} recipients • {item.time}</p>
+      {/* Automated Sequences Testing */}
+      <div className="card">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">🤖 Test Automated Sequences</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button
+            onClick={() => handleSequenceTest('shortlisted')}
+            disabled={testing}
+            className="p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl transition-colors disabled:opacity-50"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 className="font-semibold text-gray-900 dark:text-white">Shortlist Notification</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Test shortlist notification sequence</p>
+          </button>
+
+          <button
+            onClick={() => handleSequenceTest('interview_scheduled')}
+            disabled={testing}
+            className="p-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl transition-colors disabled:opacity-50"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <h3 className="font-semibold text-gray-900 dark:text-white">Interview Notification</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Test interview scheduling sequence</p>
+          </button>
+
+          <button
+            onClick={() => handleSequenceTest('feedback_request')}
+            disabled={testing}
+            className="p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-xl transition-colors disabled:opacity-50"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <h3 className="font-semibold text-gray-900 dark:text-white">Feedback Request</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Test feedback request sequence</p>
+          </button>
+        </div>
+      </div>
+
+      {/* Automation Triggers */}
+      <div className="card">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">⚙️ Automation Triggers</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {automations.map((automation) => (
+            <div key={automation.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow">
+              <div className="flex items-start justify-between mb-4">
+                <div className={`w-12 h-12 bg-gradient-to-br ${colorClasses[automation.color as keyof typeof colorClasses]} rounded-lg flex items-center justify-center text-white`}>
+                  {automation.icon}
                 </div>
               </div>
-              <span className="px-3 py-1 bg-green-900 text-green-300 rounded-full text-xs font-medium">
-                Success
-              </span>
+              
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{automation.title}</h3>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">{automation.description}</p>
+              
+              <button
+                onClick={() => handleTrigger(automation.id, automation.title)}
+                disabled={loading === automation.id}
+                className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                {loading === automation.id ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Triggering...
+                  </span>
+                ) : (
+                  'Trigger Now'
+                )}
+              </button>
             </div>
           ))}
         </div>

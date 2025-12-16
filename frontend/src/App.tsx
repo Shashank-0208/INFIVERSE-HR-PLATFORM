@@ -27,10 +27,18 @@ import JobCreation from './pages/recruiter/JobCreation'
 import ApplicantsMatching from './pages/recruiter/ApplicantsMatching'
 import FeedbackForm from './pages/recruiter/FeedbackForm'
 import AutomationPanel from './pages/recruiter/AutomationPanel'
+import CandidateSearch from './pages/recruiter/CandidateSearch'
+import BatchUpload from './pages/recruiter/BatchUpload'
+import BatchOperations from './pages/recruiter/BatchOperations'
+import InterviewScheduling from './pages/recruiter/InterviewScheduling'
+import ExportReports from './pages/recruiter/ExportReports'
+import ClientJobsMonitor from './pages/recruiter/ClientJobsMonitor'
 
 // Client Pages
 import ClientDashboard from './pages/client/Dashboard'
 import ShortlistReview from './pages/client/ShortlistReview'
+import MatchResults from './pages/client/MatchResults'
+import ClientReports from './pages/client/ClientReports'
 
 function App() {
   const [showSplash, setShowSplash] = useState(true)
@@ -83,13 +91,19 @@ function App() {
               }>
                 <Route index element={<RecruiterDashboard />} />
                 <Route path="create-job" element={<JobCreation />} />
+                <Route path="upload-candidates" element={<BatchUpload />} />
                 <Route path="jobs" element={<RecruiterDashboard />} />
-                <Route path="candidates" element={<RecruiterDashboard />} />
-                <Route path="screening" element={<RecruiterDashboard />} />
+                <Route path="candidates" element={<Navigate to="/recruiter/candidate-search" replace />} />
+                <Route path="candidate-search" element={<CandidateSearch />} />
+                <Route path="screening" element={<ApplicantsMatching />} />
                 <Route path="applicants/:jobId" element={<ApplicantsMatching />} />
+                <Route path="schedule-interview" element={<InterviewScheduling />} />
                 <Route path="feedback/:candidateId" element={<FeedbackForm />} />
+                <Route path="export-reports" element={<ExportReports />} />
+                <Route path="client-jobs" element={<ClientJobsMonitor />} />
+                <Route path="batch-operations" element={<BatchOperations />} />
                 <Route path="automation" element={<AutomationPanel />} />
-                <Route path="reports" element={<RecruiterDashboard />} />
+                <Route path="reports" element={<ExportReports />} />
               </Route>
 
               {/* Client Routes - Protected for 'client' role only */}
@@ -102,6 +116,8 @@ function App() {
                 <Route path="jobs" element={<ClientDashboard />} />
                 <Route path="shortlisted" element={<ClientDashboard />} />
                 <Route path="shortlist/:jobId" element={<ShortlistReview />} />
+                <Route path="matches" element={<MatchResults />} />
+                <Route path="reports" element={<ClientReports />} />
                 <Route path="interviews" element={<ClientDashboard />} />
                 <Route path="hired" element={<ClientDashboard />} />
                 <Route path="analytics" element={<ClientDashboard />} />

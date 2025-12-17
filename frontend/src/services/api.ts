@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 // API Base URL - Gateway service
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://bhiv-hr-gateway-ltg0.onrender.com'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://bhiv-hr-gateway-l0xp.onrender.com'
 
 // API Key for backend authentication (required until Supabase auth is deployed to backend)
 const API_KEY = import.meta.env.VITE_API_KEY || 'prod_api_key_XUqM2msdCa4CYIaRywRNXRVc477nlI3AQ-lr6cgTB2o'

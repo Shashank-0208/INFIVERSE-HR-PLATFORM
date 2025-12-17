@@ -161,9 +161,9 @@ export default function BatchOperations() {
     setSendingNotifications(true)
     try {
       // Call LangGraph service for bulk notifications via Gateway API
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://bhiv-hr-gateway-ltg0.onrender.com'
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://bhiv-hr-gateway-l0xp.onrender.com'
       const API_KEY = import.meta.env.VITE_API_KEY || 'prod_api_key_XUqM2msdCa4CYIaRywRNXRVc477nlI3AQ-lr6cgTB2o'
-      const langgraphUrl = import.meta.env.VITE_LANGGRAPH_URL || `${API_BASE_URL}/v1/automation`
+      const langgraphUrl = import.meta.env.VITE_LANGGRAPH_URL || 'https://bhiv-hr-langgraph-luy9.onrender.com'
       
       const response = await fetch(`${langgraphUrl}/bulk-notifications`, {
         method: 'POST',

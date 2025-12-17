@@ -98,12 +98,9 @@ export default function ApplicantsMatching() {
 
     setGenerating(true)
     try {
-      // Call AI matching endpoint via Gateway API
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://bhiv-hr-gateway-ltg0.onrender.com'
+      // Call AI matching endpoint via Agent Service
       const API_KEY = import.meta.env.VITE_API_KEY || 'prod_api_key_XUqM2msdCa4CYIaRywRNXRVc477nlI3AQ-lr6cgTB2o'
-      
-      // Try Gateway API first, fallback to direct agent service
-      const agentUrl = import.meta.env.VITE_AGENT_SERVICE_URL || `${API_BASE_URL}/v1/match`
+      const agentUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'https://bhiv-hr-agent-cato.onrender.com'
       
       const response = await fetch(`${agentUrl}/match`, {
         method: 'POST',

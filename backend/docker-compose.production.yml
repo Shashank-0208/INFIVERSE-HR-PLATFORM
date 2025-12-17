@@ -21,7 +21,7 @@ services:
     environment:
       POSTGRES_DB: bhiv_hr
       POSTGRES_USER: bhiv_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bhiv_local_password_2025}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:

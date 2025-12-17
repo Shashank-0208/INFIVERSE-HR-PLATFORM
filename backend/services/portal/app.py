@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 import numpy as np
 import os
-from config import API_BASE, API_KEY, headers, http_client, LANGGRAPH_SERVICE_URL
+from config import API_BASE, API_KEY_SECRET, headers, http_client, LANGGRAPH_SERVICE_URL, GATEWAY_SERVICE_URL
 from auth_manager import init_auth, get_auth_headers
 
 # Import portal configuration

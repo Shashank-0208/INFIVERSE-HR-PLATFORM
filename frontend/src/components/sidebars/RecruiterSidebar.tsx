@@ -121,8 +121,31 @@ export default function RecruiterSidebar() {
   }
 
   const handleLogout = async () => {
-    await signOut()
-    navigate('/')
+    try {
+      // Sign out from Supabase
+      await signOut()
+      
+      // Clear all localStorage items
+      localStorage.removeItem('user_role')
+      localStorage.removeItem('user_email')
+      localStorage.removeItem('user_name')
+      localStorage.removeItem('isAuthenticated')
+      localStorage.removeItem('candidate_id')
+      localStorage.removeItem('backend_candidate_id')
+      localStorage.removeItem('auth_token')
+      
+      // Navigate to home page
+      navigate('/', { replace: true })
+      
+      // Force page reload to clear all state
+      window.location.href = '/'
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Even if signOut fails, clear localStorage and navigate
+      localStorage.clear()
+      navigate('/', { replace: true })
+      window.location.href = '/'
+    }
   }
 
   return (

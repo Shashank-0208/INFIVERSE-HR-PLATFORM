@@ -35,7 +35,9 @@ import ExportReports from './pages/recruiter/ExportReports'
 import ClientJobsMonitor from './pages/recruiter/ClientJobsMonitor'
 
 // Client Pages
-import ClientDashboard from './pages/client/Dashboard'
+import ClientDashboard from './pages/client/ClientDashboard'
+import ClientJobPosting from './pages/client/ClientJobPosting'
+import ClientCandidates from './pages/client/ClientCandidates'
 import ShortlistReview from './pages/client/ShortlistReview'
 import MatchResults from './pages/client/MatchResults'
 import ClientReports from './pages/client/ClientReports'
@@ -113,15 +115,11 @@ function App() {
                 </ProtectedRoute>
               }>
                 <Route index element={<ClientDashboard />} />
-                <Route path="jobs" element={<ClientDashboard />} />
-                <Route path="shortlisted" element={<ClientDashboard />} />
-                <Route path="shortlist/:jobId" element={<ShortlistReview />} />
+                <Route path="dashboard" element={<ClientDashboard />} />
+                <Route path="jobs" element={<ClientJobPosting />} />
+                <Route path="candidates" element={<ClientCandidates />} />
                 <Route path="matches" element={<MatchResults />} />
                 <Route path="reports" element={<ClientReports />} />
-                <Route path="interviews" element={<ClientDashboard />} />
-                <Route path="hired" element={<ClientDashboard />} />
-                <Route path="analytics" element={<ClientDashboard />} />
-                <Route path="settings" element={<ClientDashboard />} />
               </Route>
 
               {/* Fallback */}

@@ -14,7 +14,11 @@ import InterviewTaskPanel from './pages/candidate/InterviewTaskPanel'
 import CandidateFeedback from './pages/candidate/Feedback'
 
 // Client Pages
-import ClientDashboard from './pages/client/Dashboard'
+import ClientDashboard from './pages/client/ClientDashboard'
+import ClientJobPosting from './pages/client/ClientJobPosting'
+import ClientCandidates from './pages/client/ClientCandidates'
+import MatchResults from './pages/client/MatchResults'
+import ClientReports from './pages/client/ClientReports'
 import ShortlistReview from './pages/client/ShortlistReview'
 
 export default function AppRoutes() {
@@ -36,6 +40,11 @@ export default function AppRoutes() {
 
       {/* Client Routes */}
       <Route path="/client" element={<ClientDashboard />} />
+      <Route path="/client/dashboard" element={<ClientDashboard />} />
+      <Route path="/client/jobs" element={<ClientJobPosting />} />
+      <Route path="/client/candidates" element={<ClientCandidates />} />
+      <Route path="/client/matches" element={<MatchResults />} />
+      <Route path="/client/reports" element={<ClientReports />} />
       <Route path="/client/shortlist/:jobId" element={<ShortlistReview />} />
 
       {/* 404 - Redirect to role selection */}

@@ -49,12 +49,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const handleSignOut = async () => {
-    await signOut()
-    // Clear localStorage as backup
-    localStorage.removeItem('user_role')
-    localStorage.removeItem('user_email')
-    localStorage.removeItem('user_name')
-    localStorage.removeItem('isAuthenticated')
+    try {
+      await signOut()
+      // Clear all localStorage items
+      localStorage.removeItem('user_role')
+      localStorage.removeItem('user_email')
+      localStorage.removeItem('user_name')
+      localStorage.removeItem('isAuthenticated')
+      localStorage.removeItem('candidate_id')
+      localStorage.removeItem('backend_candidate_id')
+      localStorage.removeItem('auth_token')
+    } catch (error) {
+      console.error('Sign out error:', error)
+      // Even if signOut fails, clear localStorage
+      localStorage.clear()
+    }
   }
 
   const userRole = user?.user_metadata?.role || localStorage.getItem('user_role')

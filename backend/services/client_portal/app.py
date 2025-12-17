@@ -37,13 +37,19 @@ def main():
         layout="wide"
     )
     
+    # ============================================
+    # AUTHENTICATION DISABLED - DIRECT ACCESS
+    # ============================================
+    # Initialize default client info (authentication removed)
+    if 'client_id' not in st.session_state:
+        st.session_state['client_id'] = 'DEMO_CLIENT'
+    if 'client_name' not in st.session_state:
+        st.session_state['client_name'] = 'Demo Company'
+    if 'client_authenticated' not in st.session_state:
+        st.session_state['client_authenticated'] = True  # Always authenticated
+    
     st.title("🏢 BHIV Client Portal")
     st.markdown("**Dedicated Client Interface for Job Posting & Candidate Review**")
-    
-    # Client authentication
-    if 'client_authenticated' not in st.session_state:
-        show_client_login()
-        return
     
     # Sidebar navigation with real-time updates
     st.sidebar.title("🏢 Client Menu")
@@ -94,21 +100,10 @@ def main():
     
     # Client info sidebar
     st.sidebar.markdown("---")
-    st.sidebar.success(f"🏢 {st.session_state.get('client_name', 'Unknown')}")
-    st.sidebar.info(f"Client ID: {st.session_state.get('client_id', 'N/A')}")
+    st.sidebar.success(f"🏢 {st.session_state.get('client_name', 'Demo Company')}")
+    st.sidebar.info(f"Client ID: {st.session_state.get('client_id', 'DEMO_CLIENT')}")
     
-    if st.sidebar.button("🚪 Secure Logout"):
-        # Revoke JWT token
-        if 'client_token' in st.session_state:
-            logout_client(st.session_state['client_token'])
-        
-        # Clear all session data
-        for key in ['client_authenticated', 'client_token', 'client_id', 'client_name']:
-            if key in st.session_state:
-                del st.session_state[key]
-        
-        st.success("✅ Logged out securely")
-        st.rerun()
+    # Authentication removed - no logout needed
 
 def show_client_login():
     st.header("🔐 Client Portal Access")
@@ -129,8 +124,8 @@ def show_client_login():
                         if success:
                             st.session_state['client_authenticated'] = True
                             st.session_state['client_token'] = result.get('access_token', result.get('token', ''))
-                            st.session_state['client_id'] = result['client_id']
-                            st.session_state['client_name'] = result['company_name']
+                            st.session_state['client_id'] = result.get('client_id', 'DEMO_CLIENT')
+                            st.session_state['client_name'] = result.get('company_name', 'Demo Company')
                             st.success("✅ Login successful!")
                             st.balloons()
                             st.rerun()

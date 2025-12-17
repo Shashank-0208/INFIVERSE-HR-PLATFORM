@@ -353,6 +353,19 @@ export const getInterviews = async (candidateId?: string): Promise<Interview[]> 
   }
 }
 
+export const getAllInterviews = async (): Promise<Interview[]> => {
+  try {
+    const response = await api.get('/v1/interviews')
+    return response.data.interviews || response.data || []
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      return []
+    }
+    console.error('Error fetching all interviews:', error)
+    return []
+  }
+}
+
 export const scheduleInterview = async (data: Partial<Interview>) => {
   try {
     const response = await api.post('/v1/interviews', data)
@@ -470,6 +483,16 @@ export const getCandidateOffers = async (candidateId: string): Promise<Offer[]> 
     return response.data.offers || response.data || []
   } catch (error) {
     console.error('Error fetching offers:', error)
+    return []
+  }
+}
+
+export const getAllOffers = async (): Promise<Offer[]> => {
+  try {
+    const response = await api.get('/v1/offers')
+    return response.data.offers || response.data || []
+  } catch (error) {
+    console.error('Error fetching all offers:', error)
     return []
   }
 }

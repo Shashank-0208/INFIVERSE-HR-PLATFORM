@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { signIn as supabaseSignIn, signOut } from '../../lib/supabase'
+import { getOrCreateBackendCandidateId } from '../../services/api'
 
 type AuthMode = 'login' | 'signup'
 
@@ -106,7 +107,7 @@ export default function AuthPage() {
 
     try {
       if (mode === 'signup') {
-        const { error } = await signUp(formData.email, formData.password, {
+        const { data: signUpData, error } = await signUp(formData.email, formData.password, {
           name: formData.fullName,
           role: role || 'candidate',
         })
@@ -121,6 +122,19 @@ export default function AuthPage() {
         localStorage.setItem('user_email', formData.email)
         localStorage.setItem('user_name', formData.fullName)
         localStorage.setItem('isAuthenticated', 'true')
+        
+        // For candidates, get or create backend candidate ID after signup
+        if (role === 'candidate' && signUpData?.user) {
+          try {
+            const backendId = await getOrCreateBackendCandidateId(signUpData.user)
+            if (backendId) {
+              localStorage.setItem('backend_candidate_id', backendId)
+            }
+          } catch (error) {
+            console.warn('Could not get backend candidate ID:', error)
+            // Don't block signup if this fails
+          }
+        }
         
         toast.success('Account created! Please check your email to verify.')
         setIsLoading(false)
@@ -151,6 +165,19 @@ export default function AuthPage() {
         localStorage.setItem('user_email', formData.email)
         localStorage.setItem('user_name', (data?.user?.user_metadata as any)?.name || formData.email.split('@')[0])
         localStorage.setItem('isAuthenticated', 'true')
+        
+        // For candidates, get or create backend candidate ID
+        if ((userRole || expectedRole) === 'candidate' && data?.user) {
+          try {
+            const backendId = await getOrCreateBackendCandidateId(data.user)
+            if (backendId) {
+              localStorage.setItem('backend_candidate_id', backendId)
+            }
+          } catch (error) {
+            console.warn('Could not get backend candidate ID:', error)
+            // Don't block login if this fails
+          }
+        }
         
         toast.success('Login successful!')
         setIsLoading(false)

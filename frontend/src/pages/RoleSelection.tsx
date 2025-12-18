@@ -12,7 +12,7 @@ const roles = [
     ),
     gradient: 'from-blue-500 to-cyan-500',
     hoverGradient: 'group-hover:from-blue-600 group-hover:to-cyan-600',
-    path: '/auth/candidate',
+    path: '/auth?mode=signup',
     features: ['Apply to Jobs', 'Track Applications', 'AI-Powered Matching'],
   },
   {
@@ -26,7 +26,7 @@ const roles = [
     ),
     gradient: 'from-emerald-500 to-teal-500',
     hoverGradient: 'group-hover:from-emerald-600 group-hover:to-teal-600',
-    path: '/auth/recruiter',
+    path: '/auth?mode=signup',
     features: ['Post Jobs', 'AI Screening', 'Manage Pipeline'],
   },
   {
@@ -40,7 +40,7 @@ const roles = [
     ),
     gradient: 'from-purple-500 to-pink-500',
     hoverGradient: 'group-hover:from-purple-600 group-hover:to-pink-600',
-    path: '/auth/client',
+    path: '/auth?mode=signup',
     features: ['Review Shortlists', 'Interview Scheduling', 'Analytics Dashboard'],
   },
 ]
@@ -88,7 +88,7 @@ export default function RoleSelection() {
           {roles.map((role, index) => (
             <button
               key={role.id}
-              onClick={() => navigate(`${role.path}?mode=signup`)}
+              onClick={() => navigate('/auth?mode=signup')}
               className="group relative bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8 text-left transition-all duration-300 hover:scale-105 hover:border-slate-600 hover:shadow-2xl hover:shadow-purple-500/10"
               style={{ animationDelay: `${index * 100}ms` }}
             >

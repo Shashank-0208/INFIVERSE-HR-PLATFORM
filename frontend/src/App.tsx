@@ -68,7 +68,7 @@ function App() {
             <Routes>
               {/* Public Routes - redirect to dashboard if already logged in */}
               <Route path="/" element={<PublicRoute><RoleSelection /></PublicRoute>} />
-              <Route path="/auth/:role" element={<PublicRoute><AuthPage /></PublicRoute>} />
+              <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
 
               {/* Candidate Routes - Protected for 'candidate' role only */}
               <Route path="/candidate" element={

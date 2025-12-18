@@ -1,61 +1,31 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
-import { signIn as supabaseSignIn, signOut } from '../../lib/supabase'
+import { signIn as supabaseSignIn, signOut, supabase, isSupabaseConfigured } from '../../lib/supabase'
 
 type AuthMode = 'login' | 'signup'
+type UserRole = 'candidate' | 'recruiter' | 'client'
 
 const roleConfig = {
   candidate: {
     title: 'Candidate',
     gradient: 'from-blue-500 to-cyan-500',
-    bgGradient: 'from-blue-500/10 to-cyan-500/10',
-    borderColor: 'border-blue-500/30',
-    focusRing: 'focus:ring-blue-500',
-    checkboxColor: 'text-blue-500 focus:ring-blue-500',
-    shadowColor: 'hover:shadow-blue-500/25',
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-      </svg>
-    ),
-    redirectPath: '/candidate/profile',
+    redirectPath: '/candidate/dashboard',
   },
   recruiter: {
     title: 'Recruiter',
     gradient: 'from-emerald-500 to-teal-500',
-    bgGradient: 'from-emerald-500/10 to-teal-500/10',
-    borderColor: 'border-emerald-500/30',
-    focusRing: 'focus:ring-emerald-500',
-    checkboxColor: 'text-emerald-500 focus:ring-emerald-500',
-    shadowColor: 'hover:shadow-emerald-500/25',
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-      </svg>
-    ),
     redirectPath: '/recruiter',
   },
   client: {
     title: 'Client',
     gradient: 'from-purple-500 to-pink-500',
-    bgGradient: 'from-purple-500/10 to-pink-500/10',
-    borderColor: 'border-purple-500/30',
-    focusRing: 'focus:ring-purple-500',
-    checkboxColor: 'text-purple-500 focus:ring-purple-500',
-    shadowColor: 'hover:shadow-purple-500/25',
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
     redirectPath: '/client',
   },
 }
 
 export default function AuthPage() {
-  const { role } = useParams<{ role: string }>()
   const navigate = useNavigate()
   const { signUp } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -66,7 +36,10 @@ export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>(initialMode)
   const [isLoading, setIsLoading] = useState(false)
   
-  // Sync mode with URL parameter when URL changes (e.g., browser back/forward)
+  // Role selection state (only for signup)
+  const [selectedRole, setSelectedRole] = useState<UserRole>('candidate')
+  
+  // Sync mode with URL parameter when URL changes
   useEffect(() => {
     const currentUrlMode = searchParams.get('mode')
     if (currentUrlMode === 'signup' || currentUrlMode === 'login') {
@@ -92,10 +65,13 @@ export default function AuthPage() {
     phone: '',
   })
 
-  const config = roleConfig[role as keyof typeof roleConfig] || roleConfig.candidate
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    if (name === 'role') {
+      setSelectedRole(value as UserRole)
+    } else {
+      setFormData({ ...formData, [name]: value })
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,19 +103,14 @@ export default function AuthPage() {
     }
 
     try {
-      // Get the expected role from URL parameter - this is the role-specific page
-      const expectedRole = role || 'candidate'
-      
       if (mode === 'signup') {
-        // SIGNUP: Create account with the role from the page URL
-        // No role checking during signup - just create with the page's role
+        // SIGNUP: Create account with the selected role
         const { error, data } = await signUp(formData.email, formData.password, {
           name: formData.fullName,
-          role: expectedRole, // Always use the role from the URL
+          role: selectedRole,
         })
         
         if (error) {
-          // Simple error handling - don't try to login or check roles
           const errorMsg = error.message || ''
           
           if (errorMsg.includes('already registered') || 
@@ -147,8 +118,7 @@ export default function AuthPage() {
               errorMsg.includes('already exists') ||
               errorMsg.includes('email address is already') ||
               errorMsg.includes('already been registered')) {
-            // Email exists - tell them to login, but don't check role here
-            toast.error(`This email is already registered. Please use the login page at /auth/${expectedRole} to login.`)
+            toast.error('This email is already registered. Please use the login page to sign in.')
           } else {
             toast.error(errorMsg || 'Signup failed. Please try again.')
           }
@@ -156,35 +126,42 @@ export default function AuthPage() {
           return
         }
         
-        // Signup successful - set role from page, not from Supabase
         if (!data?.user) {
           toast.error('Signup failed. Please try again.')
           setIsLoading(false)
           return
         }
         
-        // IMPORTANT: Set role from the page URL, not from user metadata
-        // This ensures role-based separation
-        // Set role BEFORE any potential Supabase auto-login triggers
-        localStorage.setItem('user_role', expectedRole)
+        // Set role from selected role, not from Supabase
+        localStorage.setItem('user_role', selectedRole)
         localStorage.setItem('user_email', formData.email)
         localStorage.setItem('user_name', formData.fullName)
         localStorage.setItem('isAuthenticated', 'true')
         localStorage.setItem('user_id', data.user.id)
         
-        // If Supabase auto-logged in, ensure the role in user metadata matches
-        // (This prevents auth state change from overriding our role)
-        if (data.user.user_metadata && data.user.user_metadata.role !== expectedRole) {
-          // Role mismatch in metadata - this shouldn't happen, but handle it
-          console.warn(`Role mismatch: metadata has ${data.user.user_metadata.role}, expected ${expectedRole}`)
+        // Update Supabase metadata if configured
+        if (isSupabaseConfigured() && data.user.user_metadata?.role !== selectedRole) {
+          try {
+            const { error: updateError } = await supabase.auth.updateUser({
+              data: { 
+                ...data.user.user_metadata,
+                role: selectedRole,
+                name: formData.fullName
+              }
+            })
+            if (updateError) {
+              console.warn('Could not update user metadata:', updateError)
+            }
+          } catch (err) {
+            console.warn('Error updating user metadata:', err)
+          }
         }
         
-        toast.success(`Account created successfully as ${expectedRole}!`)
+        toast.success(`Account created successfully as ${roleConfig[selectedRole].title}!`)
         setIsLoading(false)
-        navigate(config.redirectPath)
+        navigate(roleConfig[selectedRole].redirectPath)
       } else {
-        // LOGIN: STRICT role-based authentication
-        // User MUST login through their role's page
+        // LOGIN: Authenticate and redirect based on user's role
         const { error, data } = await supabaseSignIn(formData.email, formData.password)
         
         if (error) {
@@ -199,38 +176,38 @@ export default function AuthPage() {
           return
         }
         
-        // Get user's role from Supabase metadata or localStorage
-        const userRole = data.user.user_metadata?.role || localStorage.getItem('user_role')
+        // Get user's role from metadata or localStorage
+        const storedRole = localStorage.getItem('user_role')
+        const metadataRole = data.user.user_metadata?.role
         
-        // STRICT ROLE CHECK: Only check if user has a role set
-        // If role exists and doesn't match page role, reject login
-        if (userRole && userRole.trim() !== '' && userRole !== expectedRole) {
-          // Role mismatch - sign them out and show clear error
-          await signOut()
-          toast.error(`This account is registered as a ${userRole}. Please login at /auth/${userRole} instead.`)
-          setIsLoading(false)
-          return
+        // Determine final role: metadata > localStorage > default to candidate
+        let finalRole: UserRole = 'candidate'
+        if (metadataRole && ['candidate', 'recruiter', 'client'].includes(metadataRole)) {
+          finalRole = metadataRole as UserRole
+        } else if (storedRole && ['candidate', 'recruiter', 'client'].includes(storedRole)) {
+          finalRole = storedRole as UserRole
         }
         
-        // Role matches OR no role set (use page role for new signups or when role is missing)
-        // Use the role from metadata/localStorage if available, otherwise use page role
-        const finalRole = (userRole && userRole.trim() !== '') ? userRole : expectedRole
-        
+        // Save role and user info
         localStorage.setItem('user_role', finalRole)
         localStorage.setItem('user_email', formData.email)
         localStorage.setItem('user_name', (data.user.user_metadata as any)?.name || formData.email.split('@')[0])
         localStorage.setItem('isAuthenticated', 'true')
         localStorage.setItem('user_id', data.user.id)
         
-        toast.success(`Login successful as ${finalRole}!`)
+        toast.success(`Login successful as ${roleConfig[finalRole].title}!`)
         setIsLoading(false)
-        navigate(config.redirectPath)
+        navigate(roleConfig[finalRole].redirectPath)
       }
     } catch (err: any) {
       toast.error(err.message || 'An error occurred')
       setIsLoading(false)
     }
   }
+
+  // Get current role config for styling (use selected role for signup, or default for login)
+  const currentRole = mode === 'signup' ? selectedRole : 'candidate'
+  const config = roleConfig[currentRole]
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4 py-8">
@@ -245,7 +222,7 @@ export default function AuthPage() {
       <div className={`relative z-10 w-full ${mode === 'signup' ? 'max-w-2xl' : 'max-w-md'}`}>
         {/* Logo & Branding */}
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-3 mb-6 group">
+          <div className="inline-flex items-center gap-3 mb-6 group">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 via-purple-500 to-pink-500 p-0.5 group-hover:scale-110 transition-transform shadow-lg shadow-purple-500/20">
               <div className="w-full h-full rounded-2xl bg-slate-900 flex items-center justify-center">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -259,7 +236,7 @@ export default function AuthPage() {
               </span>
               <span className="text-white"> HR</span>
             </span>
-          </Link>
+          </div>
 
           {/* Heading */}
           <h1 className="text-3xl font-bold text-white mb-2">
@@ -277,8 +254,8 @@ export default function AuthPage() {
         </div>
 
         {/* Form Card */}
-        <div className={`bg-slate-800/60 backdrop-blur-xl border ${config.borderColor} rounded-3xl p-8 shadow-2xl`}>
-           {/* Mode Toggle - Clear and Prominent */}
+        <div className={`bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-8 shadow-2xl`}>
+           {/* Mode Toggle */}
            <div className="flex bg-slate-900/60 rounded-2xl p-1.5 mb-6">
              <button
                type="button"
@@ -303,120 +280,130 @@ export default function AuthPage() {
                Sign Up
              </button>
            </div>
-           
-           {/* Role Indicator */}
-           <div className="mb-4 text-center">
-             <span className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900/60 rounded-full text-sm text-gray-300">
-               <span className={`w-2 h-2 rounded-full bg-gradient-to-r ${config.gradient}`}></span>
-               {config.title} Portal
-             </span>
-           </div>
 
           <form onSubmit={handleSubmit}>
-            {/* ========== SIGNUP FORM - 2 COLUMNS ========== */}
+            {/* ========== SIGNUP FORM ========== */}
             {mode === 'signup' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                {/* Full Name */}
+              <div className="space-y-4 mb-4">
+                {/* Role Selection - Only in Signup */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Full Name <span className="text-red-400">*</span>
+                    Select Role <span className="text-red-400">*</span>
                   </label>
-                  <input
-                    type="text"
-                    name="fullName"
-                    value={formData.fullName}
+                  <select
+                    name="role"
+                    value={selectedRole}
                     onChange={handleInputChange}
-                    placeholder="John Doe"
-                    className={`w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 ${config.focusRing} transition-all`}
+                    className={`w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all`}
                     required
-                  />
+                  >
+                    <option value="candidate">Candidate</option>
+                    <option value="recruiter">Recruiter (HR)</option>
+                    <option value="client">Client</option>
+                  </select>
                 </div>
 
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Email Address <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="john@example.com"
-                    className={`w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 ${config.focusRing} transition-all`}
-                    required
-                  />
-                </div>
-
-                {/* Phone */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Phone Number <span className="text-gray-500 text-xs">(Optional)</span>
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="+1 (555) 123-4567"
-                    className={`w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 ${config.focusRing} transition-all`}
-                  />
-                </div>
-
-                {/* Company - Only for recruiter/client */}
-                {(role === 'recruiter' || role === 'client') ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Full Name */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Company Name
+                      Full Name <span className="text-red-400">*</span>
                     </label>
                     <input
                       type="text"
-                      name="company"
-                      value={formData.company}
+                      name="fullName"
+                      value={formData.fullName}
                       onChange={handleInputChange}
-                      placeholder="Acme Inc."
-                      className={`w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 ${config.focusRing} transition-all`}
+                      placeholder="John Doe"
+                      className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                      required
                     />
                   </div>
-                ) : (
-                  <div className="hidden md:block" />
-                )}
 
-                {/* Password */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Password <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    placeholder="••••••••"
-                    className={`w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 ${config.focusRing} transition-all`}
-                    required
-                  />
-                </div>
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Email Address <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      placeholder="john@example.com"
+                      className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                      required
+                    />
+                  </div>
 
-                {/* Confirm Password */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Confirm Password <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="password"
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    placeholder="••••••••"
-                    className={`w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 ${config.focusRing} transition-all`}
-                    required
-                  />
+                  {/* Phone */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Phone Number <span className="text-gray-500 text-xs">(Optional)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      placeholder="+1 (555) 123-4567"
+                      className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
+                  </div>
+
+                  {/* Company - Only for recruiter/client */}
+                  {(selectedRole === 'recruiter' || selectedRole === 'client') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Company Name
+                      </label>
+                      <input
+                        type="text"
+                        name="company"
+                        value={formData.company}
+                        onChange={handleInputChange}
+                        placeholder="Acme Inc."
+                        className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                      />
+                    </div>
+                  )}
+
+                  {/* Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Password <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      placeholder="••••••••"
+                      className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                      required
+                    />
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Confirm Password <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      placeholder="••••••••"
+                      className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* ========== LOGIN FORM - SINGLE COLUMN ========== */}
+            {/* ========== LOGIN FORM ========== */}
             {mode === 'login' && (
               <div className="space-y-4">
                 {/* Email */}
@@ -430,7 +417,7 @@ export default function AuthPage() {
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder="john@example.com"
-                    className={`w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 ${config.focusRing} transition-all`}
+                    className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
                     required
                   />
                 </div>
@@ -446,7 +433,7 @@ export default function AuthPage() {
                     value={formData.password}
                     onChange={handleInputChange}
                     placeholder="••••••••"
-                    className={`w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 ${config.focusRing} transition-all`}
+                    className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
                     required
                   />
                 </div>
@@ -455,7 +442,7 @@ export default function AuthPage() {
                 <div className="flex justify-end">
                   <button
                     type="button"
-                    className={`text-sm font-medium bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent hover:opacity-80 transition-opacity`}
+                    className="text-sm font-medium bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent hover:opacity-80 transition-opacity"
                   >
                     Forgot password?
                   </button>
@@ -465,20 +452,20 @@ export default function AuthPage() {
 
             {/* Terms Checkbox - Signup only */}
             {mode === 'signup' && (
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 mb-4">
                 <input
                   type="checkbox"
                   id="terms"
-                  className={`w-4 h-4 mt-1 rounded border-slate-600 bg-slate-900/60 ${config.checkboxColor} focus:ring-offset-0`}
+                  className="w-4 h-4 mt-1 rounded border-slate-600 bg-slate-900/60 text-blue-500 focus:ring-offset-0"
                   required
                 />
                 <label htmlFor="terms" className="text-sm text-gray-400">
                   I agree to the{' '}
-                  <button type="button" className={`bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent font-medium`}>
+                  <button type="button" className="bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent font-medium">
                     Terms
                   </button>{' '}
                   and{' '}
-                  <button type="button" className={`bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent font-medium`}>
+                  <button type="button" className="bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent font-medium">
                     Privacy Policy
                   </button>
                 </label>
@@ -489,7 +476,7 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full py-3.5 px-6 bg-gradient-to-r ${config.gradient} text-white font-bold rounded-xl hover:opacity-90 hover:shadow-lg ${config.shadowColor} transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6`}
+              className={`w-full py-3.5 px-6 bg-gradient-to-r ${config.gradient} text-white font-bold rounded-xl hover:opacity-90 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6`}
             >
               {isLoading ? (
                 <>
@@ -542,23 +529,12 @@ export default function AuthPage() {
              <button
                type="button"
                onClick={() => handleModeChange(mode === 'login' ? 'signup' : 'login')}
-               className={`font-semibold bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent hover:opacity-80 transition-opacity`}
+               className="font-semibold bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent hover:opacity-80 transition-opacity"
              >
                {mode === 'login' ? 'Sign up' : 'Sign in'}
              </button>
            </p>
         </div>
-
-        {/* Back Link */}
-        <Link
-          to="/"
-          className="flex items-center justify-center gap-2 text-gray-500 hover:text-white transition-colors mt-6 group"
-        >
-          <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to role selection
-        </Link>
       </div>
     </div>
   )

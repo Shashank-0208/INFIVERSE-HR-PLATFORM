@@ -78,24 +78,24 @@ export default function ClientDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="mb-8">
-        <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-500/5 to-indigo-500/5 dark:from-blue-500/10 dark:to-indigo-500/10 backdrop-blur-xl border border-blue-300/20 dark:border-blue-500/20 mb-8">
-          <h1 className="page-title">BHIV Client Portal</h1>
-          <p className="page-subtitle">Dedicated Client Interface for Job Posting & Candidate Review</p>
+      <div className="mb-6 sm:mb-8">
+        <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-blue-500/5 to-indigo-500/5 dark:from-blue-500/10 dark:to-indigo-500/10 backdrop-blur-xl border border-blue-300/20 dark:border-blue-500/20 mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-heading font-bold text-gray-900 dark:text-white mb-2">BHIV Client Portal</h1>
+          <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">Dedicated Client Interface for Job Posting & Candidate Review</p>
         </div>
       </div>
 
       {/* Client Reports & Analytics */}
-      <div className="mb-8">
-        <h2 className="section-title flex items-center gap-2">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="mb-6 sm:mb-8">
+        <h2 className="text-lg sm:text-xl font-heading font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
           Client Reports & Analytics
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <StatsCard
             title="Active Jobs"
             value={activeJobs}

@@ -99,7 +99,7 @@
 @layer components {
   /* Primary Button with Gradient */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl h-11 px-6 text-sm font-bold
+    @apply inline-flex items-center justify-center gap-2 rounded-lg sm:rounded-xl h-10 sm:h-11 px-4 sm:px-6 text-xs sm:text-sm font-bold
       text-white
       hover:shadow-xl hover:shadow-purple-500/30 hover:scale-105
       active:scale-95 transition-all duration-300
@@ -109,7 +109,7 @@
 
   /* Secondary Button */
   .btn-secondary {
-    @apply rounded-xl h-11 px-6 text-sm font-bold
+    @apply rounded-lg sm:rounded-xl h-10 sm:h-11 px-4 sm:px-6 text-xs sm:text-sm font-bold
       hover:shadow-xl hover:scale-105
       active:scale-95 transition-all duration-300;
     background-color: hsl(var(--secondary));
@@ -158,9 +158,9 @@
 
   /* Glassmorphic Card */
   .card {
-    @apply rounded-2xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl
+    @apply rounded-xl sm:rounded-2xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl
       border-2 border-gray-200/50 dark:border-gray-700/50
-      p-6 transition-all duration-500 hover:scale-[1.01];
+      p-4 sm:p-6 transition-all duration-500 hover:scale-[1.01];
     box-shadow: 8px 8px 16px hsl(220 13% 85%), -8px -8px 16px hsl(0 0% 100%);
   }
   .dark .card {
@@ -182,9 +182,9 @@
 
   /* Modern Input Field */
   .input-field {
-    @apply flex h-12 w-full rounded-xl
+    @apply flex h-11 sm:h-12 w-full rounded-lg sm:rounded-xl
       bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm
-      px-4 py-3 text-base font-medium
+      px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base font-medium
       transition-all duration-300
       focus:outline-none
       disabled:cursor-not-allowed disabled:opacity-50;
@@ -273,18 +273,33 @@
 
   /* Page Header */
   .page-header {
-    @apply mb-8;
+    @apply mb-6 sm:mb-8;
   }
   .page-title {
-    @apply text-3xl font-heading font-bold text-gray-900 dark:text-white mb-2;
+    @apply text-2xl sm:text-3xl font-heading font-bold text-gray-900 dark:text-white mb-2;
   }
   .page-subtitle {
-    @apply text-gray-500 dark:text-gray-400;
+    @apply text-sm sm:text-base text-gray-500 dark:text-gray-400;
   }
 
   /* Section */
   .section-title {
-    @apply text-xl font-heading font-bold text-gray-900 dark:text-white mb-4;
+    @apply text-lg sm:text-xl font-heading font-bold text-gray-900 dark:text-white mb-4;
+  }
+
+  /* Mobile-first responsive utilities */
+  .container-responsive {
+    @apply w-full px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Card responsive padding */
+  .card-responsive {
+    @apply p-4 sm:p-6;
+  }
+
+  /* Button responsive sizing */
+  .btn-responsive {
+    @apply text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-2.5;
   }
 }
 

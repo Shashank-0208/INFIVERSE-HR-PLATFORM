@@ -6,7 +6,7 @@ import ApiStatus from '../ApiStatus'
 export default function RecruiterSidebar() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { isCollapsed } = useSidebar()
+  const { isCollapsed, isMobileOpen, closeMobile } = useSidebar()
   const { signOut } = useAuth()
   
   const navItems = [
@@ -138,11 +138,22 @@ export default function RecruiterSidebar() {
     }
   }
 
+  const handleLinkClick = () => {
+    // Close mobile menu when link is clicked
+    if (window.innerWidth < 1024) {
+      closeMobile()
+    }
+  }
+
   return (
     <aside 
-      className={`fixed left-0 top-16 h-[calc(100vh-4rem)] bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 overflow-y-auto transition-all duration-300 ${
-        isCollapsed ? 'w-20' : 'w-64'
-      }`}
+      className={`fixed left-0 top-16 h-[calc(100vh-4rem)] bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 overflow-y-auto transition-all duration-300 z-50 ${
+        // Mobile: show/hide based on isMobileOpen
+        isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+      } lg:translate-x-0 ${
+        // Desktop: width based on isCollapsed
+        isCollapsed ? 'lg:w-20' : 'lg:w-64'
+      } w-64`}
     >
       {/* Navigation */}
       <nav className="p-3 space-y-1 pb-32">
@@ -150,6 +161,7 @@ export default function RecruiterSidebar() {
           <Link
             key={item.path}
             to={item.path}
+            onClick={handleLinkClick}
             title={isCollapsed ? item.title : undefined}
             className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-3 py-3 rounded-xl transition-all duration-200 ${
               isActive(item.path)

@@ -28,33 +28,33 @@ export default function StatsCard({ title, value, icon, color = 'blue', trend }:
   return (
     <div className={`card relative overflow-hidden ${bgColors[color as keyof typeof bgColors] || bgColors.blue}`}>
       <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
+        <div className="space-y-1 sm:space-y-2 flex-1 min-w-0">
+          <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400 truncate">{title}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
           {trend && (
-            <div className={`flex items-center gap-1 text-sm ${trend.value >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+            <div className={`flex items-center gap-1 text-xs sm:text-sm ${trend.value >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
               {trend.value >= 0 ? (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
                 </svg>
               ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                 </svg>
               )}
               <span className="font-semibold">{Math.abs(trend.value)}%</span>
-              <span className="text-gray-500 dark:text-gray-400">{trend.label}</span>
+              <span className="text-gray-500 dark:text-gray-400 truncate">{trend.label}</span>
             </div>
           )}
         </div>
         {icon && (
-          <div className={`w-14 h-14 bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses] || colorClasses.blue} rounded-2xl flex items-center justify-center shadow-lg`}>
+          <div className={`w-10 h-10 sm:w-14 sm:h-14 bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses] || colorClasses.blue} rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0`}>
             {icon}
           </div>
         )}
       </div>
       {/* Decorative element */}
-      <div className={`absolute -right-8 -bottom-8 w-32 h-32 rounded-full opacity-10 bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses] || colorClasses.blue}`} />
+      <div className={`absolute -right-6 sm:-right-8 -bottom-6 sm:-bottom-8 w-24 h-24 sm:w-32 sm:h-32 rounded-full opacity-10 bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses] || colorClasses.blue}`} />
     </div>
   )
 }

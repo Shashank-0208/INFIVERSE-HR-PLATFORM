@@ -88,19 +88,19 @@ export default function CandidateDashboard() {
   return (
     <div className="space-y-8">
       {/* Welcome Header */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-500/5 to-cyan-500/5 dark:from-blue-500/10 dark:to-cyan-500/10 backdrop-blur-xl border border-blue-300/20 dark:border-blue-500/20">
-        <h1 className="page-title">Welcome back, {userName}</h1>
-        <p className="page-subtitle">Track your job applications and upcoming interviews</p>
-        <div className="mt-6 flex gap-4">
+      <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-blue-500/5 to-cyan-500/5 dark:from-blue-500/10 dark:to-cyan-500/10 backdrop-blur-xl border border-blue-300/20 dark:border-blue-500/20">
+        <h1 className="text-2xl sm:text-3xl font-heading font-bold text-gray-900 dark:text-white mb-2">Welcome back, {userName}</h1>
+        <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">Track your job applications and upcoming interviews</p>
+        <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-3">
           <button 
             onClick={() => navigate('/candidate/jobs')}
-            className="px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 sm:px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
           >
             Browse Jobs
           </button>
           <button 
             onClick={() => navigate('/candidate/profile')}
-            className="px-6 py-2.5 bg-blue-50/50 dark:bg-blue-900/20 backdrop-blur-sm text-blue-700 dark:text-blue-300 font-semibold rounded-lg hover:bg-blue-100/50 dark:hover:bg-blue-800/30 transition-colors border border-blue-200/30 dark:border-blue-500/20"
+            className="px-4 sm:px-6 py-2.5 bg-blue-50/50 dark:bg-blue-900/20 backdrop-blur-sm text-blue-700 dark:text-blue-300 font-semibold rounded-lg hover:bg-blue-100/50 dark:hover:bg-blue-800/30 transition-colors border border-blue-200/30 dark:border-blue-500/20 text-sm sm:text-base"
           >
             Update Profile
           </button>
@@ -108,7 +108,7 @@ export default function CandidateDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
         {statCards.map((stat, index) => (
           <div
             key={stat.label}
@@ -135,9 +135,9 @@ export default function CandidateDashboard() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Applications */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="section-title">Recent Applications</h2>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 dark:border-slate-700">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl font-heading font-bold text-gray-900 dark:text-white">Recent Applications</h2>
             <button
               onClick={() => navigate('/candidate/applied-jobs')}
               className="text-blue-500 hover:text-blue-600 text-sm font-medium"
@@ -192,9 +192,9 @@ export default function CandidateDashboard() {
         </div>
 
         {/* Upcoming Interviews */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="section-title">Upcoming Interviews</h2>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 dark:border-slate-700">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl font-heading font-bold text-gray-900 dark:text-white">Upcoming Interviews</h2>
             <button
               onClick={() => navigate('/candidate/interviews')}
               className="text-blue-500 hover:text-blue-600 text-sm font-medium"
@@ -266,9 +266,9 @@ export default function CandidateDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700">
-        <h2 className="section-title mb-6">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100 dark:border-slate-700">
+        <h2 className="text-lg sm:text-xl font-heading font-bold text-gray-900 dark:text-white mb-4 sm:mb-6">Quick Actions</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <button
             onClick={() => navigate('/candidate/profile')}
             className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-700/50 dark:to-slate-700 rounded-xl hover:shadow-md transition-all text-center group"

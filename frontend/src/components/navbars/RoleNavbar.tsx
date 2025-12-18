@@ -45,7 +45,7 @@ const roleConfig = {
 
 export default function RoleNavbar({ role }: RoleNavbarProps) {
   const { theme, toggleTheme } = useTheme()
-  const { isCollapsed, toggleSidebar } = useSidebar()
+  const { isCollapsed, toggleSidebar, toggleMobile } = useSidebar()
   const { signOut, userName } = useAuth()
   const navigate = useNavigate()
   const config = roleConfig[role]
@@ -80,12 +80,23 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
 
   return (
     <nav className="fixed top-0 left-0 right-0 h-16 backdrop-blur-xl bg-white/95 dark:bg-slate-900/95 border-b border-gray-200/50 dark:border-slate-700/50 z-50 shadow-sm transition-all duration-300">
-      <div className="flex items-center justify-between h-full px-4">
-        {/* Logo - Click to Toggle Sidebar */}
+      <div className="flex items-center justify-between h-full px-3 sm:px-4">
+        {/* Logo & Mobile Menu Button */}
         <div className="flex items-center gap-2">
+          {/* Mobile Menu Button */}
+          <button
+            onClick={toggleMobile}
+            className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors mr-1"
+            title="Toggle Menu"
+          >
+            <svg className="w-6 h-6 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          {/* Desktop Sidebar Toggle */}
           <button
             onClick={toggleSidebar}
-            className="flex items-center space-x-3 group"
+            className="hidden lg:flex items-center space-x-3 group"
             title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
             <div className={`w-10 h-10 bg-gradient-to-br ${config.gradient} rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-all duration-300 ${isCollapsed ? 'rotate-180' : ''}`}>
@@ -103,12 +114,23 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
               </p>
             </div>
           </button>
+          {/* Mobile Logo Only */}
+          <div className="lg:hidden flex items-center gap-2">
+            <div className={`w-8 h-8 bg-gradient-to-br ${config.gradient} rounded-lg flex items-center justify-center shadow-md`}>
+              {config.icon}
+            </div>
+            <span className="text-lg font-bold">
+              <span className={`bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent`}>
+                Infiverse
+              </span>
+            </span>
+          </div>
         </div>
         
         {/* Right Side Actions */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
-          {/* Search Bar */}
-          <div className="hidden lg:flex items-center">
+        <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-3">
+          {/* Search Bar - Desktop Only */}
+          <div className="hidden xl:flex items-center">
             <div className="relative">
               <input
                 type="text"
@@ -124,7 +146,7 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
           {/* Theme Toggle */}
           <button 
             onClick={toggleTheme}
-            className="p-2.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl transition-all duration-300 text-gray-700 dark:text-gray-300 hover:scale-110"
+            className="p-2 sm:p-2.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl transition-all duration-300 text-gray-700 dark:text-gray-300 hover:scale-110"
             title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
           >
             {theme === 'light' ? (
@@ -138,8 +160,8 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
             )}
           </button>
           
-          {/* Notifications */}
-          <button className="p-2.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl transition-all duration-300 text-gray-700 dark:text-gray-300 hover:scale-110 relative">
+          {/* Notifications - Hidden on small mobile */}
+          <button className="hidden sm:block p-2 sm:p-2.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl transition-all duration-300 text-gray-700 dark:text-gray-300 hover:scale-110 relative">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
@@ -147,18 +169,18 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
           </button>
 
           {/* User Profile */}
-          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-gray-200 dark:border-slate-700">
+          <div className="flex items-center gap-1 sm:gap-2 pl-1 sm:pl-2 lg:pl-3 border-l border-gray-200 dark:border-slate-700">
             <button
               onClick={() => navigate(config.profilePath)}
-              className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl p-1.5 transition-all duration-200"
+              className="flex items-center gap-1 sm:gap-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl p-1 sm:p-1.5 transition-all duration-200"
               title="View Profile"
             >
-              <div className={`w-8 h-8 bg-gradient-to-br ${config.gradient} rounded-full flex items-center justify-center shadow-md`}>
-                <span className="text-white font-semibold text-sm">
+              <div className={`w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br ${config.gradient} rounded-full flex items-center justify-center shadow-md`}>
+                <span className="text-white font-semibold text-xs sm:text-sm">
                   {userName?.charAt(0).toUpperCase() || localStorage.getItem('user_name')?.charAt(0).toUpperCase() || role.charAt(0).toUpperCase()}
                 </span>
               </div>
-              <div className="hidden md:block text-left">
+              <div className="hidden lg:block text-left">
                 <p className="text-sm font-medium text-gray-900 dark:text-white">
                   {userName || localStorage.getItem('user_name') || role.charAt(0).toUpperCase() + role.slice(1)}
                 </p>
@@ -167,10 +189,10 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
                 </p>
               </div>
             </button>
-            {/* Logout Button */}
+            {/* Logout Button - Hidden on mobile, shown on tablet+ */}
             <button
               onClick={handleLogout}
-              className="ml-2 p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              className="hidden sm:block p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
               title="Logout"
             >
               <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -3,9 +3,58 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co'
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key'
 
+// Debug: Log configuration (only in development)
+if (import.meta.env.DEV) {
+  console.log('🔧 Supabase Configuration:', {
+    url: supabaseUrl,
+    keyPrefix: supabaseAnonKey?.substring(0, 20) + '...',
+    isConfigured: supabaseUrl !== 'https://placeholder.supabase.co' && supabaseAnonKey !== 'placeholder-key'
+  })
+}
+
 // Create Supabase client with fallback values if not configured
 // This allows the app to run without Supabase (using localStorage auth instead)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+})
+
+/**
+ * Test Supabase connection
+ * Useful for debugging connection issues
+ */
+export const testSupabaseConnection = async (): Promise<{ success: boolean; error?: string }> => {
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: 'Supabase not configured' }
+  }
+
+  try {
+    // Try a simple health check by fetching the auth settings
+    const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+      method: 'GET',
+      headers: {
+        'apikey': supabaseAnonKey,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (response.ok || response.status === 404) {
+      // 404 is actually OK - it means the endpoint exists but no table specified
+      return { success: true }
+    }
+
+    return { success: false, error: `HTTP ${response.status}: ${response.statusText}` }
+  } catch (err: any) {
+    console.error('Supabase connection test failed:', err)
+    return { 
+      success: false, 
+      error: err.message || 'Network error - check if Supabase project is active' 
+    }
+  }
+}
 
 // Check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
@@ -62,10 +111,34 @@ export const signUp = async (email: string, password: string, userData: { name: 
           } 
         }
       }
+      
+      // Check for network/fetch errors
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        console.error('Supabase connection error:', error)
+        return {
+          data: null,
+          error: {
+            ...error,
+            message: 'Unable to connect to authentication service. Please check your internet connection or try again later.'
+          }
+        }
+      }
     }
     
     return { data, error }
   } catch (err: any) {
+    // If Supabase fails, check if it's a network error
+    if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')) {
+      console.error('Supabase network error during signup:', err)
+      return {
+        data: null,
+        error: {
+          message: 'Network error: Unable to connect to authentication service. Please check your internet connection and ensure the Supabase project is active.',
+          status: 0
+        }
+      }
+    }
+    
     // If Supabase fails, fall back to localStorage auth
     console.warn('Supabase sign up failed, using localStorage auth:', err)
     return { 
@@ -110,8 +183,33 @@ export const signIn = async (email: string, password: string) => {
       email,
       password,
     })
+    
+    // Check for network/fetch errors
+    if (error && (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError'))) {
+      console.error('Supabase connection error during login:', error)
+      return {
+        data: null,
+        error: {
+          ...error,
+          message: 'Unable to connect to authentication service. Please check your internet connection or try again later.'
+        }
+      }
+    }
+    
     return { data, error }
   } catch (err: any) {
+    // Check if it's a network error
+    if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')) {
+      console.error('Supabase network error during login:', err)
+      return {
+        data: null,
+        error: {
+          message: 'Network error: Unable to connect to authentication service. Please check your internet connection and ensure the Supabase project is active.',
+          status: 0
+        }
+      }
+    }
+    
     // If Supabase fails, fall back to localStorage auth
     console.warn('Supabase sign in failed, using localStorage auth:', err)
     const storedRole = localStorage.getItem('user_role')

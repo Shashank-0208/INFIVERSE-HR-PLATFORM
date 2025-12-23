@@ -102,6 +102,18 @@ export default function AuthPage() {
 
     try {
       if (mode === 'signup') {
+        // Test Supabase connection first (only in development)
+        if (import.meta.env.DEV && isSupabaseConfigured()) {
+          const { testSupabaseConnection } = await import('../../lib/supabase')
+          const connectionTest = await testSupabaseConnection()
+          if (!connectionTest.success) {
+            console.error('Supabase connection test failed:', connectionTest.error)
+            toast.error(`Connection error: ${connectionTest.error}. Please check if Supabase project is active.`)
+            setIsLoading(false)
+            return
+          }
+        }
+
         // SIGNUP: Create account with the selected role
         const { error, data } = await supabaseSignUp(formData.email, formData.password, {
           name: formData.fullName,

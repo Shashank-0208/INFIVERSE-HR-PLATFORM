@@ -278,7 +278,7 @@ export default function AuthPage() {
                   .insert({
                     id: data.user.id,
                     email: formData.email,
-                    full_name: data.user.user_metadata?.name || formData.email.split('@')[0],
+                    full_name: (data.user.user_metadata as any)?.name || formData.email.split('@')[0],
                     role: recoveryRole
                   })
                 

@@ -137,11 +137,9 @@ export default function AuthPage() {
         localStorage.setItem('isAuthenticated', 'true')
         localStorage.setItem('user_id', data.user.id)
         
-        // Update Supabase metadata if configured
-        // The role should already be set during signUp, but we ensure it's correct here
+        // Update Supabase metadata and create profile if configured
         if (isSupabaseConfigured()) {
           // Always try to update metadata to ensure role is saved
-          // This handles cases where the initial signup didn't save the role properly
           try {
             const { error: updateError } = await supabase.auth.updateUser({
               data: { 
@@ -152,17 +150,37 @@ export default function AuthPage() {
             })
             if (updateError) {
               console.warn('Could not update user metadata:', updateError)
-              // Even if update fails, continue - role is in localStorage
             } else {
               console.log('User metadata updated successfully with role:', selectedRole)
-              // Verify the update worked by getting fresh user data
-              const { data: { user: verifyUser } } = await supabase.auth.getUser()
-              if (verifyUser?.user_metadata?.role !== selectedRole) {
-                console.warn('Role verification failed. Role in metadata:', verifyUser?.user_metadata?.role, 'Expected:', selectedRole)
-              }
             }
           } catch (err) {
             console.warn('Error updating user metadata:', err)
+          }
+
+          // Explicitly create or update user profile in user_profiles table
+          // This ensures the profile exists even if the trigger didn't fire
+          try {
+            const { error: profileError } = await supabase
+              .from('user_profiles')
+              .upsert({
+                id: data.user.id,
+                email: formData.email,
+                full_name: formData.fullName,
+                role: selectedRole,
+                phone: formData.phone || null,
+                company: formData.company || null,
+              }, {
+                onConflict: 'id'
+              })
+            
+            if (profileError) {
+              console.warn('Could not create/update user profile:', profileError)
+              // Continue anyway - role is in localStorage and metadata
+            } else {
+              console.log('User profile created/updated successfully with role:', selectedRole)
+            }
+          } catch (err) {
+            console.warn('Error creating user profile:', err)
             // Continue anyway - role is in localStorage
           }
         }
@@ -247,40 +265,67 @@ export default function AuthPage() {
                 .eq('id', data.user.id)
                 .single()
               
-              // If profile doesn't exist, create it with default role
+              // If profile doesn't exist, create it
               if (profileError && profileError.code === 'PGRST116') {
-                // Profile doesn't exist - create it
-                const defaultRole = 'candidate' // Default to candidate for recovery
+                // Profile doesn't exist - try to get role from metadata first
+                const metadataRole = data.user.user_metadata?.role
+                const recoveryRole = (metadataRole && ['candidate', 'recruiter', 'client'].includes(metadataRole)) 
+                  ? metadataRole 
+                  : 'candidate' // Default to candidate if no metadata role
+                
                 const { error: insertError } = await supabase
                   .from('user_profiles')
                   .insert({
                     id: data.user.id,
                     email: formData.email,
                     full_name: data.user.user_metadata?.name || formData.email.split('@')[0],
-                    role: defaultRole
+                    role: recoveryRole
                   })
                 
                 if (!insertError) {
-                  userRole = defaultRole as UserRole
-                  console.log('Created missing profile with default role:', defaultRole)
-                  toast.success('Profile created. Please update your role in settings if needed.')
+                  userRole = recoveryRole as UserRole
+                  console.log('Created missing profile with role:', recoveryRole)
+                  toast.success('Profile created successfully!')
                 } else {
                   console.error('Failed to create profile:', insertError)
                 }
-              } else if (profileData && profileData.role) {
-                // Profile exists but role might be null - use default
-                userRole = (profileData.role || 'candidate') as UserRole
+              } else if (profileData) {
+                // Profile exists but role might be null - try metadata or default
+                if (profileData.role && ['candidate', 'recruiter', 'client'].includes(profileData.role)) {
+                  userRole = profileData.role as UserRole
+                } else {
+                  // Profile exists but role is null - update it from metadata or use default
+                  const metadataRole = data.user.user_metadata?.role
+                  const recoveryRole = (metadataRole && ['candidate', 'recruiter', 'client'].includes(metadataRole)) 
+                    ? metadataRole 
+                    : 'candidate'
+                  
+                  const { error: updateError } = await supabase
+                    .from('user_profiles')
+                    .update({ role: recoveryRole })
+                    .eq('id', data.user.id)
+                  
+                  if (!updateError) {
+                    userRole = recoveryRole as UserRole
+                    console.log('Updated profile role to:', recoveryRole)
+                  } else {
+                    // Use default if update fails
+                    userRole = 'candidate' as UserRole
+                  }
+                }
               }
             } catch (err) {
               console.error('Error during profile recovery:', err)
             }
           }
           
-          // If still no role, show error with helpful message
+          // If still no role, use default candidate role as last resort
           if (!userRole) {
-            toast.error('Role not found for this account. The account may need to be set up. Please contact support.')
-            setIsLoading(false)
-            return
+            console.warn('Using default candidate role as fallback')
+            userRole = 'candidate'
+            // Still save to localStorage so it works next time
+            localStorage.setItem('user_role', 'candidate')
+            toast.success('Logged in as Candidate. Please update your role in settings if needed.')
           }
         }
         

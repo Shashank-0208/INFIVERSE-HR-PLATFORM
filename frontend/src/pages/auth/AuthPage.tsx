@@ -219,46 +219,48 @@ export default function AuthPage() {
         // Get user's role from multiple sources (priority order)
         let userRole: UserRole | null = null
         
-        // Priority 1: Check user_profiles table (most reliable)
-        if (isSupabaseConfigured()) {
-          try {
-            const profileRole = await getUserRole(data.user.id)
-            if (profileRole && ['candidate', 'recruiter', 'client'].includes(profileRole)) {
-              userRole = profileRole as UserRole
-            }
-          } catch (err) {
-            console.warn('Could not fetch role from user_profiles:', err)
-          }
+        // Priority 1: Check user metadata from the sign-in response
+        // (This is fastest and works with both Supabase and localStorage fallback)
+        const metadataRole = data.user.user_metadata?.role
+        if (metadataRole && ['candidate', 'recruiter', 'client'].includes(metadataRole)) {
+          userRole = metadataRole as UserRole
         }
         
-        // Priority 2: Check user metadata from the sign-in response
-        if (!userRole) {
-          const metadataRole = data.user.user_metadata?.role
-          if (metadataRole && ['candidate', 'recruiter', 'client'].includes(metadataRole)) {
-            userRole = metadataRole as UserRole
-          }
-        }
-        
-        // Priority 3: Try to get fresh user data
-        if (!userRole && isSupabaseConfigured()) {
-          try {
-            const { data: { user: freshUser } } = await supabase.auth.getUser()
-            if (freshUser?.user_metadata?.role && ['candidate', 'recruiter', 'client'].includes(freshUser.user_metadata.role)) {
-              userRole = freshUser.user_metadata.role as UserRole
-            }
-          } catch (err) {
-            console.warn('Could not fetch fresh user data:', err)
-          }
-        }
-        
-        // Priority 4: Check localStorage (but only if email matches)
-        // This handles cases where Supabase isn't configured
+        // Priority 2: Check localStorage (if email matches)
+        // This handles cases where Supabase isn't configured or fails
         if (!userRole) {
           const storedEmail = localStorage.getItem('user_email')
           const storedRole = localStorage.getItem('user_role')
           // Only use localStorage role if email matches (same user)
           if (storedEmail === formData.email && storedRole && ['candidate', 'recruiter', 'client'].includes(storedRole)) {
             userRole = storedRole as UserRole
+            console.log('Using role from localStorage:', userRole)
+          }
+        }
+        
+        // Priority 3: Check user_profiles table (only if Supabase is configured and working)
+        if (!userRole && isSupabaseConfigured()) {
+          try {
+            const profileRole = await getUserRole(data.user.id)
+            if (profileRole && ['candidate', 'recruiter', 'client'].includes(profileRole)) {
+              userRole = profileRole as UserRole
+              console.log('Using role from user_profiles:', userRole)
+            }
+          } catch (err) {
+            console.warn('Could not fetch role from user_profiles:', err)
+          }
+        }
+        
+        // Priority 4: Try to get fresh user data (only if Supabase is configured and working)
+        if (!userRole && isSupabaseConfigured()) {
+          try {
+            const { data: { user: freshUser } } = await supabase.auth.getUser()
+            if (freshUser?.user_metadata?.role && ['candidate', 'recruiter', 'client'].includes(freshUser.user_metadata.role)) {
+              userRole = freshUser.user_metadata.role as UserRole
+              console.log('Using role from fresh user data:', userRole)
+            }
+          } catch (err) {
+            console.warn('Could not fetch fresh user data:', err)
           }
         }
         
@@ -279,11 +281,18 @@ export default function AuthPage() {
               
               // If profile doesn't exist, create it
               if (profileError && profileError.code === 'PGRST116') {
-                // Profile doesn't exist - try to get role from metadata first
+                // Try to get role from multiple sources (in priority order)
                 const metadataRole = data.user.user_metadata?.role
-                const recoveryRole = (metadataRole && ['candidate', 'recruiter', 'client'].includes(metadataRole)) 
-                  ? metadataRole 
-                  : 'candidate' // Default to candidate if no metadata role
+                const storedEmail = localStorage.getItem('user_email')
+                const storedRole = localStorage.getItem('user_role')
+                const localStorageRole = (storedEmail === formData.email && storedRole) ? storedRole : null
+                
+                // Priority: metadata > localStorage > default to candidate
+                const recoveryRole = (metadataRole && ['candidate', 'recruiter', 'client'].includes(metadataRole))
+                  ? metadataRole
+                  : (localStorageRole && ['candidate', 'recruiter', 'client'].includes(localStorageRole))
+                  ? localStorageRole
+                  : 'candidate' // Default to candidate if no role found
                 
                 const { error: insertError } = await supabase
                   .from('user_profiles')
@@ -300,16 +309,27 @@ export default function AuthPage() {
                   toast.success('Profile created successfully!')
                 } else {
                   console.error('Failed to create profile:', insertError)
+                  // Still use the recovery role even if profile creation fails
+                  if (recoveryRole !== 'candidate' || metadataRole || localStorageRole) {
+                    userRole = recoveryRole as UserRole
+                  }
                 }
               } else if (profileData) {
-                // Profile exists but role might be null - try metadata or default
+                // Profile exists but role might be null - try metadata or localStorage or default
                 if (profileData.role && ['candidate', 'recruiter', 'client'].includes(profileData.role)) {
                   userRole = profileData.role as UserRole
                 } else {
-                  // Profile exists but role is null - update it from metadata or use default
+                  // Profile exists but role is null - update it from metadata, localStorage, or use default
                   const metadataRole = data.user.user_metadata?.role
-                  const recoveryRole = (metadataRole && ['candidate', 'recruiter', 'client'].includes(metadataRole)) 
-                    ? metadataRole 
+                  const storedEmail = localStorage.getItem('user_email')
+                  const storedRole = localStorage.getItem('user_role')
+                  const localStorageRole = (storedEmail === formData.email && storedRole) ? storedRole : null
+                  
+                  // Priority: metadata > localStorage > default to candidate
+                  const recoveryRole = (metadataRole && ['candidate', 'recruiter', 'client'].includes(metadataRole))
+                    ? metadataRole
+                    : (localStorageRole && ['candidate', 'recruiter', 'client'].includes(localStorageRole))
+                    ? localStorageRole
                     : 'candidate'
                   
                   const { error: updateError } = await supabase
@@ -321,8 +341,8 @@ export default function AuthPage() {
                     userRole = recoveryRole as UserRole
                     console.log('Updated profile role to:', recoveryRole)
                   } else {
-                    // Use default if update fails
-                    userRole = 'candidate' as UserRole
+                    // Use recovery role even if update fails
+                    userRole = recoveryRole as UserRole
                   }
                 }
               }
@@ -331,13 +351,20 @@ export default function AuthPage() {
             }
           }
           
-          // If still no role, use default candidate role as last resort
+          // If still no role, check localStorage one more time, then default to candidate
           if (!userRole) {
-            console.warn('Using default candidate role as fallback')
-            userRole = 'candidate'
-            // Still save to localStorage so it works next time
-            localStorage.setItem('user_role', 'candidate')
-            toast.success('Logged in as Candidate. Please update your role in settings if needed.')
+            const storedEmail = localStorage.getItem('user_email')
+            const storedRole = localStorage.getItem('user_role')
+            if (storedEmail === formData.email && storedRole && ['candidate', 'recruiter', 'client'].includes(storedRole)) {
+              userRole = storedRole as UserRole
+              console.log('Using localStorage role as final fallback:', userRole)
+            } else {
+              console.warn('Using default candidate role as last resort')
+              userRole = 'candidate'
+              // Still save to localStorage so it works next time
+              localStorage.setItem('user_role', 'candidate')
+              toast.success('Logged in as Candidate. Please update your role in settings if needed.')
+            }
           }
         }
         

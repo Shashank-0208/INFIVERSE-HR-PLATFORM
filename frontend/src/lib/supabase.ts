@@ -198,16 +198,19 @@ export const signIn = async (email: string, password: string) => {
   if (!isSupabaseConfigured()) {
     // Check if user exists in localStorage (for demo purposes)
     // In real app, this would validate against a backend
+    const storedEmail = localStorage.getItem('user_email')
     const storedRole = localStorage.getItem('user_role')
+    // Only return role if email matches (same user)
+    const roleToUse = (storedEmail === email && storedRole) ? storedRole : null
     
     // Return mock success for localStorage-based auth
-    // Use stored role if available, otherwise return null (will be set by AuthPage)
+    // Use stored role if available and email matches, otherwise return null (will be set by AuthPage)
     return { 
       data: { 
         user: { 
           id: localStorage.getItem('user_id') || 'local-user', 
           email: email,
-          user_metadata: storedRole ? { role: storedRole } : {}
+          user_metadata: roleToUse ? { role: roleToUse } : {}
         } 
       }, 
       error: null 
@@ -228,14 +231,17 @@ export const signIn = async (email: string, password: string) => {
       error.name === 'AuthRetryableFetchError'
     )) {
       console.warn('Supabase connection error during login, falling back to localStorage auth:', error.message)
-      // Fall back to localStorage auth instead of returning error
+      // Fall back to localStorage auth - only use role if email matches
+      const storedEmail = localStorage.getItem('user_email')
       const storedRole = localStorage.getItem('user_role')
+      // Only return role if email matches (same user)
+      const roleToUse = (storedEmail === email && storedRole) ? storedRole : null
       return { 
         data: { 
           user: { 
             id: localStorage.getItem('user_id') || 'local-user', 
             email: email,
-            user_metadata: storedRole ? { role: storedRole } : {}
+            user_metadata: roleToUse ? { role: roleToUse } : {}
           } 
         }, 
         error: null 
@@ -253,14 +259,17 @@ export const signIn = async (email: string, password: string) => {
       err?.name === 'TypeError'
     ) {
       console.warn('Supabase network/DNS error during login, falling back to localStorage auth:', err.message || err.name)
-      // Fall back to localStorage auth
+      // Fall back to localStorage auth - only use role if email matches
+      const storedEmail = localStorage.getItem('user_email')
       const storedRole = localStorage.getItem('user_role')
+      // Only return role if email matches (same user)
+      const roleToUse = (storedEmail === email && storedRole) ? storedRole : null
       return { 
         data: { 
           user: { 
             id: localStorage.getItem('user_id') || 'local-user', 
             email: email,
-            user_metadata: storedRole ? { role: storedRole } : {}
+            user_metadata: roleToUse ? { role: roleToUse } : {}
           } 
         }, 
         error: null 

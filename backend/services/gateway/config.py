@@ -60,7 +60,7 @@ def setup_logging():
     if ENVIRONMENT == "production":
         # Disable debug logging in production
         logging.getLogger("uvicorn").setLevel(logging.WARNING)
-        logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
+        logging.getLogger("pymongo").setLevel(logging.WARNING)
 
 # Configuration validation
 def validate_config():

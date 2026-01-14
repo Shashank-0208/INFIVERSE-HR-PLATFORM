@@ -15,7 +15,7 @@
 - **Auth page** - Public, redirects if already logged in
 
 ### ✅ **Features**
-- Supabase authentication (with localStorage fallback)
+- JWT token authentication
 - User profile creation
 - Role management
 - Session persistence
@@ -26,15 +26,15 @@
 ### **Signup Flow:**
 1. User goes to `/auth` → Selects "Sign Up"
 2. Fills form → Selects role (candidate/recruiter/client)
-3. Submits → Creates account in Supabase
-4. Profile created in database
+3. Submits → Registers with backend API
+4. JWT token received and stored
 5. Redirects to role-specific dashboard
 
 ### **Login Flow:**
 1. User goes to `/auth` → Selects "Sign In"
 2. Enters email/password
-3. Authenticates with Supabase
-4. Gets role from database
+3. Authenticates with backend API
+4. JWT token received and stored
 5. Redirects to role-specific dashboard
 
 ### **Route Protection:**
@@ -44,9 +44,9 @@
 
 ## 📋 Current Configuration
 
-### **Supabase Settings:**
-- URL: `https://smcgaaecckvngkhvsanb.supabase.com`
-- Key: Configured in `.env` file
+### **API Settings:**
+- URL: Configured in `.env` file as `VITE_API_BASE_URL`
+- Backend: Connects to JWT authentication endpoints
 
 ### **Routes:**
 - `/` → Redirects to `/auth`
@@ -78,21 +78,20 @@
 
 Make sure your `.env` file has:
 ```env
-VITE_SUPABASE_URL=https://smcgaaecckvngkhvsanb.supabase.com
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
+VITE_API_BASE_URL=http://localhost:8000
 ```
 
 ## 🔧 If You See Errors
 
 ### **"Failed to fetch" Error:**
-1. Check Supabase project is active (not paused)
-2. Verify `.env` file has correct URL and key
+1. Check backend API server is running
+2. Verify `.env` file has correct API URL
 3. Restart dev server after changing `.env`
 
-### **"Role not found" Error:**
-1. Run the migration SQL in Supabase dashboard
-2. Check `user_profiles` table exists
-3. Verify trigger is created
+### **"Authentication failed" Error:**
+1. Verify backend authentication endpoints are working
+2. Check if the backend JWT system is properly configured
+3. Confirm user credentials are correct
 
 ### **Build Errors:**
 - Run `npm run build` to check for TypeScript errors
@@ -100,18 +99,18 @@ VITE_SUPABASE_ANON_KEY=your-anon-key-here
 
 ## 📝 Next Steps
 
-1. **Run Database Migration:**
-   - Go to Supabase Dashboard → SQL Editor
-   - Run `frontend/supabase/migrations/001_create_user_profiles.sql`
+1. **Ensure Backend is Running:**
+   - Start the backend API server
+   - Verify JWT authentication endpoints are accessible
 
 2. **Test Authentication:**
    - Try signing up with a new account
    - Try logging in
    - Verify role-based redirects work
 
-3. **Verify Supabase Connection:**
+3. **Verify API Connection:**
    - Check browser console for debug messages
-   - Should see: `🔧 Supabase Configuration:`
+   - Should see successful API calls to authentication endpoints
 
 ## ✅ Status
 

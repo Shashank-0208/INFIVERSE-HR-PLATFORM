@@ -5,8 +5,9 @@
 ```
 frontend/
 ├── src/
-│   ├── lib/
-│   │   └── supabase.ts              # Supabase client & auth functions
+│   ├── services/
+│   │   ├── authService.ts           # JWT auth functions & token management
+│   │   └── api.ts                   # API service with JWT interceptors
 │   ├── context/
 │   │   └── AuthContext.tsx          # React context for auth state
 │   ├── components/
@@ -15,20 +16,16 @@ frontend/
 │   │   └── auth/
 │   │       └── AuthPage.tsx         # Signup/Login UI
 │   └── App.tsx                      # Main app with route definitions
-├── supabase/
-│   ├── migrations/
-│   │   └── 001_create_user_profiles.sql  # Database schema
-│   └── update_existing_users.sql   # Migration script
 └── .env                             # Environment variables
 ```
 
 ## 🏗️ Architecture Overview
 
-### **Dual Authentication System**
+### **JWT-Based Authentication System**
 
-The system uses a **hybrid approach** that supports both:
-1. **Supabase Auth** (primary) - Full authentication with database
-2. **localStorage Auth** (fallback) - Works when Supabase is unavailable
+The system uses a **JWT (JSON Web Token) approach** that integrates with the backend authentication system:
+1. **JWT Tokens** (primary) - Tokens issued by backend and stored in localStorage
+2. **Backend Integration** - Direct connection to backend JWT authentication endpoints
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -41,63 +38,69 @@ The system uses a **hybrid approach** that supports both:
 │              AuthPage.tsx                               │
 │  - Handles form submission                             │
 │  - Validates input                                     │
-│  - Calls auth functions                                │
+│  - Calls auth context functions                        │
 └──────────────────┬──────────────────────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────────────────────┐
-│              supabase.ts                                │
-│  - signUp() / signIn() / signOut()                     │
-│  - Supabase client configuration                        │
-│  - Error handling & fallback                           │
-└──────────────────┬──────────────────────────────────────┘
-                   │
-        ┌──────────┴──────────┐
-        │                     │
-        ▼                     ▼
-┌──────────────┐    ┌──────────────────────┐
-│  Supabase   │    │   localStorage       │
-│  Database   │    │   (Fallback)          │
-└──────────────┘    └──────────────────────┘
-        │                     │
-        └──────────┬──────────┘
                    │
                    ▼
 ┌─────────────────────────────────────────────────────────┐
 │              AuthContext.tsx                            │
-│  - Manages auth state                                   │
-│  - Provides auth to entire app                          │
-│  - Listens for auth changes                             │
+│  - Manages auth state                                  │
+│  - Calls authService methods                           │
+│  - Updates user state                                  │
 └──────────────────┬──────────────────────────────────────┘
                    │
                    ▼
 ┌─────────────────────────────────────────────────────────┐
-│              ProtectedRoute.tsx                         │
-│  - Checks authentication                                │
-│  - Validates user role                                  │
-│  - Redirects if unauthorized                            │
+│              authService.ts                             │
+│  - signIn() / signUp() / signOut()                     │
+│  - JWT token management                                │
+│  - API calls to backend                                │
+└──────────────────┬──────────────────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────────────────┐
+│              Backend API                                │
+│  - /v1/candidate/login                                 │
+│  - /v1/candidate/register                              │
+│  - Issues JWT tokens                                   │
+└──────────────────┬──────────────────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────────────────┐
+│              localStorage                               │
+│  - Stores JWT token                                    │
+│  - Stores user data                                    │
+│  - Stores user role                                    │
+└─────────────────────────────────────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────────────────┐
+│              api.ts (Axios Interceptor)               │
+│  - Attaches JWT tokens to requests                     │
+│  - Handles auth errors                                 │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ## 📦 Core Components
 
-### 1. **Supabase Client** (`src/lib/supabase.ts`)
+### 1. **Auth Service** (`src/services/authService.ts`)
 
-**Purpose:** Low-level Supabase integration and auth functions
+**Purpose:** Low-level JWT token management and API integration
 
 **Key Functions:**
-- `signUp(email, password, userData)` - Create new user
-- `signIn(email, password)` - Authenticate user
-- `signOut()` - Sign out user
-- `getUserRole(userId)` - Get user role from database
-- `testSupabaseConnection()` - Test Supabase connectivity
-- `isSupabaseConfigured()` - Check if Supabase is set up
+- `login(email, password)` - Authenticate user and get JWT token
+- `register(userData)` - Create new user and get JWT token
+- `logout()` - Sign out user and clear stored data
+- `getAuthToken()` - Get stored JWT token
+- `setAuthToken(token)` - Set JWT token in storage and axios
+- `isAuthenticated()` - Check if user is authenticated
+- `getUserData()` - Get stored user data
 
 **Features:**
-- Automatic fallback to localStorage if Supabase fails
+- JWT token management in localStorage
+- Axios defaults configuration for auth headers
+- Token expiration checking
 - Error handling with user-friendly messages
-- Connection testing before operations
-- Debug logging in development
 
 ### 2. **Auth Context** (`src/context/AuthContext.tsx`)
 
@@ -107,7 +110,6 @@ The system uses a **hybrid approach** that supports both:
 ```typescript
 {
   user: User | null              // Current user object
-  session: Session | null        // Supabase session
   loading: boolean               // Auth check in progress
   userRole: string | null        // User's role (candidate/recruiter/client)
   userName: string | null       // User's name
@@ -121,10 +123,9 @@ The system uses a **hybrid approach** that supports both:
 
 **Initialization Flow:**
 1. Check localStorage for existing auth
-2. If found, create mock user from localStorage
-3. Try to get Supabase session (non-blocking)
-4. Listen for auth state changes
-5. Update state accordingly
+2. If found, restore user from localStorage
+3. Verify JWT token validity
+4. Update state accordingly
 
 ### 3. **Auth Page** (`src/pages/auth/AuthPage.tsx`)
 
@@ -198,35 +199,19 @@ The system uses a **hybrid approach** that supports both:
 
 ## 🗄️ Database Schema
 
-### **Supabase Auth Tables** (Managed by Supabase)
-- `auth.users` - User accounts
-- `auth.sessions` - Active sessions
+### **Backend User Management**
 
-### **Custom Tables**
+The user authentication is handled by the backend system which manages user accounts in the PostgreSQL database. The frontend only stores JWT tokens and user metadata locally.
 
-#### **user_profiles** (`supabase/migrations/001_create_user_profiles.sql`)
+### **Frontend Storage (localStorage)**
 
-```sql
-CREATE TABLE public.user_profiles (
-    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    email TEXT UNIQUE NOT NULL,
-    full_name TEXT,
-    role TEXT NOT NULL CHECK (role IN ('candidate', 'recruiter', 'client')) DEFAULT 'candidate',
-    phone TEXT,
-    company TEXT,
-    avatar_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
+The frontend stores authentication data in localStorage:
 
-**Triggers:**
-- `on_auth_user_created` - Auto-creates profile when user signs up
-- `set_updated_at` - Auto-updates timestamp on changes
-
-**Row Level Security (RLS):**
-- Users can view/update their own profile
-- Service role has full access
+- `auth_token` - JWT token for API authentication
+- `user_data` - User information received from backend
+- `user_role` - User role (candidate, recruiter, client)
+- `user_email` - User's email address
+- `user_name` - User's name
 
 ## 🔄 Authentication Flows
 
@@ -241,27 +226,23 @@ Submit form
     ↓
 AuthPage.tsx validates
     ↓
-supabase.ts → signUp()
+AuthContext.tsx → handleSignUp()
+    ↓
+authService.ts → register()
     ↓
 ┌─────────────────────────┐
-│  Supabase Auth          │
+│  Backend API            │
+│  - /v1/candidate/register │
 │  - Create user account  │
-│  - Set user metadata    │
+│  - Return JWT token     │
 └───────────┬─────────────┘
             │
             ▼
 ┌─────────────────────────┐
-│  Database Trigger        │
-│  - Creates user_profile  │
-│  - Sets role from meta   │
-└───────────┬─────────────┘
-            │
-            ▼
-┌─────────────────────────┐
-│  AuthPage.tsx           │
+│  Store JWT Token       │
 │  - Save to localStorage │
-│  - Update metadata      │
-│  - Create/update profile│
+│  - Update axios headers │
+│  - Store user data      │
 └───────────┬─────────────┘
             │
             ▼
@@ -278,38 +259,29 @@ User enters credentials
     ↓
 AuthPage.tsx validates
     ↓
-supabase.ts → signIn()
+AuthContext.tsx → handleSignIn()
+    ↓
+authService.ts → login()
     ↓
 ┌─────────────────────────┐
-│  Supabase Auth           │
-│  - Verify credentials    │
-│  - Create session        │
+│  Backend API            │
+│  - /v1/candidate/login  │
+│  - Verify credentials   │
+│  - Return JWT token     │
+└───────────┬─────────────┘
+            │
+            ▼
+┌─────────────────────────┐
+│  Store JWT Token       │
+│  - Save to localStorage │
+│  - Update axios headers │
+│  - Store user data      │
 └───────────┬─────────────┘
             │
             ▼
 ┌─────────────────────────┐
 │  Get User Role          │
-│  Priority:              │
-│  1. user_profiles table │
-│  2. user metadata       │
-│  3. Fresh user data      │
-│  4. localStorage        │
-└───────────┬─────────────┘
-            │
-            ▼
-┌─────────────────────────┐
-│  If role not found:     │
-│  - Create profile       │
-│  - Set default role     │
-└───────────┬─────────────┘
-            │
-            ▼
-┌─────────────────────────┐
-│  Save to localStorage   │
-│  - user_role            │
-│  - user_email           │
-│  - user_name            │
-│  - isAuthenticated      │
+│  From localStorage      │
 └───────────┬─────────────┘
             │
             ▼
@@ -327,8 +299,9 @@ User clicks logout
 AuthContext → signOut()
     ↓
 ┌─────────────────────────┐
-│  Supabase signOut()     │
-│  - End session          │
+│  authService.signOut()  │
+│  - Clear localStorage   │
+│  - Remove axios headers │
 └───────────┬─────────────┘
             │
             ▼
@@ -337,8 +310,8 @@ AuthContext → signOut()
 │  - user_role            │
 │  - user_email           │
 │  - user_name            │
-│  - isAuthenticated      │
-│  - user_id              │
+│  - auth_token           │
+│  - user_data            │
 └───────────┬─────────────┘
             │
             ▼
@@ -398,21 +371,12 @@ AuthContext → signOut()
 ### **Environment Variables** (`.env`)
 
 ```env
-VITE_SUPABASE_URL=https://your-project.supabase.com
-VITE_SUPABASE_ANON_KEY=your-anon-public-key
+VITE_API_BASE_URL=http://localhost:8000
 ```
 
-### **Supabase Client Options**
+### **API Configuration**
 
-```typescript
-{
-  auth: {
-    autoRefreshToken: true,    // Auto-refresh expired tokens
-    persistSession: true,      // Save session to localStorage
-    detectSessionInUrl: true   // Detect session from URL
-  }
-}
-```
+The authentication service uses axios for API calls and automatically attaches JWT tokens to requests via interceptors.
 
 ## 🛡️ Security Features
 
@@ -468,12 +432,12 @@ console.log(result)
 
 | File | Purpose |
 |------|---------|
-| `src/lib/supabase.ts` | Supabase client & auth functions |
+| `src/services/authService.ts` | JWT auth functions & token management |
 | `src/context/AuthContext.tsx` | Global auth state management |
 | `src/pages/auth/AuthPage.tsx` | Signup/Login UI |
 | `src/components/ProtectedRoute.tsx` | Route protection |
+| `src/services/api.ts` | API service with JWT interceptors |
 | `src/App.tsx` | Route definitions |
-| `supabase/migrations/001_create_user_profiles.sql` | Database schema |
 | `.env` | Environment configuration |
 
 ## 🚀 Usage Examples
@@ -515,5 +479,5 @@ if (userRole === 'candidate') return <CandidateDashboard />
 3. **Handle loading states** - Check `loading` before rendering
 4. **Validate roles** - Always check role before showing content
 5. **Error handling** - Show user-friendly error messages
-6. **Fallback gracefully** - System works even if Supabase is down
+6. **Token management** - Properly handle JWT token expiration
 

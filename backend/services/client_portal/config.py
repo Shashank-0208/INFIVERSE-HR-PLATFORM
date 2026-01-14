@@ -63,8 +63,9 @@ if not JWT_SECRET_KEY:
 # Candidate JWT Secret (optional for client portal)
 CANDIDATE_JWT_SECRET_KEY = os.getenv("CANDIDATE_JWT_SECRET_KEY", "candidate_jwt_secret_key_2025")
 
-# Database URL (optional for client portal - uses gateway)
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://bhiv_user:password@db:5432/bhiv_hr")
+# Database URL (optional for client portal - uses gateway for all DB operations)
+# MongoDB connection - not used directly by client portal
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 # API Configuration
 API_BASE_URL = GATEWAY_SERVICE_URL

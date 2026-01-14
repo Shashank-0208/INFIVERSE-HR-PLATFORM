@@ -2,8 +2,9 @@ from fastapi import FastAPI, HTTPException, Depends, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import psycopg2
-from psycopg2 import pool
+# MongoDB imports (migrated from psycopg2/PostgreSQL)
+from database import get_mongo_db, get_collection
+from bson import ObjectId
 import os
 import json
 import sys
@@ -174,46 +175,19 @@ class MatchResponse(BaseModel):
     algorithm_version: str
     status: str
 
-# Initialize connection pool
-connection_pool = None
-
-def init_connection_pool():
-    """Initialize database connection pool"""
-    global connection_pool
-    database_url = os.getenv("DATABASE_URL")
-    
-    try:
-        connection_pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=2,
-            maxconn=10,
-            dsn=database_url,
-            connect_timeout=10,
-            application_name="bhiv_agent"
-        )
-        logger.info("Database connection pool initialized")
-    except Exception as e:
-        logger.error(f"Failed to initialize connection pool: {e}")
-
+# MongoDB connection functions (migrated from PostgreSQL connection pool)
 def get_db_connection():
-    """Get database connection from pool"""
-    global connection_pool
-    if not connection_pool:
-        init_connection_pool()
-    
+    """Get MongoDB database connection"""
     try:
-        conn = connection_pool.getconn()
-        if conn:
-            conn.autocommit = True
-        return conn
+        db = get_mongo_db()
+        return db
     except Exception as e:
-        logger.error(f"Failed to get connection from pool: {e}")
+        logger.error(f"Failed to get MongoDB connection: {e}")
         return None
 
 def return_db_connection(conn):
-    """Return connection to pool"""
-    global connection_pool
-    if connection_pool and conn:
-        connection_pool.putconn(conn)
+    """No-op for MongoDB (connection pooling handled automatically)"""
+    pass
 
 @app.get("/", tags=["Core API Endpoints"], summary="AI Service Information")
 def read_root():
@@ -242,41 +216,35 @@ def health_check():
 
 @app.get("/test-db", tags=["System Diagnostics"], summary="Database Connectivity Test")
 def test_database(auth = Depends(auth_dependency)):
-    conn = None
+    db = None
     try:
-        conn = get_db_connection()
-        if not conn:
+        db = get_db_connection()
+        if not db:
             return {"status": "failed", "error": "Connection failed"}
         
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM candidates")
-        count = cursor.fetchone()[0]
-        cursor.execute("SELECT id, name FROM candidates LIMIT 3")
-        samples = cursor.fetchall()
-        cursor.close()
+        # MongoDB version of candidate count and sample query
+        count = db.candidates.count_documents({})
+        samples = list(db.candidates.find({}, {'_id': 1, 'name': 1}).limit(3))
         
         return {
             "status": "success",
             "candidates_count": count, 
-            "samples": [{'id': s[0], 'name': s[1]} for s in samples]
+            "samples": [{'id': str(s.get('_id')), 'name': s.get('name')} for s in samples]
         }
     except Exception as e:
         logger.error(f"Database test failed: {e}")
         return {"status": "failed", "error": str(e)}
-    finally:
-        if conn:
-            return_db_connection(conn)
 
 @app.post("/match", response_model=MatchResponse, tags=["AI Matching Engine"], summary="AI-Powered Candidate Matching")
 def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
     """Phase 3 AI-powered candidate matching"""
     start_time = datetime.now()
     logger.info(f"Starting Phase 3 match for job_id: {request.job_id}")
-    conn = None
+    db = None
     
     try:
-        conn = get_db_connection()
-        if not conn:
+        db = get_db_connection()
+        if not db:
             logger.error("Database connection failed")
             return MatchResponse(
                 job_id=request.job_id,
@@ -289,15 +257,16 @@ def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
         
         logger.info("Database connection successful")
         
-        # Get job details
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT title, description, department, location, experience_level, requirements
-            FROM jobs WHERE id = %s
-        """, (request.job_id,))
+        # Get job details (MongoDB version)
+        # Try to find by ObjectId first, then by integer id
+        try:
+            job_query = {'_id': ObjectId(str(request.job_id))}
+        except:
+            job_query = {'$or': [{'_id': request.job_id}, {'id': request.job_id}]}
         
-        job_data = cursor.fetchone()
-        if not job_data:
+        job_doc = db.jobs.find_one(job_query)
+        
+        if not job_doc:
             return MatchResponse(
                 job_id=request.job_id,
                 top_candidates=[],
@@ -307,18 +276,17 @@ def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
                 status="job_not_found"
             )
         
-        job_title, job_desc, job_dept, job_location, job_level, job_requirements = job_data
+        job_title = job_doc.get('title', '')
+        job_desc = job_doc.get('description', '')
+        job_dept = job_doc.get('department', '')
+        job_location = job_doc.get('location', '')
+        job_level = job_doc.get('experience_level', '')
+        job_requirements = job_doc.get('requirements', '')
         logger.info(f"Processing job: {job_title}")
         
-        # Get all candidates
-        cursor.execute("""
-            SELECT id, name, email, phone, location, experience_years, 
-                   technical_skills, seniority_level, education_level
-            FROM candidates 
-            ORDER BY created_at DESC
-        """)
-        
-        candidates = cursor.fetchall()
+        # Get all candidates (MongoDB version)
+        candidates_cursor = db.candidates.find({}).sort('created_at', -1)
+        candidates = list(candidates_cursor)
         logger.info(f"Found {len(candidates)} candidates for Phase 3 matching")
         
         if not candidates:
@@ -344,20 +312,19 @@ def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
             'experience_level': job_level
         }
         
-        # Convert candidates to dict format
+        # Convert candidates to dict format (MongoDB documents)
         candidates_dict = []
-        for candidate in candidates:
-            cand_id, name, email, phone, location, exp_years, skills, seniority, education = candidate
+        for cand in candidates:
             candidates_dict.append({
-                'id': cand_id,
-                'name': name,
-                'email': email,
-                'phone': phone,
-                'location': location,
-                'experience_years': exp_years,
-                'technical_skills': skills,
-                'seniority_level': seniority,
-                'education_level': education
+                'id': str(cand.get('_id')),
+                'name': cand.get('name', ''),
+                'email': cand.get('email', ''),
+                'phone': cand.get('phone', ''),
+                'location': cand.get('location', ''),
+                'experience_years': cand.get('experience_years', 0),
+                'technical_skills': cand.get('technical_skills', ''),
+                'seniority_level': cand.get('seniority_level', ''),
+                'education_level': cand.get('education_level', '')
             })
         
         # Use Phase 3 semantic matching if available, otherwise fallback
@@ -458,7 +425,6 @@ def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
         # Get top candidates
         top_candidates = scored_candidates[:10]
         
-        cursor.close()
         processing_time = (datetime.now() - start_time).total_seconds()
         
         logger.info(f"Phase 3 matching completed: {len(top_candidates)} top candidates found")
@@ -482,9 +448,6 @@ def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
             algorithm_version="3.0.0-phase3-production",
             status="error"
         )
-    finally:
-        if conn:
-            return_db_connection(conn)
 
 class BatchMatchRequest(BaseModel):
     job_ids: List[int]
@@ -499,61 +462,56 @@ def batch_match_jobs(request: BatchMatchRequest, auth = Depends(auth_dependency)
     if len(request.job_ids) > 10:
         raise HTTPException(status_code=400, detail="Maximum 10 jobs can be processed in batch")
     
-    conn = None
+    db = None
     try:
-        conn = get_db_connection()
-        if not conn:
+        db = get_db_connection()
+        if not db:
             raise HTTPException(status_code=500, detail="Database connection failed")
         
-        cursor = conn.cursor()
+        # Get jobs data (MongoDB version)
+        # Build query for multiple job IDs (try ObjectId and integer id)
+        job_queries = []
+        for jid in request.job_ids:
+            try:
+                job_queries.append({'_id': ObjectId(str(jid))})
+            except:
+                job_queries.append({'$or': [{'_id': jid}, {'id': jid}]})
         
-        # Get jobs data
-        cursor.execute("""
-            SELECT id, title, description, department, location, experience_level, requirements
-            FROM jobs WHERE id = ANY(%s)
-        """, (request.job_ids,))
+        jobs_cursor = db.jobs.find({'$or': job_queries})
+        jobs_data = list(jobs_cursor)
         
-        jobs_data = cursor.fetchall()
         if not jobs_data:
             raise HTTPException(status_code=404, detail="No jobs found")
         
-        # Get all candidates
-        cursor.execute("""
-            SELECT id, name, email, phone, location, experience_years, 
-                   technical_skills, seniority_level, education_level
-            FROM candidates 
-            ORDER BY created_at DESC
-        """)
+        # Get all candidates (MongoDB version)
+        candidates_cursor = db.candidates.find({}).sort('created_at', -1)
+        candidates_data = list(candidates_cursor)
         
-        candidates_data = cursor.fetchall()
-        
-        # Format data for batch processing
+        # Format data for batch processing (already in dict format from MongoDB)
         jobs = []
-        for job in jobs_data:
-            job_id, title, desc, dept, location, level, requirements = job
+        for job_doc in jobs_data:
             jobs.append({
-                'id': job_id,
-                'title': title,
-                'description': desc,
-                'department': dept,
-                'location': location,
-                'experience_level': level,
-                'requirements': requirements
+                'id': str(job_doc.get('_id')),
+                'title': job_doc.get('title', ''),
+                'description': job_doc.get('description', ''),
+                'department': job_doc.get('department', ''),
+                'location': job_doc.get('location', ''),
+                'experience_level': job_doc.get('experience_level', ''),
+                'requirements': job_doc.get('requirements', '')
             })
         
         candidates = []
-        for candidate in candidates_data:
-            cand_id, name, email, phone, location, exp_years, skills, seniority, education = candidate
+        for cand in candidates_data:
             candidates.append({
-                'id': cand_id,
-                'name': name,
-                'email': email,
-                'phone': phone,
-                'location': location,
-                'experience_years': exp_years,
-                'technical_skills': skills,
-                'seniority_level': seniority,
-                'education_level': education
+                'id': str(cand.get('_id')),
+                'name': cand.get('name', ''),
+                'email': cand.get('email', ''),
+                'phone': cand.get('phone', ''),
+                'location': cand.get('location', ''),
+                'experience_years': cand.get('experience_years', 0),
+                'technical_skills': cand.get('technical_skills', ''),
+                'seniority_level': cand.get('seniority_level', ''),
+                'education_level': cand.get('education_level', '')
             })
         
         # Process batch matching with detailed candidate information
@@ -608,8 +566,6 @@ def batch_match_jobs(request: BatchMatchRequest, auth = Depends(auth_dependency)
                 'processing_time': '0.5s'
             }
         
-        cursor.close()
-        
         return {
             "batch_results": results,
             "total_jobs_processed": len(jobs),
@@ -624,31 +580,34 @@ def batch_match_jobs(request: BatchMatchRequest, auth = Depends(auth_dependency)
     except Exception as e:
         logger.error(f"Batch matching error: {e}")
         raise HTTPException(status_code=500, detail=f"Batch matching failed: {str(e)}")
-    finally:
-        if conn:
-            return_db_connection(conn)
 
 @app.get("/analyze/{candidate_id}", tags=["Candidate Analysis"], summary="Detailed Candidate Analysis")
 def analyze_candidate(candidate_id: int, auth = Depends(auth_dependency)):
     """Detailed candidate analysis"""
-    conn = None
+    db = None
     try:
-        conn = get_db_connection()
-        if not conn:
+        db = get_db_connection()
+        if not db:
             raise HTTPException(status_code=500, detail="Database connection failed")
         
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT name, email, technical_skills, experience_years, 
-                   seniority_level, education_level, location
-            FROM candidates WHERE id = %s
-        """, (candidate_id,))
+        # MongoDB version - try ObjectId first, then integer id
+        try:
+            cand_query = {'_id': ObjectId(str(candidate_id))}
+        except:
+            cand_query = {'$or': [{'_id': candidate_id}, {'id': candidate_id}]}
         
-        candidate = cursor.fetchone()
+        candidate = db.candidates.find_one(cand_query)
+        
         if not candidate:
             raise HTTPException(status_code=404, detail="Candidate not found")
         
-        name, email, skills, exp_years, seniority, education, location = candidate
+        name = candidate.get('name', '')
+        email = candidate.get('email', '')
+        skills = candidate.get('technical_skills', '')
+        exp_years = candidate.get('experience_years', 0)
+        seniority = candidate.get('seniority_level', '')
+        education = candidate.get('education_level', '')
+        location = candidate.get('location', '')
         
         skill_categories = {
             'Programming': ['python', 'java', 'javascript', 'c++', 'go'],
@@ -680,7 +639,7 @@ def analyze_candidate(candidate_id: int, auth = Depends(auth_dependency)):
                 semantic_skills = skills_list[:10]  # Limit to first 10 skills
         
         return {
-            "candidate_id": candidate_id,
+            "candidate_id": str(candidate.get('_id')),
             "name": name,
             "email": email,
             "experience_years": exp_years,
@@ -693,16 +652,12 @@ def analyze_candidate(candidate_id: int, auth = Depends(auth_dependency)):
             "ai_analysis_enabled": True,
             "analysis_timestamp": datetime.now().isoformat()
         }
-        cursor.close()
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Analysis error: {e}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
-    finally:
-        if conn:
-            return_db_connection(conn)
 
 if __name__ == "__main__":
     import uvicorn

@@ -4,11 +4,15 @@ uvicorn[standard]>=0.24.0,<0.30.0
 starlette>=0.27.0,<0.40.0
 pydantic>=2.5.0,<3.0.0
 
-# Database dependencies - Stable versions
-asyncpg>=0.29.0,<0.30.0
-psycopg2-binary>=2.9.7,<3.0.0
-sqlalchemy>=2.0.23,<2.1.0
-alembic>=1.12.0,<2.0.0
+# Database dependencies - MongoDB (Async Motor for FastAPI)
+motor>=3.3.0  # Async MongoDB driver
+dnspython>=2.4.0  # For MongoDB Atlas SRV connections
+
+# PostgreSQL dependencies - REMOVED (migrating to MongoDB)
+# asyncpg>=0.29.0,<0.30.0
+# psycopg2-binary>=2.9.7,<3.0.0
+# sqlalchemy>=2.0.23,<2.1.0
+# alembic>=1.12.0,<2.0.0
 
 # Authentication & Security - Compatible versions
 python-jose[cryptography]>=3.3.0,<4.0.0

@@ -29,7 +29,7 @@ AI-powered workflow orchestration service for BHIV HR Platform with intelligent 
 
 ### Prerequisites
 - Python 3.12.7+
-- PostgreSQL database
+- MongoDB database (Atlas or local)
 - Gemini API key (optional)
 
 ### Setup
@@ -41,7 +41,8 @@ python -m uvicorn app:app --host 0.0.0.0 --port 9001 --reload
 
 ### Environment Variables
 ```bash
-DATABASE_URL=postgresql://user:pass@localhost:5432/bhiv_hr
+MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/bhiv_hr
+MONGODB_DB_NAME=bhiv_hr
 GATEWAY_SERVICE_URL=http://localhost:8000
 API_KEY_SECRET=your_api_key
 JWT_SECRET_KEY=your_jwt_secret

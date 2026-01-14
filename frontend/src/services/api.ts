@@ -3,9 +3,6 @@ import axios from 'axios'
 // API Base URL - Gateway service
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://bhiv-hr-gateway-l0xp.onrender.com'
 
-// API Key for backend authentication (required until Supabase auth is deployed to backend)
-const API_KEY = import.meta.env.VITE_API_KEY || 'prod_api_key_XUqM2msdCa4CYIaRywRNXRVc477nlI3AQ-lr6cgTB2o'
-
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
@@ -14,17 +11,20 @@ const api = axios.create({
   },
 })
 
-// Request interceptor - Always use API key for backend auth
-// (Backend doesn't yet have Supabase auth configured)
+// Request interceptor - Use JWT token for authentication
 api.interceptors.request.use(
   async (config) => {
-    // Always use API key for authentication
-    // The backend validates this API key against API_KEY_SECRET env var
-    config.headers.Authorization = `Bearer ${API_KEY}`
-    return config
+    // Get JWT token from localStorage
+    const token = localStorage.getItem('auth_token');
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
+    return config;
   },
   (error) => Promise.reject(error)
-)
+);
 
 // Response interceptor for error handling
 api.interceptors.response.use(

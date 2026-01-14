@@ -1,6 +1,7 @@
 """
 Phase 3 Semantic Engine - Production Implementation
 No fallbacks, proper dependency management, production standards
+Migrated from PostgreSQL/SQLAlchemy to MongoDB
 """
 import os
 import asyncio
@@ -12,7 +13,8 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from sqlalchemy import create_engine, text
+# MongoDB imports (migrated from SQLAlchemy)
+from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
 
@@ -37,48 +39,76 @@ class Phase3SemanticEngine:
             logger.error(f"Failed to initialize Phase 3 engine: {e}")
             raise RuntimeError(f"Phase 3 initialization failed: {e}")
     
-    def _get_db_engine(self):
-        """Get database engine with proper connection pooling"""
-        database_url = os.getenv("DATABASE_URL")
-        return create_engine(
-            database_url, 
-            pool_size=10, 
-            max_overflow=20,
-            pool_pre_ping=True,
-            pool_recycle=3600
-        )
+    def _get_db_connection(self):
+        """Get MongoDB database connection"""
+        mongodb_uri = os.getenv("DATABASE_URL") or os.getenv("MONGODB_URI")
+        if not mongodb_uri:
+            raise ValueError("DATABASE_URL or MONGODB_URI environment variable is required")
+        
+        client = MongoClient(mongodb_uri, serverSelectionTimeoutMS=5000)
+        db_name = os.getenv("MONGODB_DB_NAME", "bhiv_hr")
+        return client[db_name]
     
     def _load_company_preferences(self):
         """Load company scoring preferences from feedback data"""
         try:
-            engine = self._get_db_engine()
-            with engine.connect() as connection:
-                query = text("""
-                    SELECT j.client_id, 
-                           AVG(f.average_score) as avg_satisfaction,
-                           COUNT(*) as feedback_count,
-                           AVG(c.experience_years) as avg_exp_hired
-                    FROM feedback f
-                    JOIN jobs j ON f.job_id = j.id
-                    JOIN candidates c ON f.candidate_id = c.id
-                    WHERE f.average_score >= 4.0
-                    GROUP BY j.client_id
-                    HAVING COUNT(*) >= 3
-                """)
-                
-                results = connection.execute(query)
-                for row in results:
-                    client_id, avg_satisfaction, feedback_count, avg_exp = row
-                    weights = self._calculate_optimal_weights(avg_satisfaction, avg_exp)
-                    
-                    self.company_preferences[client_id] = {
-                        'scoring_weights': weights,
-                        'avg_satisfaction': float(avg_satisfaction),
-                        'feedback_count': feedback_count,
-                        'preferred_experience': float(avg_exp) if avg_exp else 0
+            db = self._get_db_connection()
+            
+            # MongoDB aggregation to replicate the PostgreSQL query
+            pipeline = [
+                # Join feedback with jobs
+                {
+                    '$lookup': {
+                        'from': 'jobs',
+                        'localField': 'job_id',
+                        'foreignField': '_id',
+                        'as': 'job'
                     }
+                },
+                {'$unwind': '$job'},
+                # Join with candidates
+                {
+                    '$lookup': {
+                        'from': 'candidates',
+                        'localField': 'candidate_id',
+                        'foreignField': '_id',
+                        'as': 'candidate'
+                    }
+                },
+                {'$unwind': '$candidate'},
+                # Filter for high scores
+                {'$match': {'average_score': {'$gte': 4.0}}},
+                # Group by client_id
+                {
+                    '$group': {
+                        '_id': '$job.client_id',
+                        'avg_satisfaction': {'$avg': '$average_score'},
+                        'feedback_count': {'$sum': 1},
+                        'avg_exp_hired': {'$avg': '$candidate.experience_years'}
+                    }
+                },
+                # Filter for clients with enough feedback
+                {'$match': {'feedback_count': {'$gte': 3}}}
+            ]
+            
+            results = db.feedback.aggregate(pipeline)
+            
+            for row in results:
+                client_id = row['_id']
+                avg_satisfaction = row['avg_satisfaction']
+                feedback_count = row['feedback_count']
+                avg_exp = row['avg_exp_hired']
                 
-                logger.info(f"Loaded preferences for {len(self.company_preferences)} companies")
+                weights = self._calculate_optimal_weights(avg_satisfaction, avg_exp or 0)
+                
+                self.company_preferences[client_id] = {
+                    'scoring_weights': weights,
+                    'avg_satisfaction': float(avg_satisfaction),
+                    'feedback_count': feedback_count,
+                    'preferred_experience': float(avg_exp) if avg_exp else 0
+                }
+            
+            logger.info(f"Loaded preferences for {len(self.company_preferences)} companies")
         except Exception as e:
             logger.error(f"Failed to load company preferences: {e}")
     
@@ -234,21 +264,58 @@ class Phase3SemanticEngine:
             return 0.5
         
         try:
-            engine = self._get_db_engine()
-            with engine.connect() as connection:
-                query = text("""
-                    SELECT AVG((integrity + honesty + discipline + hard_work + gratitude) / 5.0) 
-                    FROM feedback f 
-                    JOIN jobs j ON f.job_id = j.id 
-                    WHERE j.client_id = :client_id 
-                    AND f.candidate_id = :candidate_id
-                """)
-                result = connection.execute(query, {
-                    'client_id': client_id, 
-                    'candidate_id': candidate_data.get('id')
-                })
-                avg_score = result.fetchone()
-                return float(avg_score[0]) / 5.0 if avg_score[0] else 0.5
+            db = self._get_db_connection()
+            
+            # MongoDB aggregation to calculate cultural fit
+            candidate_id = candidate_data.get('id')
+            
+            pipeline = [
+                # Join feedback with jobs
+                {
+                    '$lookup': {
+                        'from': 'jobs',
+                        'localField': 'job_id',
+                        'foreignField': '_id',
+                        'as': 'job'
+                    }
+                },
+                {'$unwind': '$job'},
+                # Filter by client_id and candidate_id
+                {
+                    '$match': {
+                        'job.client_id': client_id,
+                        'candidate_id': candidate_id
+                    }
+                },
+                # Calculate average of cultural fit metrics
+                {
+                    '$group': {
+                        '_id': None,
+                        'avg_score': {
+                            '$avg': {
+                                '$divide': [
+                                    {
+                                        '$add': [
+                                            {'$ifNull': ['$integrity', 0]},
+                                            {'$ifNull': ['$honesty', 0]},
+                                            {'$ifNull': ['$discipline', 0]},
+                                            {'$ifNull': ['$hard_work', 0]},
+                                            {'$ifNull': ['$gratitude', 0]}
+                                        ]
+                                    },
+                                    5.0
+                                ]
+                            }
+                        }
+                    }
+                }
+            ]
+            
+            result = list(db.feedback.aggregate(pipeline))
+            
+            if result and result[0].get('avg_score'):
+                return float(result[0]['avg_score']) / 5.0
+            return 0.5
         except Exception as e:
             logger.error(f"Error calculating cultural fit: {e}")
             return 0.5

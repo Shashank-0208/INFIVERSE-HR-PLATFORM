@@ -15,7 +15,10 @@ import random
 import jwt
 import bcrypt
 from collections import defaultdict
-from sqlalchemy import create_engine, text
+# MongoDB imports (migrated from SQLAlchemy/PostgreSQL)
+from app.database import get_mongo_db, get_mongo_client
+from app.db_helpers import find_one_by_field, find_many, count_documents, insert_one, update_one, delete_one, convert_objectid_to_str
+from bson import ObjectId
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, field_validator
 import time
@@ -215,8 +218,8 @@ class JobCreate(BaseModel):
     client_id: Optional[int] = 1
     employment_type: Optional[str] = "Full-time"
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "title": "Senior Software Engineer",
                 "department": "Engineering",
@@ -227,6 +230,7 @@ class JobCreate(BaseModel):
                 "employment_type": "Full-time"
             }
         }
+    }
 
 class CandidateBulk(BaseModel):
     candidates: List[Dict[str, Any]]
@@ -341,21 +345,13 @@ class CandidateProfileUpdate(BaseModel):
     seniority_level: Optional[str] = None
 
 class JobApplication(BaseModel):
-    candidate_id: int
-    job_id: int
+    candidate_id: str  # Changed from int to str for MongoDB ObjectId
+    job_id: str  # Changed from int to str for MongoDB ObjectId
     cover_letter: Optional[str] = None
 
-def get_db_engine():
-    database_url = os.getenv("DATABASE_URL")
-    return create_engine(
-        database_url, 
-        pool_pre_ping=True, 
-        pool_recycle=3600,
-        pool_size=10,
-        connect_args={"connect_timeout": 10, "application_name": "bhiv_gateway"},
-        pool_timeout=20,
-        max_overflow=5
-    )
+# Legacy get_db_engine function - replaced by MongoDB
+# MongoDB connection is handled by app.database module
+# Use: db = await get_mongo_db() for async database access
 
 def validate_api_key(api_key: str) -> bool:
     expected_key = os.getenv("API_KEY_SECRET")
@@ -438,19 +434,19 @@ def health_check(response: Response):
 
 @app.get("/v1/test-candidates", tags=["Core API Endpoints"])
 async def test_candidates_db(api_key: str = Depends(get_api_key)):
-    """Database Connectivity Test"""
+    """Database Connectivity Test - MongoDB Atlas"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-            result = connection.execute(text("SELECT COUNT(*) FROM candidates"))
-            candidate_count = result.fetchone()[0]
-            
-            return {
-                "database_status": "connected",
-                "total_candidates": candidate_count,
-                "test_timestamp": datetime.now(timezone.utc).isoformat()
-            }
+        db = await get_mongo_db()
+        # Test connection by running a simple command
+        await db.command('ping')
+        candidate_count = await db.candidates.count_documents({})
+        
+        return {
+            "database_status": "connected",
+            "database_type": "MongoDB Atlas",
+            "total_candidates": candidate_count,
+            "test_timestamp": datetime.now(timezone.utc).isoformat()
+        }
     except Exception as e:
         return {
             "database_status": "failed",
@@ -474,28 +470,25 @@ async def create_job(job: JobCreate, api_key: str = Depends(get_api_key)):
     **Authentication:** Bearer token required
     """
     try:
-        engine = get_db_engine()
-        with engine.begin() as connection:
-            query = text("""
-                INSERT INTO jobs (title, department, location, experience_level, requirements, description, status, created_at)
-                VALUES (:title, :department, :location, :experience_level, :requirements, :description, 'active', NOW())
-                RETURNING id
-            """)
-            result = connection.execute(query, {
-                "title": job.title,
-                "department": job.department,
-                "location": job.location,
-                "experience_level": job.experience_level,
-                "requirements": job.requirements,
-                "description": job.description
-            })
-            job_id = result.fetchone()[0]
-            
-            return {
-                "message": "Job created successfully",
-                "job_id": job_id,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
+        db = await get_mongo_db()
+        document = {
+            "title": job.title,
+            "department": job.department,
+            "location": job.location,
+            "experience_level": job.experience_level,
+            "requirements": job.requirements,
+            "description": job.description,
+            "status": "active",
+            "created_at": datetime.now(timezone.utc)
+        }
+        result = await db.jobs.insert_one(document)
+        job_id = str(result.inserted_id)
+        
+        return {
+            "message": "Job created successfully",
+            "job_id": job_id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
     except Exception as e:
         return {
             "message": "Job creation failed",
@@ -507,23 +500,23 @@ async def create_job(job: JobCreate, api_key: str = Depends(get_api_key)):
 async def list_jobs():
     """List All Active Jobs (Public Endpoint)"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            query = text("""
-                SELECT id, title, department, location, experience_level, requirements, description, created_at 
-                FROM jobs WHERE status = 'active' ORDER BY created_at DESC LIMIT 100
-            """)
-            result = connection.execute(query)
-            jobs = [{
-                "id": row[0], 
-                "title": row[1], 
-                "department": row[2],
-                "location": row[3],
-                "experience_level": row[4],
-                "requirements": row[5],
-                "description": row[6],
-                "created_at": row[7].isoformat() if row[7] else None
-            } for row in result]
+        db = await get_mongo_db()
+        cursor = db.jobs.find({"status": "active"}).sort("created_at", -1).limit(100)
+        jobs_list = await cursor.to_list(length=100)
+        
+        jobs = []
+        for doc in jobs_list:
+            jobs.append({
+                "id": str(doc["_id"]),
+                "title": doc.get("title"),
+                "department": doc.get("department"),
+                "location": doc.get("location"),
+                "experience_level": doc.get("experience_level"),
+                "requirements": doc.get("requirements"),
+                "description": doc.get("description"),
+                "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+            })
+        
         return {"jobs": jobs, "count": len(jobs)}
     except Exception as e:
         return {"jobs": [], "count": 0, "error": str(e)}
@@ -533,30 +526,27 @@ async def list_jobs():
 async def get_all_candidates(limit: int = 50, offset: int = 0, api_key: str = Depends(get_api_key)):
     """Get All Candidates with Pagination"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            query = text("""
-                SELECT id, name, email, phone, location, experience_years, technical_skills, seniority_level, education_level, created_at
-                FROM candidates ORDER BY created_at DESC LIMIT :limit OFFSET :offset
-            """)
-            result = connection.execute(query, {"limit": limit, "offset": offset})
-            candidates = [{
-                "id": row[0],
-                "name": row[1],
-                "email": row[2],
-                "phone": row[3],
-                "location": row[4],
-                "experience_years": row[5],
-                "technical_skills": row[6],
-                "seniority_level": row[7],
-                "education_level": row[8],
-                "created_at": row[9].isoformat() if row[9] else None
-            } for row in result]
-            
-            count_query = text("SELECT COUNT(*) FROM candidates")
-            count_result = connection.execute(count_query)
-            total_count = count_result.fetchone()[0]
-            
+        db = await get_mongo_db()
+        cursor = db.candidates.find({}).sort("created_at", -1).skip(offset).limit(limit)
+        candidates_list = await cursor.to_list(length=limit)
+        
+        candidates = []
+        for doc in candidates_list:
+            candidates.append({
+                "id": str(doc["_id"]),
+                "name": doc.get("name"),
+                "email": doc.get("email"),
+                "phone": doc.get("phone"),
+                "location": doc.get("location"),
+                "experience_years": doc.get("experience_years"),
+                "technical_skills": doc.get("technical_skills"),
+                "seniority_level": doc.get("seniority_level"),
+                "education_level": doc.get("education_level"),
+                "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+            })
+        
+        total_count = await db.candidates.count_documents({})
+        
         return {
             "candidates": candidates,
             "total": total_count,
@@ -583,73 +573,61 @@ async def get_candidate_stats(api_key: str = Depends(get_api_key)):
     **Response:** Real-time statistics including total candidates, active jobs, recent matches, and pending interviews.
     """
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            total_query = text("SELECT COUNT(*) FROM candidates")
-            total_result = connection.execute(total_query)
-            total_candidates = total_result.fetchone()[0]
-            
-            # Get active jobs count
-            active_jobs_query = text("SELECT COUNT(*) FROM jobs WHERE status = 'active'")
-            active_jobs_result = connection.execute(active_jobs_query)
-            active_jobs = active_jobs_result.fetchone()[0]
-            
-            # Get recent matches count (from matching_cache table if exists, otherwise estimate)
-            try:
-                recent_matches_query = text("""
-                    SELECT COUNT(*) FROM matching_cache 
-                    WHERE created_at >= NOW() - INTERVAL '7 days'
-                """)
-                recent_matches_result = connection.execute(recent_matches_query)
-                recent_matches = recent_matches_result.fetchone()[0]
-            except:
-                # Fallback: estimate based on candidates and jobs
-                recent_matches = min(total_candidates * active_jobs // 10, 50) if total_candidates > 0 and active_jobs > 0 else 0
-            
-            # Get pending interviews count
-            try:
-                pending_interviews_query = text("""
-                    SELECT COUNT(*) FROM interviews 
-                    WHERE status IN ('scheduled', 'pending') 
-                    AND interview_date >= NOW()
-                """)
-                pending_interviews_result = connection.execute(pending_interviews_query)
-                pending_interviews = pending_interviews_result.fetchone()[0]
-            except:
-                # Fallback if interviews table doesn't exist
-                pending_interviews = 0
-            
-            # Additional dynamic statistics
-            try:
-                # Get new candidates this week
-                new_candidates_query = text("""
-                    SELECT COUNT(*) FROM candidates 
-                    WHERE created_at >= NOW() - INTERVAL '7 days'
-                """)
-                new_candidates_result = connection.execute(new_candidates_query)
-                new_candidates_this_week = new_candidates_result.fetchone()[0]
-            except:
-                new_candidates_this_week = 0
-            
-            try:
-                # Get feedback submissions count
-                feedback_count_query = text("SELECT COUNT(*) FROM feedback")
-                feedback_count_result = connection.execute(feedback_count_query)
-                total_feedback = feedback_count_result.fetchone()[0]
-            except:
-                total_feedback = 0
-            
-            return {
-                "total_candidates": total_candidates,
-                "active_jobs": active_jobs,
-                "recent_matches": recent_matches,
-                "pending_interviews": pending_interviews,
-                "new_candidates_this_week": new_candidates_this_week,
-                "total_feedback_submissions": total_feedback,
-                "statistics_generated_at": datetime.now(timezone.utc).isoformat(),
-                "data_source": "real_time_database",
-                "dashboard_ready": True
-            }
+        db = await get_mongo_db()
+        
+        # Get total candidates count
+        total_candidates = await db.candidates.count_documents({})
+        
+        # Get active jobs count
+        active_jobs = await db.jobs.count_documents({"status": "active"})
+        
+        # Get recent matches count (from matching_cache collection if exists)
+        try:
+            seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+            recent_matches = await db.matching_cache.count_documents({
+                "created_at": {"$gte": seven_days_ago}
+            })
+        except:
+            # Fallback: estimate based on candidates and jobs
+            recent_matches = min(total_candidates * active_jobs // 10, 50) if total_candidates > 0 and active_jobs > 0 else 0
+        
+        # Get pending interviews count
+        try:
+            now = datetime.now(timezone.utc)
+            pending_interviews = await db.interviews.count_documents({
+                "status": {"$in": ["scheduled", "pending"]},
+                "interview_date": {"$gte": now}
+            })
+        except:
+            # Fallback if interviews collection doesn't exist
+            pending_interviews = 0
+        
+        # Additional dynamic statistics
+        try:
+            # Get new candidates this week
+            new_candidates_this_week = await db.candidates.count_documents({
+                "created_at": {"$gte": seven_days_ago}
+            })
+        except:
+            new_candidates_this_week = 0
+        
+        try:
+            # Get feedback submissions count
+            total_feedback = await db.feedback.count_documents({})
+        except:
+            total_feedback = 0
+        
+        return {
+            "total_candidates": total_candidates,
+            "active_jobs": active_jobs,
+            "recent_matches": recent_matches,
+            "pending_interviews": pending_interviews,
+            "new_candidates_this_week": new_candidates_this_week,
+            "total_feedback_submissions": total_feedback,
+            "statistics_generated_at": datetime.now(timezone.utc).isoformat(),
+            "data_source": "mongodb_atlas",
+            "dashboard_ready": True
+        }
     except Exception as e:
         return {
             "total_candidates": 0,
@@ -686,44 +664,36 @@ async def search_candidates(
         raise HTTPException(status_code=400, detail="experience_min must be non-negative.")
     
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            where_conditions = []
-            params = {}
-            
-            if skills:
-                where_conditions.append("technical_skills ILIKE :skills")
-                params["skills"] = f"%{skills}%"
-            
-            if location:
-                where_conditions.append("location ILIKE :location")
-                params["location"] = f"%{location}%"
-            
-            if experience_min is not None:
-                where_conditions.append("experience_years >= :experience_min")
-                params["experience_min"] = experience_min
-            
-            base_query = "SELECT id, name, email, phone, location, technical_skills, experience_years, seniority_level, education_level, status FROM candidates"
-            
-            if where_conditions:
-                query = text(f"{base_query} WHERE {' AND '.join(where_conditions)} LIMIT 50")
-                result = connection.execute(query, params)
-            else:
-                query = text(f"{base_query} LIMIT 50")
-                result = connection.execute(query)
-            
-            candidates = [{
-                "id": row[0],
-                "name": row[1],
-                "email": row[2],
-                "phone": row[3],
-                "location": row[4],
-                "technical_skills": row[5],
-                "experience_years": row[6],
-                "seniority_level": row[7],
-                "education_level": row[8],
-                "status": row[9]
-            } for row in result]
+        db = await get_mongo_db()
+        query = {}
+        
+        if skills:
+            # Case-insensitive regex search for skills
+            query["technical_skills"] = {"$regex": skills, "$options": "i"}
+        
+        if location:
+            query["location"] = {"$regex": location, "$options": "i"}
+        
+        if experience_min is not None:
+            query["experience_years"] = {"$gte": experience_min}
+        
+        cursor = db.candidates.find(query).limit(50)
+        candidates_list = await cursor.to_list(length=50)
+        
+        candidates = []
+        for doc in candidates_list:
+            candidates.append({
+                "id": str(doc["_id"]),
+                "name": doc.get("name"),
+                "email": doc.get("email"),
+                "phone": doc.get("phone"),
+                "location": doc.get("location"),
+                "technical_skills": doc.get("technical_skills"),
+                "experience_years": doc.get("experience_years"),
+                "seniority_level": doc.get("seniority_level"),
+                "education_level": doc.get("education_level"),
+                "status": doc.get("status")
+            })
         
         return {
             "candidates": candidates, 
@@ -739,60 +709,60 @@ async def search_candidates(
         }
 
 @app.get("/v1/candidates/job/{job_id}", tags=["Candidate Management"])
-async def get_candidates_by_job(job_id: int, api_key: str = Depends(get_api_key)):
+async def get_candidates_by_job(job_id: str, api_key: str = Depends(get_api_key)):
     """Get All Candidates (Dynamic Matching)"""
-    if job_id < 1:
+    if not job_id:
         raise HTTPException(status_code=400, detail="Invalid job ID")
     
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            query = text("SELECT id, name, email, technical_skills, experience_years FROM candidates LIMIT 10")
-            result = connection.execute(query)
-            candidates = [{
-                "id": row[0],
-                "name": row[1],
-                "email": row[2],
-                "skills": row[3],
-                "experience": row[4]
-            } for row in result]
+        db = await get_mongo_db()
+        cursor = db.candidates.find({}).limit(10)
+        candidates_list = await cursor.to_list(length=10)
+        
+        candidates = []
+        for doc in candidates_list:
+            candidates.append({
+                "id": str(doc["_id"]),
+                "name": doc.get("name"),
+                "email": doc.get("email"),
+                "skills": doc.get("technical_skills"),
+                "experience": doc.get("experience_years")
+            })
         
         return {"candidates": candidates, "job_id": job_id, "count": len(candidates)}
     except Exception as e:
         return {"candidates": [], "job_id": job_id, "count": 0, "error": str(e)}
 
 @app.get("/v1/candidates/{candidate_id}", tags=["Candidate Management"])
-async def get_candidate_by_id(candidate_id: int, api_key: str = Depends(get_api_key)):
+async def get_candidate_by_id(candidate_id: str, api_key: str = Depends(get_api_key)):
     """Get Specific Candidate by ID"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            query = text("""
-                SELECT id, name, email, phone, location, experience_years, technical_skills, 
-                       seniority_level, education_level, resume_path, created_at, updated_at
-                FROM candidates WHERE id = :candidate_id
-            """)
-            result = connection.execute(query, {"candidate_id": candidate_id})
-            row = result.fetchone()
-            
-            if not row:
-                return {"error": "Candidate not found", "candidate_id": candidate_id}
-            
-            candidate = {
-                "id": row[0],
-                "name": row[1],
-                "email": row[2],
-                "phone": row[3],
-                "location": row[4],
-                "experience_years": row[5],
-                "technical_skills": row[6],
-                "seniority_level": row[7],
-                "education_level": row[8],
-                "resume_path": row[9],
-                "created_at": row[10].isoformat() if row[10] else None,
-                "updated_at": row[11].isoformat() if row[11] else None
-            }
-            
+        db = await get_mongo_db()
+        
+        # Try to convert to ObjectId if valid, otherwise search by string id
+        try:
+            doc = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
+        except:
+            doc = await db.candidates.find_one({"id": candidate_id})
+        
+        if not doc:
+            return {"error": "Candidate not found", "candidate_id": candidate_id}
+        
+        candidate = {
+            "id": str(doc["_id"]),
+            "name": doc.get("name"),
+            "email": doc.get("email"),
+            "phone": doc.get("phone"),
+            "location": doc.get("location"),
+            "experience_years": doc.get("experience_years"),
+            "technical_skills": doc.get("technical_skills"),
+            "seniority_level": doc.get("seniority_level"),
+            "education_level": doc.get("education_level"),
+            "resume_path": doc.get("resume_path"),
+            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None
+        }
+        
         return {"candidate": candidate}
     except Exception as e:
         return {"error": str(e), "candidate_id": candidate_id}
@@ -802,46 +772,42 @@ async def get_candidate_by_id(candidate_id: int, api_key: str = Depends(get_api_
 async def bulk_upload_candidates(candidates: CandidateBulk, api_key: str = Depends(get_api_key)):
     """Bulk Upload Candidates"""
     try:
-        engine = get_db_engine()
+        db = await get_mongo_db()
         inserted_count = 0
         errors = []
         
-        with engine.begin() as connection:
-            for i, candidate in enumerate(candidates.candidates):
-                try:
-                    email = candidate.get("email", "")
-                    if not email:
-                        errors.append(f"Candidate {i+1}: Email is required")
-                        continue
-                        
-                    # Check email uniqueness
-                    check_query = text("SELECT COUNT(*) FROM candidates WHERE email = :email")
-                    result = connection.execute(check_query, {"email": email})
-                    if result.fetchone()[0] > 0:
-                        errors.append(f"Candidate {i+1}: Email {email} already exists")
-                        continue
-                    
-                    # Insert with proper error handling
-                    query = text("""
-                        INSERT INTO candidates (name, email, phone, location, experience_years, technical_skills, seniority_level, education_level, resume_path, status, created_at)
-                        VALUES (:name, :email, :phone, :location, :experience_years, :technical_skills, :seniority_level, :education_level, :resume_path, :status, NOW())
-                    """)
-                    connection.execute(query, {
-                        "name": candidate.get("name", "Unknown"),
-                        "email": email,
-                        "phone": candidate.get("phone", ""),
-                        "location": candidate.get("location", ""),
-                        "experience_years": max(0, int(candidate.get("experience_years", 0)) if str(candidate.get("experience_years", 0)).isdigit() else 0),
-                        "technical_skills": candidate.get("technical_skills", ""),
-                        "seniority_level": candidate.get("designation", candidate.get("seniority_level", "")),
-                        "education_level": candidate.get("education_level", ""),
-                        "resume_path": candidate.get("cv_url", candidate.get("resume_path", "")),
-                        "status": candidate.get("status", "applied")
-                    })
-                    inserted_count += 1
-                except Exception as e:
-                    errors.append(f"Candidate {i+1}: {str(e)[:100]}")
+        for i, candidate in enumerate(candidates.candidates):
+            try:
+                email = candidate.get("email", "")
+                if not email:
+                    errors.append(f"Candidate {i+1}: Email is required")
                     continue
+                
+                # Check email uniqueness
+                existing = await db.candidates.find_one({"email": email})
+                if existing:
+                    errors.append(f"Candidate {i+1}: Email {email} already exists")
+                    continue
+                
+                # Insert with proper error handling
+                document = {
+                    "name": candidate.get("name", "Unknown"),
+                    "email": email,
+                    "phone": candidate.get("phone", ""),
+                    "location": candidate.get("location", ""),
+                    "experience_years": max(0, int(candidate.get("experience_years", 0)) if str(candidate.get("experience_years", 0)).isdigit() else 0),
+                    "technical_skills": candidate.get("technical_skills", ""),
+                    "seniority_level": candidate.get("designation", candidate.get("seniority_level", "")),
+                    "education_level": candidate.get("education_level", ""),
+                    "resume_path": candidate.get("cv_url", candidate.get("resume_path", "")),
+                    "status": candidate.get("status", "applied"),
+                    "created_at": datetime.now(timezone.utc)
+                }
+                await db.candidates.insert_one(document)
+                inserted_count += 1
+            except Exception as e:
+                errors.append(f"Candidate {i+1}: {str(e)[:100]}")
+                continue
         
         return {
             "message": "Bulk upload completed",
@@ -920,47 +886,49 @@ async def get_top_matches(job_id: int, limit: int = 10, api_key: str = Depends(g
         # Fallback to database matching
         return await fallback_matching(job_id, limit)
 
-async def fallback_matching(job_id: int, limit: int):
+async def fallback_matching(job_id: str, limit: int):
     """Fallback matching when agent service is unavailable"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            # Get job requirements for better matching
-            job_query = text("SELECT requirements, location FROM jobs WHERE id = :job_id")
-            job_result = connection.execute(job_query, {"job_id": job_id})
-            job_data = job_result.fetchone()
-            job_requirements = (job_data[0] if job_data else "").lower()
-            job_location = job_data[1] if job_data else ""
+        db = await get_mongo_db()
+        
+        # Get job requirements for better matching
+        try:
+            job_doc = await db.jobs.find_one({"_id": ObjectId(job_id)})
+        except:
+            job_doc = await db.jobs.find_one({"id": job_id})
+        
+        job_requirements = (job_doc.get("requirements", "") if job_doc else "").lower()
+        job_location = job_doc.get("location", "") if job_doc else ""
+        
+        cursor = db.candidates.find({}).limit(limit)
+        candidates_list = await cursor.to_list(length=limit)
+        matches = []
+        
+        for i, doc in enumerate(candidates_list):
+            candidate_skills = (doc.get("technical_skills") or "").lower()
+            candidate_location = doc.get("location") or ""
             
-            query = text("SELECT id, name, email, technical_skills, location FROM candidates LIMIT :limit")
-            result = connection.execute(query, {"limit": limit})
-            matches = []
+            # Basic skill matching
+            skill_match_count = sum(1 for skill in ['python', 'java', 'javascript'] 
+                                  if skill in candidate_skills and skill in job_requirements)
             
-            for i, row in enumerate(result):
-                candidate_skills = (row[3] or "").lower()
-                candidate_location = row[4] or ""
-                
-                # Basic skill matching
-                skill_match_count = sum(1 for skill in ['python', 'java', 'javascript'] 
-                                      if skill in candidate_skills and skill in job_requirements)
-                
-                # Location matching
-                location_match = job_location.lower() in candidate_location.lower() if job_location and candidate_location else False
-                
-                # Calculate score based on matches
-                base_score = 60 + (skill_match_count * 10) + (10 if location_match else 0) + (5 - i)
-                
-                matches.append({
-                    "candidate_id": row[0],
-                    "name": row[1],
-                    "email": row[2],
-                    "score": min(95, base_score),
-                    "skills_match": row[3] or "",
-                    "experience_match": f"Skills: {skill_match_count} matches",
-                    "location_match": location_match,
-                    "reasoning": f"Fallback matching: {skill_match_count} skill matches, location: {location_match}",
-                    "recommendation_strength": "Good Match" if base_score > 75 else "Fair Match"
-                })
+            # Location matching
+            location_match = job_location.lower() in candidate_location.lower() if job_location and candidate_location else False
+            
+            # Calculate score based on matches
+            base_score = 60 + (skill_match_count * 10) + (10 if location_match else 0) + (5 - i)
+            
+            matches.append({
+                "candidate_id": str(doc["_id"]),
+                "name": doc.get("name"),
+                "email": doc.get("email"),
+                "score": min(95, base_score),
+                "skills_match": doc.get("technical_skills") or "",
+                "experience_match": f"Skills: {skill_match_count} matches",
+                "location_match": location_match,
+                "reasoning": f"Fallback matching: {skill_match_count} skill matches, location: {location_match}",
+                "recommendation_strength": "Good Match" if base_score > 75 else "Fair Match"
+            })
         
         return {
             "matches": matches,
@@ -976,81 +944,82 @@ async def fallback_matching(job_id: int, limit: int):
     except Exception as e:
         return {"matches": [], "job_id": job_id, "limit": limit, "error": str(e), "agent_status": "error"}
 
-async def batch_fallback_matching(job_ids: List[int]):
+async def batch_fallback_matching(job_ids: List[str]):
     """Fallback batch matching when agent service is unavailable"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            # Get job requirements for each job
-            job_requirements = {}
-            for job_id in job_ids:
-                job_query = text("SELECT requirements, location FROM jobs WHERE id = :job_id")
-                job_result = connection.execute(job_query, {"job_id": job_id})
-                job_data = job_result.fetchone()
-                job_requirements[job_id] = {
-                    "requirements": (job_data[0] if job_data else "").lower(),
-                    "location": job_data[1] if job_data else ""
-                }
+        db = await get_mongo_db()
+        
+        # Get job requirements for each job
+        job_requirements = {}
+        for job_id in job_ids:
+            try:
+                job_doc = await db.jobs.find_one({"_id": ObjectId(job_id)})
+            except:
+                job_doc = await db.jobs.find_one({"id": job_id})
             
-            # Get candidates
-            query = text("SELECT id, name, email, technical_skills, location FROM candidates LIMIT 5")
-            result = connection.execute(query)
-            candidates = list(result)
-            
-            batch_results = {}
-            for job_id in job_ids:
-                job_req = job_requirements[job_id]
-                matches = []
-                
-                for i, row in enumerate(candidates):
-                    candidate_skills = (row[3] or "").lower()
-                    candidate_location = row[4] or ""
-                    
-                    # Basic skill matching
-                    skill_match_count = sum(1 for skill in ['python', 'java', 'javascript'] 
-                                          if skill in candidate_skills and skill in job_req["requirements"])
-                    
-                    # Location matching
-                    location_match = job_req["location"].lower() in candidate_location.lower() if job_req["location"] and candidate_location else False
-                    
-                    # Calculate score
-                    base_score = 60 + (skill_match_count * 10) + (10 if location_match else 0) + (5 - i)
-                    
-                    matches.append({
-                        "candidate_id": row[0],
-                        "name": row[1],
-                        "email": row[2],
-                        "score": min(95, base_score),
-                        "skills_match": row[3] or "",
-                        "experience_match": f"Skills: {skill_match_count} matches",
-                        "location_match": location_match,
-                        "reasoning": f"Fallback batch matching: {skill_match_count} skill matches, location: {location_match}",
-                        "recommendation_strength": "Good Match" if base_score > 75 else "Fair Match"
-                    })
-                
-                batch_results[str(job_id)] = {
-                    "job_id": job_id,
-                    "matches": matches,
-                    "top_candidates": matches,
-                    "total_candidates": len(matches),
-                    "algorithm": "fallback-batch",
-                    "processing_time": "0.05s",
-                    "ai_analysis": "Database fallback - Agent service unavailable"
-                }
-            
-            return {
-                "batch_results": batch_results,
-                "total_jobs_processed": len(job_ids),
-                "total_candidates_analyzed": len(candidates),
-                "algorithm_version": "2.0.0-gateway-fallback-batch",
-                "status": "fallback_success",
-                "agent_status": "disconnected"
+            job_requirements[job_id] = {
+                "requirements": (job_doc.get("requirements", "") if job_doc else "").lower(),
+                "location": job_doc.get("location", "") if job_doc else ""
             }
+        
+        # Get candidates
+        cursor = db.candidates.find({}).limit(5)
+        candidates = await cursor.to_list(length=5)
+        
+        batch_results = {}
+        for job_id in job_ids:
+            job_req = job_requirements[job_id]
+            matches = []
+            
+            for i, doc in enumerate(candidates):
+                candidate_skills = (doc.get("technical_skills") or "").lower()
+                candidate_location = doc.get("location") or ""
+                
+                # Basic skill matching
+                skill_match_count = sum(1 for skill in ['python', 'java', 'javascript'] 
+                                      if skill in candidate_skills and skill in job_req["requirements"])
+                
+                # Location matching
+                location_match = job_req["location"].lower() in candidate_location.lower() if job_req["location"] and candidate_location else False
+                
+                # Calculate score
+                base_score = 60 + (skill_match_count * 10) + (10 if location_match else 0) + (5 - i)
+                
+                matches.append({
+                    "candidate_id": str(doc["_id"]),
+                    "name": doc.get("name"),
+                    "email": doc.get("email"),
+                    "score": min(95, base_score),
+                    "skills_match": doc.get("technical_skills") or "",
+                    "experience_match": f"Skills: {skill_match_count} matches",
+                    "location_match": location_match,
+                    "reasoning": f"Fallback batch matching: {skill_match_count} skill matches, location: {location_match}",
+                    "recommendation_strength": "Good Match" if base_score > 75 else "Fair Match"
+                })
+            
+            batch_results[str(job_id)] = {
+                "job_id": job_id,
+                "matches": matches,
+                "top_candidates": matches,
+                "total_candidates": len(matches),
+                "algorithm": "fallback-batch",
+                "processing_time": "0.05s",
+                "ai_analysis": "Database fallback - Agent service unavailable"
+            }
+        
+        return {
+            "batch_results": batch_results,
+            "total_jobs_processed": len(job_ids),
+            "total_candidates_analyzed": len(candidates),
+            "algorithm_version": "2.0.0-gateway-fallback-batch",
+            "status": "fallback_success",
+            "agent_status": "disconnected"
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Batch fallback failed: {str(e)}")
 
 @app.post("/v1/match/batch", tags=["AI Matching Engine"])
-async def batch_match_jobs(job_ids: List[int], api_key: str = Depends(get_api_key)):
+async def batch_match_jobs(job_ids: List[str], api_key: str = Depends(get_api_key)):
     """Batch AI matching via Agent Service"""
     if not job_ids or len(job_ids) == 0:
         raise HTTPException(status_code=400, detail="At least one job ID is required")
@@ -1125,28 +1094,25 @@ async def batch_match_jobs(job_ids: List[int], api_key: str = Depends(get_api_ke
 async def submit_feedback(feedback: FeedbackSubmission, api_key: str = Depends(get_api_key)):
     """Values Assessment"""
     try:
-        engine = get_db_engine()
-        with engine.begin() as connection:
-            avg_score = (feedback.integrity + feedback.honesty + feedback.discipline + 
-                        feedback.hard_work + feedback.gratitude) / 5
-            
-            query = text("""
-                INSERT INTO feedback (candidate_id, job_id, integrity, honesty, discipline, hard_work, gratitude, comments, created_at)
-                VALUES (:candidate_id, :job_id, :integrity, :honesty, :discipline, :hard_work, :gratitude, :comments, NOW())
-                RETURNING id
-            """)
-            result = connection.execute(query, {
-                "candidate_id": feedback.candidate_id,
-                "job_id": feedback.job_id,
-                "integrity": feedback.integrity,
-                "honesty": feedback.honesty,
-                "discipline": feedback.discipline,
-                "hard_work": feedback.hard_work,
-                "gratitude": feedback.gratitude,
-                "comments": feedback.comments
-            })
-            feedback_id = result.fetchone()[0]
-            
+        db = await get_mongo_db()
+        avg_score = (feedback.integrity + feedback.honesty + feedback.discipline + 
+                    feedback.hard_work + feedback.gratitude) / 5
+        
+        document = {
+            "candidate_id": feedback.candidate_id,
+            "job_id": feedback.job_id,
+            "integrity": feedback.integrity,
+            "honesty": feedback.honesty,
+            "discipline": feedback.discipline,
+            "hard_work": feedback.hard_work,
+            "gratitude": feedback.gratitude,
+            "average_score": avg_score,
+            "comments": feedback.comments,
+            "created_at": datetime.now(timezone.utc)
+        }
+        result = await db.feedback.insert_one(document)
+        feedback_id = str(result.inserted_id)
+        
         return {
             "message": "Feedback submitted successfully",
             "feedback_id": feedback_id,
@@ -1174,35 +1140,62 @@ async def submit_feedback(feedback: FeedbackSubmission, api_key: str = Depends(g
 async def get_all_feedback(api_key: str = Depends(get_api_key)):
     """Get All Feedback Records"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            query = text("""
-                SELECT f.id, f.candidate_id, f.job_id, f.integrity, f.honesty, f.discipline, 
-                       f.hard_work, f.gratitude, f.average_score, f.comments, f.created_at,
-                       c.name as candidate_name, j.title as job_title
-                FROM feedback f
-                LEFT JOIN candidates c ON f.candidate_id = c.id
-                LEFT JOIN jobs j ON f.job_id = j.id
-                ORDER BY f.created_at DESC
-            """)
-            result = connection.execute(query)
-            feedback_records = [{
-                "id": row[0],
-                "candidate_id": row[1],
-                "job_id": row[2],
+        db = await get_mongo_db()
+        
+        # Use aggregation pipeline for JOIN-like behavior
+        pipeline = [
+            {"$lookup": {
+                "from": "candidates",
+                "localField": "candidate_id",
+                "foreignField": "_id",
+                "as": "candidate"
+            }},
+            {"$lookup": {
+                "from": "jobs",
+                "localField": "job_id",
+                "foreignField": "_id",
+                "as": "job"
+            }},
+            {"$sort": {"created_at": -1}},
+            {"$project": {
+                "id": {"$toString": "$_id"},
+                "candidate_id": {"$toString": "$candidate_id"},
+                "job_id": {"$toString": "$job_id"},
+                "integrity": 1,
+                "honesty": 1,
+                "discipline": 1,
+                "hard_work": 1,
+                "gratitude": 1,
+                "average_score": 1,
+                "comments": 1,
+                "created_at": 1,
+                "candidate_name": {"$arrayElemAt": ["$candidate.name", 0]},
+                "job_title": {"$arrayElemAt": ["$job.title", 0]}
+            }}
+        ]
+        
+        cursor = db.feedback.aggregate(pipeline)
+        feedback_list = await cursor.to_list(length=None)
+        
+        feedback_records = []
+        for doc in feedback_list:
+            feedback_records.append({
+                "id": doc.get("id"),
+                "candidate_id": doc.get("candidate_id"),
+                "job_id": doc.get("job_id"),
                 "values_scores": {
-                    "integrity": row[3],
-                    "honesty": row[4],
-                    "discipline": row[5],
-                    "hard_work": row[6],
-                    "gratitude": row[7]
+                    "integrity": doc.get("integrity"),
+                    "honesty": doc.get("honesty"),
+                    "discipline": doc.get("discipline"),
+                    "hard_work": doc.get("hard_work"),
+                    "gratitude": doc.get("gratitude")
                 },
-                "average_score": float(row[8]) if row[8] else 0,
-                "comments": row[9],
-                "created_at": row[10].isoformat() if row[10] else None,
-                "candidate_name": row[11],
-                "job_title": row[12]
-            } for row in result]
+                "average_score": float(doc.get("average_score", 0)) if doc.get("average_score") else 0,
+                "comments": doc.get("comments"),
+                "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+                "candidate_name": doc.get("candidate_name"),
+                "job_title": doc.get("job_title")
+            })
         
         return {"feedback": feedback_records, "count": len(feedback_records)}
     except Exception as e:
@@ -1214,27 +1207,49 @@ async def get_all_feedback(api_key: str = Depends(get_api_key)):
 async def get_interviews(api_key: str = Depends(get_api_key)):
     """Get All Interviews"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            query = text("""
-                SELECT i.id, i.candidate_id, i.job_id, i.interview_date, i.interviewer, i.status,
-                       c.name as candidate_name, j.title as job_title
-                FROM interviews i
-                LEFT JOIN candidates c ON i.candidate_id = c.id
-                LEFT JOIN jobs j ON i.job_id = j.id
-                ORDER BY i.interview_date DESC
-            """)
-            result = connection.execute(query)
-            interviews = [{
-                "id": row[0],
-                "candidate_id": row[1],
-                "job_id": row[2],
-                "interview_date": row[3].isoformat() if row[3] else None,
-                "interviewer": row[4],
-                "status": row[5],
-                "candidate_name": row[6],
-                "job_title": row[7]
-            } for row in result]
+        db = await get_mongo_db()
+        
+        pipeline = [
+            {"$lookup": {
+                "from": "candidates",
+                "localField": "candidate_id",
+                "foreignField": "_id",
+                "as": "candidate"
+            }},
+            {"$lookup": {
+                "from": "jobs",
+                "localField": "job_id",
+                "foreignField": "_id",
+                "as": "job"
+            }},
+            {"$sort": {"interview_date": -1}},
+            {"$project": {
+                "id": {"$toString": "$_id"},
+                "candidate_id": {"$toString": "$candidate_id"},
+                "job_id": {"$toString": "$job_id"},
+                "interview_date": 1,
+                "interviewer": 1,
+                "status": 1,
+                "candidate_name": {"$arrayElemAt": ["$candidate.name", 0]},
+                "job_title": {"$arrayElemAt": ["$job.title", 0]}
+            }}
+        ]
+        
+        cursor = db.interviews.aggregate(pipeline)
+        interviews_list = await cursor.to_list(length=None)
+        
+        interviews = []
+        for doc in interviews_list:
+            interviews.append({
+                "id": doc.get("id"),
+                "candidate_id": doc.get("candidate_id"),
+                "job_id": doc.get("job_id"),
+                "interview_date": doc.get("interview_date").isoformat() if doc.get("interview_date") else None,
+                "interviewer": doc.get("interviewer"),
+                "status": doc.get("status"),
+                "candidate_name": doc.get("candidate_name"),
+                "job_title": doc.get("job_title")
+            })
         
         return {"interviews": interviews, "count": len(interviews)}
     except Exception as e:
@@ -1244,22 +1259,19 @@ async def get_interviews(api_key: str = Depends(get_api_key)):
 async def schedule_interview(interview: InterviewSchedule, api_key: str = Depends(get_api_key)):
     """Schedule Interview"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            query = text("""
-                INSERT INTO interviews (candidate_id, job_id, interview_date, interviewer, status, notes)
-                VALUES (:candidate_id, :job_id, :interview_date, :interviewer, 'scheduled', :notes)
-                RETURNING id
-            """)
-            result = connection.execute(query, {
-                "candidate_id": interview.candidate_id,
-                "job_id": interview.job_id,
-                "interview_date": interview.interview_date,
-                "interviewer": interview.interviewer,
-                "notes": interview.notes
-            })
-            connection.commit()
-            interview_id = result.fetchone()[0]
+        db = await get_mongo_db()
+        
+        document = {
+            "candidate_id": interview.candidate_id,
+            "job_id": interview.job_id,
+            "interview_date": interview.interview_date,
+            "interviewer": interview.interviewer,
+            "status": "scheduled",
+            "notes": interview.notes,
+            "created_at": datetime.now(timezone.utc)
+        }
+        result = await db.interviews.insert_one(document)
+        interview_id = str(result.inserted_id)
         
         return {
             "message": "Interview scheduled successfully",
@@ -1276,22 +1288,20 @@ async def schedule_interview(interview: InterviewSchedule, api_key: str = Depend
 async def create_job_offer(offer: JobOffer, api_key: str = Depends(get_api_key)):
     """Job Offers Management"""
     try:
-        engine = get_db_engine()
-        with engine.begin() as connection:
-            query = text("""
-                INSERT INTO offers (candidate_id, job_id, salary, start_date, terms, status, created_at)
-                VALUES (:candidate_id, :job_id, :salary, :start_date, :terms, 'pending', NOW())
-                RETURNING id
-            """)
-            result = connection.execute(query, {
-                "candidate_id": offer.candidate_id,
-                "job_id": offer.job_id,
-                "salary": offer.salary,
-                "start_date": offer.start_date,
-                "terms": offer.terms
-            })
-            offer_id = result.fetchone()[0]
-            
+        db = await get_mongo_db()
+        
+        document = {
+            "candidate_id": offer.candidate_id,
+            "job_id": offer.job_id,
+            "salary": offer.salary,
+            "start_date": offer.start_date,
+            "terms": offer.terms,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc)
+        }
+        result = await db.offers.insert_one(document)
+        offer_id = str(result.inserted_id)
+        
         return {
             "message": "Job offer created successfully",
             "offer_id": offer_id,
@@ -1315,29 +1325,53 @@ async def create_job_offer(offer: JobOffer, api_key: str = Depends(get_api_key))
 async def get_all_offers(api_key: str = Depends(get_api_key)):
     """Get All Job Offers"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            query = text("""
-                SELECT o.id, o.candidate_id, o.job_id, o.salary, o.start_date, o.terms, o.status, o.created_at,
-                       c.name as candidate_name, j.title as job_title
-                FROM offers o
-                LEFT JOIN candidates c ON o.candidate_id = c.id
-                LEFT JOIN jobs j ON o.job_id = j.id
-                ORDER BY o.created_at DESC
-            """)
-            result = connection.execute(query)
-            offers = [{
-                "id": row[0],
-                "candidate_id": row[1],
-                "job_id": row[2],
-                "salary": float(row[3]) if row[3] else 0,
-                "start_date": row[4].isoformat() if row[4] else None,
-                "terms": row[5],
-                "status": row[6],
-                "created_at": row[7].isoformat() if row[7] else None,
-                "candidate_name": row[8],
-                "job_title": row[9]
-            } for row in result]
+        db = await get_mongo_db()
+        
+        pipeline = [
+            {"$lookup": {
+                "from": "candidates",
+                "localField": "candidate_id",
+                "foreignField": "_id",
+                "as": "candidate"
+            }},
+            {"$lookup": {
+                "from": "jobs",
+                "localField": "job_id",
+                "foreignField": "_id",
+                "as": "job"
+            }},
+            {"$sort": {"created_at": -1}},
+            {"$project": {
+                "id": {"$toString": "$_id"},
+                "candidate_id": {"$toString": "$candidate_id"},
+                "job_id": {"$toString": "$job_id"},
+                "salary": 1,
+                "start_date": 1,
+                "terms": 1,
+                "status": 1,
+                "created_at": 1,
+                "candidate_name": {"$arrayElemAt": ["$candidate.name", 0]},
+                "job_title": {"$arrayElemAt": ["$job.title", 0]}
+            }}
+        ]
+        
+        cursor = db.offers.aggregate(pipeline)
+        offers_list = await cursor.to_list(length=None)
+        
+        offers = []
+        for doc in offers_list:
+            offers.append({
+                "id": doc.get("id"),
+                "candidate_id": doc.get("candidate_id"),
+                "job_id": doc.get("job_id"),
+                "salary": float(doc.get("salary", 0)) if doc.get("salary") else 0,
+                "start_date": doc.get("start_date").isoformat() if doc.get("start_date") else None,
+                "terms": doc.get("terms"),
+                "status": doc.get("status"),
+                "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+                "candidate_name": doc.get("candidate_name"),
+                "job_title": doc.get("job_title")
+            })
         
         return {"offers": offers, "count": len(offers)}
     except Exception as e:
@@ -1347,44 +1381,38 @@ async def get_all_offers(api_key: str = Depends(get_api_key)):
 
 @app.get("/v1/database/schema", tags=["Analytics & Statistics"])
 async def get_database_schema(api_key: str = Depends(get_api_key)):
-    """Get Database Schema Information"""
+    """Get Database Schema Information - MongoDB"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            # Get table list
-            tables_query = text("""
-                SELECT table_name FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                ORDER BY table_name
-            """)
-            tables_result = connection.execute(tables_query)
-            tables = [row[0] for row in tables_result]
-            
-            # Get schema version
-            try:
-                version_query = text("SELECT version, applied_at FROM schema_version ORDER BY applied_at DESC LIMIT 1")
-                version_result = connection.execute(version_query)
-                version_row = version_result.fetchone()
-                schema_version = version_row[0] if version_row else "unknown"
-                applied_at = version_row[1].isoformat() if version_row and version_row[1] else None
-            except:
-                schema_version = "unknown"
-                applied_at = None
-            
-            # Check for Phase 3 table
-            phase3_exists = "company_scoring_preferences" in tables
-            
-            return {
-                "schema_version": schema_version,
-                "applied_at": applied_at,
-                "total_tables": len(tables),
-                "tables": tables,
-                "phase3_enabled": phase3_exists,
-                "core_tables": [
-                    "candidates", "jobs", "feedback", "interviews", "offers", 
-                    "users", "clients", "matching_cache", "audit_logs", 
-                    "rate_limits", "csp_violations", "company_scoring_preferences"
-                ],
+        db = await get_mongo_db()
+        
+        # Get collection list
+        collections = await db.list_collection_names()
+        collections.sort()
+        
+        # Get schema version if exists
+        try:
+            version_doc = await db.schema_version.find_one({}, sort=[("applied_at", -1)])
+            schema_version = version_doc.get("version", "unknown") if version_doc else "unknown"
+            applied_at = version_doc.get("applied_at").isoformat() if version_doc and version_doc.get("applied_at") else None
+        except:
+            schema_version = "1.0.0-mongodb"
+            applied_at = None
+        
+        # Check for company_scoring_preferences collection
+        phase3_exists = "company_scoring_preferences" in collections
+        
+        return {
+            "database_type": "MongoDB Atlas",
+            "schema_version": schema_version,
+            "applied_at": applied_at,
+            "total_collections": len(collections),
+            "collections": collections,
+            "phase3_enabled": phase3_exists,
+            "core_collections": [
+                "candidates", "jobs", "feedback", "interviews", "offers", 
+                "users", "clients", "matching_cache", "audit_logs", 
+                "rate_limits", "csp_violations", "company_scoring_preferences"
+            ],
                 "checked_at": datetime.now(timezone.utc).isoformat()
             }
     except Exception as e:
@@ -1413,41 +1441,40 @@ async def export_job_report(job_id: int, api_key: str = Depends(get_api_key)):
 async def client_register(client_data: ClientRegister):
     """Client Registration"""
     try:
-        engine = get_db_engine()
-        with engine.begin() as connection:
-            # Check if client_id already exists
-            check_query = text("SELECT COUNT(*) FROM clients WHERE client_id = :client_id")
-            result = connection.execute(check_query, {"client_id": client_data.client_id})
-            if result.fetchone()[0] > 0:
-                return {"success": False, "error": "Client ID already exists"}
-            
-            # Check if email already exists
-            email_check_query = text("SELECT COUNT(*) FROM clients WHERE email = :email")
-            email_result = connection.execute(email_check_query, {"email": client_data.contact_email})
-            if email_result.fetchone()[0] > 0:
-                return {"success": False, "error": "Email already registered"}
-            
-            # Hash password
-            password_hash = bcrypt.hashpw(client_data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-            
-            # Insert client
-            insert_query = text("""
-                INSERT INTO clients (client_id, company_name, email, password_hash, status, created_at)
-                VALUES (:client_id, :company_name, :email, :password_hash, 'active', NOW())
-            """)
-            connection.execute(insert_query, {
-                "client_id": client_data.client_id,
-                "company_name": client_data.company_name,
-                "email": client_data.contact_email,
-                "password_hash": password_hash
-            })
-            
-            return {
-                "success": True,
-                "message": "Client registration successful",
-                "client_id": client_data.client_id,
-                "company_name": client_data.company_name
-            }
+        db = await get_mongo_db()
+        
+        # Check if client_id already exists
+        existing_client = await db.clients.find_one({"client_id": client_data.client_id})
+        if existing_client:
+            return {"success": False, "error": "Client ID already exists"}
+        
+        # Check if email already exists
+        existing_email = await db.clients.find_one({"email": client_data.contact_email})
+        if existing_email:
+            return {"success": False, "error": "Email already registered"}
+        
+        # Hash password
+        password_hash = bcrypt.hashpw(client_data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
+        # Insert client
+        document = {
+            "client_id": client_data.client_id,
+            "company_name": client_data.company_name,
+            "email": client_data.contact_email,
+            "password_hash": password_hash,
+            "status": "active",
+            "failed_login_attempts": 0,
+            "locked_until": None,
+            "created_at": datetime.now(timezone.utc)
+        }
+        await db.clients.insert_one(document)
+        
+        return {
+            "success": True,
+            "message": "Client registration successful",
+            "client_id": client_data.client_id,
+            "company_name": client_data.company_name
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -1455,79 +1482,72 @@ async def client_register(client_data: ClientRegister):
 async def client_login(login_data: ClientLogin):
     """Client Authentication with Database Integration"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            # Get client by client_id from clients table
-            query = text("""
-                SELECT client_id, company_name, password_hash, status, failed_login_attempts, locked_until
-                FROM clients WHERE client_id = :client_id
-            """)
-            result = connection.execute(query, {"client_id": login_data.client_id})
-            client = result.fetchone()
-            
-            if not client:
+        db = await get_mongo_db()
+        
+        # Get client by client_id from clients collection
+        client = await db.clients.find_one({"client_id": login_data.client_id})
+        
+        if not client:
+            return {"success": False, "error": "Invalid credentials"}
+        
+        # Check if account is locked
+        if client.get("locked_until") and client.get("locked_until") > datetime.now(timezone.utc):
+            return {"success": False, "error": "Account temporarily locked"}
+        
+        # Check if account is active
+        if client.get("status") != 'active':
+            return {"success": False, "error": "Account is inactive"}
+        
+        # Verify password
+        if client.get("password_hash"):
+            if not bcrypt.checkpw(login_data.password.encode('utf-8'), client.get("password_hash").encode('utf-8')):
+                # Increment failed attempts
+                new_attempts = (client.get("failed_login_attempts") or 0) + 1
+                locked_until = None
+                if new_attempts >= 5:
+                    locked_until = datetime.now(timezone.utc) + timedelta(minutes=30)
+                
+                await db.clients.update_one(
+                    {"client_id": login_data.client_id},
+                    {"$set": {
+                        "failed_login_attempts": new_attempts,
+                        "locked_until": locked_until
+                    }}
+                )
+                
                 return {"success": False, "error": "Invalid credentials"}
-            
-            # Check if account is locked
-            if client[5] and client[5] > datetime.now(timezone.utc):
-                return {"success": False, "error": "Account temporarily locked"}
-            
-            # Check if account is active
-            if client[3] != 'active':
-                return {"success": False, "error": "Account is inactive"}
-            
-            # Verify password
-            if client[2]:  # password_hash exists
-                if not bcrypt.checkpw(login_data.password.encode('utf-8'), client[2].encode('utf-8')):
-                    # Increment failed attempts
-                    new_attempts = (client[4] or 0) + 1
-                    locked_until = None
-                    if new_attempts >= 5:
-                        locked_until = datetime.now(timezone.utc) + timedelta(minutes=30)
-                    
-                    with engine.begin() as conn:
-                        conn.execute(text("""
-                            UPDATE clients 
-                            SET failed_login_attempts = :attempts, locked_until = :locked_until
-                            WHERE client_id = :client_id
-                        """), {
-                            "attempts": new_attempts,
-                            "locked_until": locked_until,
-                            "client_id": login_data.client_id
-                        })
-                    
-                    return {"success": False, "error": "Invalid credentials"}
-            else:
-                # No password hash exists - require password to be set
-                return {"success": False, "error": "Account requires password setup"}
-            
-            # Generate JWT token using JWT_SECRET_KEY
-            jwt_secret = os.getenv("JWT_SECRET_KEY")
-            token_payload = {
-                "client_id": client[0],
-                "company_name": client[1],
-                "exp": int(datetime.now(timezone.utc).timestamp()) + 86400  # 24 hours
-            }
-            access_token = jwt.encode(token_payload, jwt_secret, algorithm="HS256")
-            
-            # Reset failed attempts and update last login
-            with engine.begin() as conn:
-                conn.execute(text("""
-                    UPDATE clients 
-                    SET failed_login_attempts = 0, locked_until = NULL
-                    WHERE client_id = :client_id
-                """), {"client_id": login_data.client_id})
-            
-            return {
-                "success": True,
-                "message": "Authentication successful",
-                "client_id": client[0],
-                "company_name": client[1],
-                "access_token": access_token,
-                "token_type": "bearer",
-                "expires_in": 86400,  # 24 hours
-                "permissions": ["view_jobs", "create_jobs", "view_candidates", "schedule_interviews"]
-            }
+        else:
+            # No password hash exists - require password to be set
+            return {"success": False, "error": "Account requires password setup"}
+        
+        # Generate JWT token using JWT_SECRET_KEY
+        jwt_secret = os.getenv("JWT_SECRET_KEY")
+        token_payload = {
+            "client_id": client.get("client_id"),
+            "company_name": client.get("company_name"),
+            "exp": int(datetime.now(timezone.utc).timestamp()) + 86400  # 24 hours
+        }
+        access_token = jwt.encode(token_payload, jwt_secret, algorithm="HS256")
+        
+        # Reset failed attempts and update last login
+        await db.clients.update_one(
+            {"client_id": login_data.client_id},
+            {"$set": {
+                "failed_login_attempts": 0,
+                "locked_until": None
+            }}
+        )
+        
+        return {
+            "success": True,
+            "message": "Authentication successful",
+            "client_id": client.get("client_id"),
+            "company_name": client.get("company_name"),
+            "access_token": access_token,
+            "token_type": "bearer",
+            "expires_in": 86400,  # 24 hours
+            "permissions": ["view_jobs", "create_jobs", "view_candidates", "schedule_interviews"]
+        }
             
     except Exception as e:
         return {
@@ -2090,45 +2110,38 @@ async def get_security_tips(api_key: str = Depends(get_api_key)):
 async def candidate_register(candidate_data: CandidateRegister):
     """Candidate Registration"""
     try:
-        engine = get_db_engine()
-        with engine.begin() as connection:
-            # Check if email already exists
-            check_query = text("SELECT COUNT(*) FROM candidates WHERE email = :email")
-            result = connection.execute(check_query, {"email": candidate_data.email})
-            if result.fetchone()[0] > 0:
-                return {"success": False, "error": "Email already registered"}
-            
-            # Hash password
-            password_hash = bcrypt.hashpw(candidate_data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-            
-            # Insert candidate with password hash
-            insert_query = text("""
-                INSERT INTO candidates (name, email, phone, location, experience_years, technical_skills, 
-                                      education_level, seniority_level, password_hash, status, created_at)
-                VALUES (:name, :email, :phone, :location, :experience_years, :technical_skills, 
-                        :education_level, :seniority_level, :password_hash, 'applied', NOW())
-                RETURNING id
-            """)
-            result = connection.execute(insert_query, {
-                "name": candidate_data.name,
-                "email": candidate_data.email,
-                "phone": candidate_data.phone,
-                "location": candidate_data.location,
-                "experience_years": candidate_data.experience_years or 0,
-                "technical_skills": candidate_data.technical_skills,
-                "education_level": candidate_data.education_level,
-                "seniority_level": candidate_data.seniority_level,
-                "password_hash": password_hash
-            })
-            candidate_id = result.fetchone()[0]
-            
-            # Password hash already stored during insertion
-            
-            return {
-                "success": True,
-                "message": "Registration successful",
-                "candidate_id": candidate_id
-            }
+        db = await get_mongo_db()
+        
+        # Check if email already exists
+        existing = await db.candidates.find_one({"email": candidate_data.email})
+        if existing:
+            return {"success": False, "error": "Email already registered"}
+        
+        # Hash password
+        password_hash = bcrypt.hashpw(candidate_data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
+        # Insert candidate with password hash
+        document = {
+            "name": candidate_data.name,
+            "email": candidate_data.email,
+            "phone": candidate_data.phone,
+            "location": candidate_data.location,
+            "experience_years": candidate_data.experience_years or 0,
+            "technical_skills": candidate_data.technical_skills,
+            "education_level": candidate_data.education_level,
+            "seniority_level": candidate_data.seniority_level,
+            "password_hash": password_hash,
+            "status": "applied",
+            "created_at": datetime.now(timezone.utc)
+        }
+        result = await db.candidates.insert_one(document)
+        candidate_id = str(result.inserted_id)
+        
+        return {
+            "success": True,
+            "message": "Registration successful",
+            "candidate_id": candidate_id
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2136,109 +2149,96 @@ async def candidate_register(candidate_data: CandidateRegister):
 async def candidate_login(login_data: CandidateLogin):
     """Candidate Login"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            # Get candidate by email
-            query = text("""
-                SELECT id, name, email, phone, location, experience_years, technical_skills, 
-                       seniority_level, education_level, status
-                FROM candidates WHERE email = :email
-            """)
-            result = connection.execute(query, {"email": login_data.email})
-            candidate = result.fetchone()
-            
-            if not candidate:
+        db = await get_mongo_db()
+        
+        # Get candidate by email
+        candidate = await db.candidates.find_one({"email": login_data.email})
+        
+        if not candidate:
+            return {"success": False, "error": "Invalid credentials"}
+        
+        # Verify password hash
+        if candidate.get("password_hash"):
+            if not bcrypt.checkpw(login_data.password.encode('utf-8'), candidate.get("password_hash").encode('utf-8')):
                 return {"success": False, "error": "Invalid credentials"}
-            
-            # Verify password hash
-            password_query = text("SELECT password_hash FROM candidates WHERE id = :candidate_id")
-            password_result = connection.execute(password_query, {"candidate_id": candidate[0]})
-            stored_hash = password_result.fetchone()
-            
-            if stored_hash and stored_hash[0]:
-                if not bcrypt.checkpw(login_data.password.encode('utf-8'), stored_hash[0].encode('utf-8')):
-                    return {"success": False, "error": "Invalid credentials"}
-            # If no password hash exists, accept any password (for existing test data)
-            
-            # Generate JWT token
-            jwt_secret = os.getenv("CANDIDATE_JWT_SECRET_KEY")
-            token_payload = {
-                "candidate_id": candidate[0],
-                "email": candidate[2],
-                "exp": int(datetime.now(timezone.utc).timestamp()) + 86400  # 24 hours
+        # If no password hash exists, accept any password (for existing test data)
+        
+        # Generate JWT token
+        jwt_secret = os.getenv("CANDIDATE_JWT_SECRET_KEY")
+        token_payload = {
+            "candidate_id": str(candidate["_id"]),
+            "email": candidate.get("email"),
+            "exp": int(datetime.now(timezone.utc).timestamp()) + 86400  # 24 hours
+        }
+        token = jwt.encode(token_payload, jwt_secret, algorithm="HS256")
+        
+        return {
+            "success": True,
+            "message": "Login successful",
+            "token": token,
+            "candidate": {
+                "id": str(candidate["_id"]),
+                "name": candidate.get("name"),
+                "email": candidate.get("email"),
+                "phone": candidate.get("phone"),
+                "location": candidate.get("location"),
+                "experience_years": candidate.get("experience_years"),
+                "technical_skills": candidate.get("technical_skills"),
+                "seniority_level": candidate.get("seniority_level"),
+                "education_level": candidate.get("education_level"),
+                "status": candidate.get("status")
             }
-            token = jwt.encode(token_payload, jwt_secret, algorithm="HS256")
-            
-            return {
-                "success": True,
-                "message": "Login successful",
-                "token": token,
-                "candidate": {
-                    "id": candidate[0],
-                    "name": candidate[1],
-                    "email": candidate[2],
-                    "phone": candidate[3],
-                    "location": candidate[4],
-                    "experience_years": candidate[5],
-                    "technical_skills": candidate[6],
-                    "seniority_level": candidate[7],
-                    "education_level": candidate[8],
-                    "status": candidate[9]
-                }
-            }
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 @app.put("/v1/candidate/profile/{candidate_id}", tags=["Candidate Portal"])
-async def update_candidate_profile(candidate_id: int, profile_data: CandidateProfileUpdate, auth = Depends(get_auth)):
+async def update_candidate_profile(candidate_id: str, profile_data: CandidateProfileUpdate, auth = Depends(get_auth)):
     """Update Candidate Profile"""
     try:
-        engine = get_db_engine()
-        with engine.begin() as connection:
-            # Input validation
-            if profile_data.phone and not re.match(r"^(\+91|91)?[6-9]\d{9}$", profile_data.phone):
-                raise HTTPException(status_code=400, detail="Invalid Indian phone number format.")
-            if profile_data.experience_years is not None and profile_data.experience_years < 0:
-                raise HTTPException(status_code=400, detail="Experience years cannot be negative.")
-            # Build update query dynamically
-            update_fields = []
-            params = {"candidate_id": candidate_id}
-            
-            if profile_data.name:
-                update_fields.append("name = :name")
-                params["name"] = profile_data.name
-            if profile_data.phone:
-                update_fields.append("phone = :phone")
-                params["phone"] = profile_data.phone
-            if profile_data.location:
-                update_fields.append("location = :location")
-                params["location"] = profile_data.location
-            if profile_data.experience_years is not None:
-                update_fields.append("experience_years = :experience_years")
-                params["experience_years"] = profile_data.experience_years
-            if profile_data.technical_skills:
-                update_fields.append("technical_skills = :technical_skills")
-                params["technical_skills"] = profile_data.technical_skills
-            if profile_data.education_level:
-                update_fields.append("education_level = :education_level")
-                params["education_level"] = profile_data.education_level
-            if profile_data.seniority_level:
-                update_fields.append("seniority_level = :seniority_level")
-                params["seniority_level"] = profile_data.seniority_level
-            
-            if not update_fields:
-                return {"success": False, "error": "No fields to update"}
-            
-            update_fields.append("updated_at = NOW()")
-            
-            query = text(f"""
-                UPDATE candidates 
-                SET {', '.join(update_fields)}
-                WHERE id = :candidate_id
-            """)
-            connection.execute(query, params)
-            
-            return {"success": True, "message": "Profile updated successfully"}
+        db = await get_mongo_db()
+        
+        # Input validation
+        if profile_data.phone and not re.match(r"^(\+91|91)?[6-9]\d{9}$", profile_data.phone):
+            raise HTTPException(status_code=400, detail="Invalid Indian phone number format.")
+        if profile_data.experience_years is not None and profile_data.experience_years < 0:
+            raise HTTPException(status_code=400, detail="Experience years cannot be negative.")
+        
+        # Build update fields
+        update_fields = {}
+        
+        if profile_data.name:
+            update_fields["name"] = profile_data.name
+        if profile_data.phone:
+            update_fields["phone"] = profile_data.phone
+        if profile_data.location:
+            update_fields["location"] = profile_data.location
+        if profile_data.experience_years is not None:
+            update_fields["experience_years"] = profile_data.experience_years
+        if profile_data.technical_skills:
+            update_fields["technical_skills"] = profile_data.technical_skills
+        if profile_data.education_level:
+            update_fields["education_level"] = profile_data.education_level
+        if profile_data.seniority_level:
+            update_fields["seniority_level"] = profile_data.seniority_level
+        
+        if not update_fields:
+            return {"success": False, "error": "No fields to update"}
+        
+        update_fields["updated_at"] = datetime.now(timezone.utc)
+        
+        try:
+            result = await db.candidates.update_one(
+                {"_id": ObjectId(candidate_id)},
+                {"$set": update_fields}
+            )
+        except:
+            result = await db.candidates.update_one(
+                {"id": candidate_id},
+                {"$set": update_fields}
+            )
+        
+        return {"success": True, "message": "Profile updated successfully"}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2246,105 +2246,74 @@ async def update_candidate_profile(candidate_id: int, profile_data: CandidatePro
 async def apply_for_job(application: JobApplication, auth = Depends(get_auth)):
     """Apply for Job"""
     try:
-        engine = get_db_engine()
-        with engine.begin() as connection:
-            # Check if already applied
-            check_query = text("""
-                SELECT COUNT(*) FROM job_applications 
-                WHERE candidate_id = :candidate_id AND job_id = :job_id
-            """)
-            
-            # Create applications table if not exists (simplified)
-            create_table_query = text("""
-                CREATE TABLE IF NOT EXISTS job_applications (
-                    id SERIAL PRIMARY KEY,
-                    candidate_id INTEGER REFERENCES candidates(id),
-                    job_id INTEGER REFERENCES jobs(id),
-                    cover_letter TEXT,
-                    status VARCHAR(50) DEFAULT 'applied',
-                    applied_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(candidate_id, job_id)
-                )
-            """)
-            connection.execute(create_table_query)
-            
-            result = connection.execute(check_query, {
-                "candidate_id": application.candidate_id,
-                "job_id": application.job_id
-            })
-            
-            if result.fetchone()[0] > 0:
-                return {"success": False, "error": "Already applied for this job"}
-            
-            # Insert application
-            insert_query = text("""
-                INSERT INTO job_applications (candidate_id, job_id, cover_letter, status, applied_date)
-                VALUES (:candidate_id, :job_id, :cover_letter, 'applied', NOW())
-                RETURNING id
-            """)
-            result = connection.execute(insert_query, {
-                "candidate_id": application.candidate_id,
-                "job_id": application.job_id,
-                "cover_letter": application.cover_letter
-            })
-            application_id = result.fetchone()[0]
-            
-            return {
-                "success": True,
-                "message": "Application submitted successfully",
-                "application_id": application_id
-            }
+        db = await get_mongo_db()
+        
+        # Check if already applied
+        existing = await db.job_applications.find_one({
+            "candidate_id": application.candidate_id,
+            "job_id": application.job_id
+        })
+        
+        if existing:
+            return {"success": False, "error": "Already applied for this job"}
+        
+        # Insert application
+        document = {
+            "candidate_id": application.candidate_id,
+            "job_id": application.job_id,
+            "cover_letter": application.cover_letter,
+            "status": "applied",
+            "applied_date": datetime.now(timezone.utc)
+        }
+        result = await db.job_applications.insert_one(document)
+        application_id = str(result.inserted_id)
+        
+        return {
+            "success": True,
+            "message": "Application submitted successfully",
+            "application_id": application_id
+        }
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 @app.get("/v1/candidate/applications/{candidate_id}", tags=["Candidate Portal"])
-async def get_candidate_applications(candidate_id: int, auth = Depends(get_auth)):
+async def get_candidate_applications(candidate_id: str, auth = Depends(get_auth)):
     """Get Candidate Applications"""
     try:
-        engine = get_db_engine()
-        with engine.connect() as connection:
-            # Create applications table if not exists
-            create_table_query = text("""
-                CREATE TABLE IF NOT EXISTS job_applications (
-                    id SERIAL PRIMARY KEY,
-                    candidate_id INTEGER REFERENCES candidates(id),
-                    job_id INTEGER REFERENCES jobs(id),
-                    cover_letter TEXT,
-                    status VARCHAR(50) DEFAULT 'applied',
-                    applied_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(candidate_id, job_id)
-                )
-            """)
-            connection.execute(create_table_query)
+        db = await get_mongo_db()
+        
+        # Use aggregation for JOIN-like query
+        pipeline = [
+            {"$match": {"candidate_id": candidate_id}},
+            {"$sort": {"applied_date": -1}}
+        ]
+        
+        cursor = db.job_applications.aggregate(pipeline)
+        applications_list = await cursor.to_list(length=None)
+        
+        applications = []
+        for doc in applications_list:
+            # Get job details
+            job_doc = None
+            try:
+                job_doc = await db.jobs.find_one({"_id": ObjectId(doc.get("job_id"))})
+            except:
+                job_doc = await db.jobs.find_one({"id": doc.get("job_id")})
             
-            query = text("""
-                SELECT ja.id, ja.job_id, ja.status, ja.applied_date, ja.cover_letter,
-                       j.title as job_title, j.department, j.location, j.experience_level,
-                       c.company_name as company
-                FROM job_applications ja
-                LEFT JOIN jobs j ON ja.job_id = j.id
-                LEFT JOIN clients c ON j.client_id = c.client_id
-                WHERE ja.candidate_id = :candidate_id
-                ORDER BY ja.applied_date DESC
-            """)
-            result = connection.execute(query, {"candidate_id": candidate_id})
-            
-            applications = []
-            for row in result:
-                applications.append({
-                    "id": row[0],
-                    "job_id": row[1],
-                    "status": row[2],
-                    "applied_date": row[3].isoformat() if row[3] else None,
-                    "cover_letter": row[4],
-                    "job_title": row[5],
-                    "department": row[6],
-                    "location": row[7],
-                    "experience_level": row[8],
-                    "company": row[9] or "BHIV Partner",
-                    "updated_at": row[3].isoformat() if row[3] else None
-                })
-            
-            return {"applications": applications, "count": len(applications)}
+            applications.append({
+                "id": str(doc["_id"]),
+                "job_id": doc.get("job_id"),
+                "status": doc.get("status"),
+                "applied_date": doc.get("applied_date").isoformat() if doc.get("applied_date") else None,
+                "cover_letter": doc.get("cover_letter"),
+                "job_title": job_doc.get("title") if job_doc else None,
+                "department": job_doc.get("department") if job_doc else None,
+                "location": job_doc.get("location") if job_doc else None,
+                "experience_level": job_doc.get("experience_level") if job_doc else None,
+                "company": "BHIV Partner",
+                "updated_at": doc.get("applied_date").isoformat() if doc.get("applied_date") else None
+            })
+        
+        return {"applications": applications, "count": len(applications)}
     except Exception as e:
         return {"applications": [], "count": 0, "error": str(e)}

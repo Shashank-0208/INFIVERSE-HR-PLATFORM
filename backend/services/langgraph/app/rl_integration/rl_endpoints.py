@@ -5,7 +5,8 @@ from datetime import datetime
 import logging
 
 from .decision_engine import DecisionEngine, EventTimeline
-from .postgres_adapter import postgres_adapter
+# MongoDB migration: Using mongodb_adapter instead of postgres_adapter
+from .mongodb_adapter import mongodb_adapter as db_adapter
 from .ml_models import MLModels
 
 logger = logging.getLogger(__name__)
@@ -33,8 +34,8 @@ class RLResponse(BaseModel):
     timestamp: str
 
 # Initialize components
-decision_engine = DecisionEngine(postgres_adapter)
-event_timeline = EventTimeline(postgres_adapter)
+decision_engine = DecisionEngine(db_adapter)
+event_timeline = EventTimeline(db_adapter)
 
 # Create router
 router = APIRouter(prefix="/rl", tags=["RL + Feedback Agent"])
@@ -44,7 +45,7 @@ async def rl_predict_match(request: RLPredictionRequest):
     """RL-Enhanced Candidate Matching Prediction"""
     try:
         # Get feedback history for RL enhancement
-        feedback_history = postgres_adapter.get_feedback_history(
+        feedback_history = db_adapter.get_feedback_history(
             candidate_id=request.candidate_id, 
             limit=50
         )
@@ -70,7 +71,7 @@ async def rl_predict_match(request: RLPredictionRequest):
             'model_version': decision_data['model_version']
         }
         
-        prediction_id = postgres_adapter.store_rl_prediction(prediction_data)
+        prediction_id = db_adapter.store_rl_prediction(prediction_data)
         
         # Log decision event
         event_timeline.log_rl_decision(
@@ -115,7 +116,7 @@ async def submit_rl_feedback(request: RLFeedbackRequest):
         }
         
         # Store feedback in database
-        feedback_id = postgres_adapter.store_rl_feedback(feedback_data)
+        feedback_id = db_adapter.store_rl_feedback(feedback_data)
         
         if not feedback_id:
             raise HTTPException(status_code=500, detail="Failed to store feedback")
@@ -140,7 +141,7 @@ async def get_rl_analytics():
     """Get RL System Analytics and Performance Metrics"""
     try:
         # Get database analytics
-        db_analytics = postgres_adapter.get_rl_analytics()
+        db_analytics = db_adapter.get_rl_analytics()
         
         if db_analytics.get('error'):
             raise HTTPException(status_code=500, detail=db_analytics['error'])
@@ -163,7 +164,7 @@ async def get_rl_analytics():
 async def get_rl_performance(model_version: str = "v1.0.0"):
     """Get RL Model Performance Metrics"""
     try:
-        analytics = postgres_adapter.get_rl_analytics()
+        analytics = db_adapter.get_rl_analytics()
         
         performance_data = {
             "model_version": model_version,
@@ -186,7 +187,7 @@ async def get_rl_performance(model_version: str = "v1.0.0"):
 async def get_candidate_rl_history(candidate_id: int):
     """Get RL Decision History for Candidate"""
     try:
-        history = postgres_adapter.get_candidate_rl_history(candidate_id)
+        history = db_adapter.get_candidate_rl_history(candidate_id)
         
         return RLResponse(
             success=True,
@@ -208,7 +209,7 @@ async def trigger_rl_retrain():
     """Trigger RL Model Retraining"""
     try:
         # Get recent feedback for retraining
-        feedback_history = postgres_adapter.get_feedback_history(limit=1000)
+        feedback_history = db_adapter.get_feedback_history(limit=1000)
         
         if len(feedback_history) < 10:
             return RLResponse(
@@ -234,7 +235,7 @@ async def trigger_rl_retrain():
             'evaluation_date': datetime.now().isoformat()
         }
         
-        performance_id = postgres_adapter.store_model_performance(performance_data)
+        performance_id = db_adapter.store_model_performance(performance_data)
         
         return RLResponse(
             success=True,

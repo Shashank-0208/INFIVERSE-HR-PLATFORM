@@ -1,5 +1,6 @@
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.postgres import PostgresSaver
+# MongoDB migration: Using custom MongoDB checkpointer instead of PostgresSaver
+from .mongodb_checkpointer import MongoDBSaver
 from .state import CandidateApplicationState
 from .agents import (
     application_screener_agent,
@@ -60,12 +61,12 @@ def create_application_workflow():
         workflow.add_edge("collect_feedback", END)
         logger.info("Sequential edges configured")
         
-        # Setup PostgreSQL checkpointer for state persistence
+        # Setup MongoDB checkpointer for state persistence (migrated from PostgresSaver)
         try:
-            checkpointer = PostgresSaver.from_conn_string(settings.database_url)
-            logger.info("✅ PostgreSQL checkpointer configured")
+            checkpointer = MongoDBSaver.from_conn_string(settings.database_url)
+            logger.info("✅ MongoDB checkpointer configured")
         except Exception as e:
-            logger.warning(f"⚠️ PostgreSQL checkpointer failed: {e}")
+            logger.warning(f"⚠️ MongoDB checkpointer failed: {e}")
             checkpointer = None
         
         # Compile graph

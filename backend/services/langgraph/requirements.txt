@@ -1,9 +1,11 @@
 # Core LangGraph & LangChain
 langgraph>=0.2.0
-langgraph-checkpoint-postgres>=1.0.0
 langchain>=0.2.0
 langchain-google-genai>=1.0.0
 langchain-core>=0.2.0
+
+# PostgreSQL checkpoint - REMOVED (custom MongoDB checkpointer will be implemented)
+# langgraph-checkpoint-postgres>=1.0.0
 
 # API & Web
 fastapi>=0.100.0
@@ -22,9 +24,13 @@ scikit-learn>=1.3.0
 numpy>=1.24.0
 psutil>=5.9.0
 
-# Database
-psycopg2-binary>=2.9.0
-sqlalchemy>=2.0.0
+# Database - MongoDB
+pymongo>=4.6.0
+dnspython>=2.4.0  # For MongoDB Atlas SRV connections
+
+# PostgreSQL dependencies - REMOVED (migrating to MongoDB)
+# psycopg2-binary>=2.9.0
+# sqlalchemy>=2.0.0
 
 # Testing
 pytest>=7.0.0

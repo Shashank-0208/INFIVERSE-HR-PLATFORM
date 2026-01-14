@@ -89,25 +89,234 @@
 2. Login with demo credentials: `TECH001` / `demo123`
 3. Test API at [Gateway Docs](https://bhiv-hr-gateway-ltg0.onrender.com/docs)
 
-### **💻 Local Development**
+---
+
+## 🖥️ Local Development Setup
+
+### **Prerequisites**
+- **Python 3.11+** - [Download](https://python.org)
+- **Node.js 18+** - [Download](https://nodejs.org) (for frontend)
+- **Docker Desktop** (optional) - [Download](https://docker.com) (for Docker method)
+- **Git** - [Download](https://git-scm.com)
+
+---
+
+## 🚀 Method 1: Python Virtual Environment (Recommended - No Docker)
+
+This method runs all backend services directly using Python without Docker. It's faster to start and uses less system resources.
+
+### **Step 1: Clone Repository**
 ```bash
 git clone https://github.com/Shashank-0208/BHIV-HR-PLATFORM.git
 cd BHIV-HR-Platform
+```
+
+### **Step 2: Setup Backend Virtual Environment**
+```bash
+cd backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment (Windows)
+venv\Scripts\activate
+
+# Activate virtual environment (Mac/Linux)
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+**OR use the automated setup script (Windows):**
+```bash
+cd backend
+setup_venv.bat
+```
+
+### **Step 3: Start Backend Services**
+```bash
+# Make sure venv is activated
+python run_services.py
+```
+
+This starts all 3 core services:
+| Service | Port | URL |
+|---------|------|-----|
+| Gateway | 8000 | http://localhost:8000/docs |
+| Agent | 9000 | http://localhost:9000/docs |
+| LangGraph | 9001 | http://localhost:9001/docs |
+
+**OR use the run script (Windows):**
+```bash
+cd backend
+run_with_venv.bat
+```
+
+### **Step 4: Start Frontend**
+Open a **new terminal**:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend will be available at: **http://localhost:3000**
+
+### **Step 5: Verify Everything Works**
+Open browser and check:
+- Frontend: http://localhost:3000
+- Gateway API: http://localhost:8000/docs
+- Agent API: http://localhost:9000/docs
+- LangGraph API: http://localhost:9001/docs
+
+---
+
+## 🐳 Method 2: Docker Compose (All 6 Services)
+
+This method runs all services including Streamlit portals in Docker containers.
+
+### **Step 1: Clone Repository**
+```bash
+git clone https://github.com/Shashank-0208/BHIV-HR-PLATFORM.git
+cd BHIV-HR-Platform/backend
+```
+
+### **Step 2: Create Environment File**
+```bash
 cp .env.example .env
-docker-compose -f docker-compose.production.yml up -d
+```
+
+Edit `.env` and add your credentials (or use defaults for testing).
+
+### **Step 3: Start Docker Services**
+```bash
+docker-compose -f docker-compose.production.yml up --build
+```
+
+This starts all 6 services:
+| Service | Port | URL |
+|---------|------|-----|
+| Gateway | 8000 | http://localhost:8000/docs |
+| Agent | 9000 | http://localhost:9000/docs |
+| LangGraph | 9001 | http://localhost:9001/docs |
+| HR Portal | 8501 | http://localhost:8501 |
+| Client Portal | 8502 | http://localhost:8502 |
+| Candidate Portal | 8503 | http://localhost:8503 |
+
+### **Step 4: Start Frontend (Optional)**
+Open a **new terminal**:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend: **http://localhost:3000**
+
+### **Step 5: Stop Services**
+```bash
+docker-compose -f docker-compose.production.yml down
+```
+
+---
+
+## 📁 Backend Scripts Reference
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `run_services.py` | Start Gateway, Agent, LangGraph | `python run_services.py` |
+| `setup_venv.bat` | Create venv & install packages | `setup_venv.bat` |
+| `run_with_venv.bat` | Activate venv & run services | `run_with_venv.bat` |
+| `seed_mongodb.py` | Seed database with sample data | `python seed_mongodb.py` |
+| `test_mongodb_atlas.py` | Test MongoDB connection | `python test_mongodb_atlas.py` |
+
+---
+
+## 🗄️ Database
+
+The platform uses **MongoDB Atlas** (cloud database). No local database setup required!
+
+**Connection**: Already configured in `run_services.py` and `.env`
+
+**Test Connection:**
+```bash
+cd backend
+python test_mongodb_atlas.py
+```
+
+**Seed Sample Data:**
+```bash
+cd backend
+python seed_mongodb.py
+```
+
+---
+
+## 🔑 Environment Variables
+
+Key environment variables (already configured in `run_services.py`):
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | MongoDB Atlas connection string |
+| `API_KEY_SECRET` | API authentication key |
+| `JWT_SECRET_KEY` | JWT token signing key |
+| `CANDIDATE_JWT_SECRET_KEY` | Candidate portal JWT key |
+| `GATEWAY_SECRET_KEY` | Gateway service key |
+
+For production, create a `.env` file from `.env.example`.
+
+---
+
+## 🧪 Testing
+
+### **Test Backend Health**
+```bash
+curl http://localhost:8000/health
+curl http://localhost:9000/health
+curl http://localhost:9001/health
+```
+
+### **Test with Authentication**
+```bash
+curl -H "Authorization: Bearer prod_api_key_XUqM2msdCa4CYIaRywRNXRVc477nlI3AQ-lr6cgTB2o" http://localhost:8000/jobs
+```
+
+---
+
+## 🛑 Troubleshooting
+
+### **Port Already in Use**
+```bash
+# Windows - Kill process on port 8000
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+```
+
+### **Module Not Found Error**
+```bash
+# Reinstall dependencies
+pip install -r requirements.txt
+```
+
+### **MongoDB Connection Error**
+```bash
+# Test connection
+python test_mongodb_atlas.py
 ```
 
 **📖 Detailed Setup**: [Quick Start Guide](docs/guides/QUICK_START_GUIDE.md)
 
 ## 🏗️ System Architecture
 
-**Microservices Architecture**: 6 services + PostgreSQL database  
-**Technology Stack**: FastAPI 4.2.0, Streamlit 1.41.1, Python 3.12.7, PostgreSQL 17  
+**Microservices Architecture**: 6 services + MongoDB Atlas (cloud database)  
+**Technology Stack**: FastAPI 4.2.0, Streamlit 1.41.1, Python 3.12.7, MongoDB Atlas  
 **Total Endpoints**: 111 (80 Gateway + 6 Agent + 25 LangGraph)  
-**Database Schema**: v4.3.0 with 19 tables (13 core + 6 RL integration)  
+**Database**: MongoDB Atlas with 19 collections  
 **Deployment**: Docker-based microservices on Render platform  
 **Organization**: Professional structure with 75+ documentation files  
-**Git Status**: Complete documentation update post-handover (Dec 9, 2025)
+**Git Status**: Complete documentation update post-handover (Jan 14, 2026)
 
 **📖 Complete Architecture**: [Project Structure](docs/architecture/PROJECT_STRUCTURE.md)
 
@@ -149,12 +358,11 @@ docker-compose -f docker-compose.production.yml up -d
 - **Real-time Synchronization** across all interfaces
 
 ### **🗄️ Database & Performance**
-- **PostgreSQL 17** with Schema v4.3.0 (19 tables)
-- **13 Core Tables + 6 RL Integration Tables** for complete HR workflow
-- **85+ Optimized Indexes** for sub-50ms query performance
+- **MongoDB Atlas** cloud database with 19 collections
+- **13 Core Collections + 6 RL Integration Collections** for complete HR workflow
+- **Indexed Queries** for sub-50ms query performance
 - **Connection Pooling** with automatic scaling
 - **Audit Logging** for comprehensive security tracking
-- **Generated Columns** for real-time calculations
 - **RL Feedback System** for continuous improvement
 
 ### **🏢 Enterprise Features**
@@ -212,9 +420,9 @@ BHIV HR PLATFORM/
 
 ### **Database Schema**
 
-**PostgreSQL 17** with Schema v4.3.0  
-**Tables**: 19 tables (13 core business + 6 RL integration)  
-**Features**: 85+ indexes, audit triggers, generated columns, referential integrity, RL feedback system
+**MongoDB Atlas** with 19 Collections  
+**Collections**: 19 total (13 core business + 6 RL integration)  
+**Features**: Indexed queries, audit logging, RL feedback system
 
 **📖 Complete Schema**: [Database Documentation](docs/database/DATABASE_DOCUMENTATION.md)
 
@@ -276,12 +484,16 @@ BHIV HR PLATFORM/
 **System Status**: ✅ **FULLY OPERATIONAL**  
 **Services**: 6/6 live with 99.9% uptime  
 **Endpoints**: 111 total (100% tested and functional)  
-**Database**: PostgreSQL 17 with 19 tables (13 core + 6 RL integration)  
+**Database**: MongoDB Atlas with 19 collections (13 core + 6 RL integration)  
 **Cost**: $0/month (optimized free tier deployment)
 
-**Recent Updates (December 9, 2025)**:
-- ✅ **Schema v4.3.0**: Enhanced database with 19 tables (13 core + 6 RL integration)
-- ✅ **111 Endpoints**: Complete API coverage (74 Gateway + 6 Agent + 25 LangGraph + 6 Portal)
+**Recent Updates (January 14, 2026)**:
+- ✅ **MongoDB Atlas Migration**: Migrated from PostgreSQL to MongoDB Atlas (cloud)
+- ✅ **Simplified Local Development**: Added `run_services.py` for Docker-free development
+- ✅ **Virtual Environment Setup**: Added `setup_venv.bat` and `run_with_venv.bat`
+- ✅ **Updated docker-compose**: Removed local MongoDB container, uses Atlas
+- ✅ **Schema v4.3.0**: 19 collections (13 core + 6 RL integration)
+- ✅ **111 Endpoints**: Complete API coverage (80 Gateway + 6 Agent + 25 LangGraph)
 - ✅ **RL Integration**: Advanced reinforcement learning with 97.3% fairness score
 - ✅ **Unified Authentication**: auth_manager.py in all 6 services
 - ✅ **Multi-Channel Notifications**: Email, WhatsApp, Telegram confirmed working
@@ -339,4 +551,4 @@ BHIV HR PLATFORM/
 
 *Built with Integrity, Honesty, Discipline, Hard Work & Gratitude*
 
-**Status**: ✅ Production Ready | **Services**: 6/6 Live | **Endpoints**: 111 Total | **Database**: 19 Tables | **Uptime**: 99.9% | **Cost**: $0/month | **Updated**: December 9, 2025 (Post-Handover Documentation Update)
+**Status**: ✅ Production Ready | **Services**: 6/6 Live | **Endpoints**: 111 Total | **Database**: MongoDB Atlas (19 Collections) | **Uptime**: 99.9% | **Cost**: $0/month | **Updated**: January 14, 2026 (MongoDB Atlas Migration)

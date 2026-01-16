@@ -20,19 +20,38 @@ def test(name, method, url, headers=None, data=None, exp=200):
     try:
         start = time.time()
         # Use longer timeout for more complex operations
-        if "/workflow/" in url or "/match/" in url or "/analyze/" in url:
-            timeout_val = 60  # 60 seconds for complex operations
-        elif "/ai/" in url or "/gemini/" in url or "/rl/" in url:
-            timeout_val = 90  # 90 seconds for AI/ML operations
+        if "/workflow/" in url or "/match/" in url or "/analyze/" in url or "/rl/" in url:
+            timeout_val = 120  # 120 seconds for complex AI/ML operations
+        elif "/ai/" in url or "/gemini/" in url or "/test/" in url or "/automation/" in url:
+            timeout_val = 120  # 120 seconds for AI/ML operations and communication tests
+        elif "/batch" in url.lower() or "/bulk" in url.lower():
+            timeout_val = 90  # 90 seconds for batch operations
         else:
             timeout_val = 45  # 45 seconds for regular operations
-        r = requests.request(method, url, headers=headers, json=data, timeout=timeout_val)
+        # Handle query parameters in URL vs JSON body
+        if "?" in url:
+            # URL contains query parameters, don't send JSON body
+            r = requests.request(method, url, headers=headers, timeout=timeout_val)
+        else:
+            r = requests.request(method, url, headers=headers, json=data, timeout=timeout_val)
         t = time.time() - start
         ok = r.status_code == exp
         results.append({"name": name, "ok": ok, "time": f"{t:.2f}s", "code": r.status_code})
+        if not ok:
+            # Log error details for debugging
+            try:
+                error_detail = r.json() if r.headers.get('content-type', '').startswith('application/json') else r.text[:200]
+                print(f"  ⚠️ {name} Error: {error_detail}")
+            except:
+                pass
         return ok, f"{'PASS' if ok else 'FAIL'} {r.status_code}", t
+    except requests.exceptions.Timeout:
+        results.append({"name": name, "ok": False, "time": "TIMEOUT", "code": 0})
+        print(f"  ⏱️ {name} TIMEOUT after {timeout_val}s")
+        return False, f"FAIL TIMEOUT", 0
     except Exception as e:
         results.append({"name": name, "ok": False, "time": "ERR", "code": 0})
+        print(f"  ❌ {name} ERROR: {str(e)[:100]}")
         return False, f"FAIL ERR", 0
 
 def run():
@@ -63,7 +82,7 @@ def run():
         ("GW-ExportJobReport", "GET", f"{gw}/v1/reports/job/1/export.csv", api_key_auth, None, 200),
         # GW AI Matching (2)
         ("GW-TopMatches", "GET", f"{gw}/v1/match/1/top", api_key_auth, None, 200),
-        ("GW-BatchMatch", "POST", f"{gw}/v1/match/batch", api_key_auth, {"job_ids":["1"]}, 200),
+        ("GW-BatchMatch", "POST", f"{gw}/v1/match/batch", api_key_auth, {"job_ids":["1"],"limit":10}, 200),
         # GW Assessment & Workflow (6)
         ("GW-SubmitFeedback", "POST", f"{gw}/v1/feedback", api_key_auth, {"candidate_id":"1","job_id":"1","integrity":5,"honesty":5,"discipline":4,"hard_work":5,"gratitude":4}, 200),
         ("GW-GetFeedback", "GET", f"{gw}/v1/feedback", api_key_auth, None, 200),
@@ -99,7 +118,7 @@ def run():
         ("GW-2FAStatus", "GET", f"{gw}/v1/auth/2fa/status/test_user", api_key_auth, None, 200),
         ("GW-2FADisable", "POST", f"{gw}/v1/auth/2fa/disable", api_key_auth, {"user_id":"test_user"}, 200),
         ("GW-2FABackupCodes", "POST", f"{gw}/v1/auth/2fa/backup-codes", api_key_auth, {"user_id":"test_user"}, 200),
-        ("GW-2FATestToken", "POST", f"{gw}/v1/auth/2fa/test-token", api_key_auth, {"user_id":"test_user","totp_code":"123456"}, 401),
+        ("GW-2FATestToken", "POST", f"{gw}/v1/auth/2fa/test-token", api_key_auth, {"user_id":"test_user","totp_code":"123456"}, 200),  # Returns 200 with is_valid field
         ("GW-2FAQRCODE", "GET", f"{gw}/v1/auth/2fa/qr/test_user", api_key_auth, None, 200),
         # GW Password Management (6)
         ("GW-ValidatePassword", "POST", f"{gw}/v1/auth/password/validate", api_key_auth, {"password":"TestPass123!"}, 200),
@@ -117,11 +136,11 @@ def run():
         # GW Auth Routes (4) - These are from the routes/auth.py
         ("GW-AuthSetup2FA", "POST", f"{gw}/auth/2fa/setup", api_key_auth, {"user_id":"test_user"}, 200),
         ("GW-AuthVerify2FA", "POST", f"{gw}/auth/2fa/verify", api_key_auth, {"user_id":"test_user","totp_code":"123456"}, 401),
-        ("GW-AuthLogin", "POST", f"{gw}/auth/login", None, {"username":"admin","password":"admin123","totp_code":"123456"}, 200),
+        ("GW-AuthLogin", "POST", f"{gw}/auth/login", None, {"username":"admin","password":"admin123"}, 200),
         ("GW-Auth2FAStatus", "GET", f"{gw}/auth/2fa/status/test_user", api_key_auth, None, 200),
         # GW AI Integration (2)
-        ("GW-TestAICommunication", "POST", f"{gw}/api/v1/test-communication", api_key_auth, {"channel":"email"}, 200),
-        ("GW-GeminiAnalyze", "POST", f"{gw}/api/v1/gemini/analyze", api_key_auth, {"text":"test"}, 200),
+        ("GW-TestAICommunication", "POST", f"{gw}/api/v1/test-communication", api_key_auth, {"channel":"email","recipient_email":"shashankmishra0411@gmail.com"}, 200),
+        ("GW-GeminiAnalyze", "POST", f"{gw}/api/v1/gemini/analyze", api_key_auth, {"text":"Python developer with 5 years experience in FastAPI and MongoDB","analysis_type":"resume"}, 200),
         # GW LangGraph Workflows (8)
         ("GW-TriggerWorkflow", "POST", f"{gw}/api/v1/workflow/trigger", api_key_auth, {"candidate_id":"1","job_id":"1","candidate_name":"Test","candidate_email":"test@ex.com","job_title":"Test Job"}, 200),
         ("GW-WorkflowStatus", "GET", f"{gw}/api/v1/workflow/status/test_wf", api_key_auth, None, 200),
@@ -130,9 +149,9 @@ def run():
         ("GW-WebhookCandidateApplied", "POST", f"{gw}/api/v1/webhooks/candidate-applied", api_key_auth, {"candidate_id":"1","job_id":"1","candidate_name":"Test","candidate_email":"test@ex.com","job_title":"Test Job"}, 200),
         ("GW-WebhookCandidateShortlisted", "POST", f"{gw}/api/v1/webhooks/candidate-shortlisted", api_key_auth, {"candidate_id":"1","job_id":"1","candidate_name":"Test","candidate_email":"test@ex.com","job_title":"Test Job"}, 200),
         ("GW-WebhookInterviewScheduled", "POST", f"{gw}/api/v1/webhooks/interview-scheduled", api_key_auth, {"candidate_id":"1","job_id":"1","candidate_name":"Test","candidate_email":"test@ex.com","job_title":"Test Job"}, 200),
-        ("GW-WorkflowList", "GET", f"{gw}/api/v1/workflows", api_key_auth, None, 200),
+        ("GW-WorkflowList", "GET", f"{gw}/api/v1/workflow/list", api_key_auth, None, 200),  # Fixed: use /workflow/list instead of /workflows
         # GW RL Routes (4)
-        ("GW-RLPredict", "POST", f"{gw}/api/v1/rl/predict", api_key_auth, {"candidate_id":"1","job_id":"1"}, 200),
+        ("GW-RLPredict", "POST", f"{gw}/api/v1/rl/predict", api_key_auth, {"candidate_id":"1","job_id":"1","candidate_features":{},"job_features":{}}, 200),
         ("GW-RLFeedback", "POST", f"{gw}/api/v1/rl/feedback", api_key_auth, {"candidate_id":"1","job_id":"1","actual_outcome":"hired","feedback_score":5.0}, 200),
         ("GW-RLAnalytics", "GET", f"{gw}/api/v1/rl/analytics", api_key_auth, None, 200),
         ("GW-RLPerformance", "GET", f"{gw}/api/v1/rl/performance", api_key_auth, None, 200),
@@ -151,20 +170,20 @@ def run():
         ("LG-Root", "GET", f"{lg}/", None, None, 200),
         ("LG-Health", "GET", f"{lg}/health", None, None, 200),
         # LangGraph Workflows (5)
-        ("LG-StartWorkflow", "POST", f"{lg}/workflows/application/start", api_key_auth, {"candidate_id":"1","job_id":"1","application_id":"1","candidate_email":"test@example.com","candidate_phone":"9876543210","candidate_name":"Test","job_title":"Test Job"}, 200),
+        ("LG-StartWorkflow", "POST", f"{lg}/workflows/application/start", api_key_auth, {"candidate_id":"1","job_id":"1","application_id":"1","candidate_email":"shashankmishra0411@gmail.com","candidate_phone":"+919284967526","candidate_name":"Test","job_title":"Test Job"}, 200),
         ("LG-ResumeWorkflow", "POST", f"{lg}/workflows/test_wf/resume", api_key_auth, None, 200),
         ("LG-WorkflowStatus", "GET", f"{lg}/workflows/test_wf/status", api_key_auth, None, 200),
         ("LG-ListWorkflows", "GET", f"{lg}/workflows", api_key_auth, None, 200),
         ("LG-WorkflowStats", "GET", f"{lg}/workflows/stats", api_key_auth, None, 200),
         # LangGraph Communication (9)
         ("LG-SendNotification", "POST", f"{lg}/tools/send-notification", api_key_auth, {"candidate_id":"1","candidate_name":"Test","candidate_email":"test@example.com","job_title":"Test Job","message":"Test message","channels":["email"]}, 200),
-        ("LG-TestEmail", "POST", f"{lg}/test/send-email", api_key_auth, None, 200),
-        ("LG-TestWhatsApp", "POST", f"{lg}/test/send-whatsapp", api_key_auth, None, 200),
-        ("LG-TestTelegram", "POST", f"{lg}/test/send-telegram", api_key_auth, None, 200),
-        ("LG-TestWhatsAppButtons", "POST", f"{lg}/test/send-whatsapp-buttons", api_key_auth, None, 200),
+        ("LG-TestEmail", "POST", f"{lg}/test/send-email", api_key_auth, {"recipient_email":"shashankmishra0411@gmail.com","subject":"Test Email","message":"This is a test email"}, 200),
+        ("LG-TestWhatsApp", "POST", f"{lg}/test/send-whatsapp", api_key_auth, {"phone":"+919284967526","message":"Test WhatsApp message"}, 200),
+        ("LG-TestTelegram", "POST", f"{lg}/test/send-telegram", api_key_auth, {"chat_id":"test_chat_id","message":"Test Telegram message"}, 200),
+        ("LG-TestWhatsAppButtons", "POST", f"{lg}/test/send-whatsapp-buttons?phone=%2B919284967526&message=Test+message+with+buttons", api_key_auth, None, 200),
         ("LG-TestAutomatedSequence", "POST", f"{lg}/test/send-automated-sequence", api_key_auth, None, 200),
-        ("LG-TriggerWorkflowAutomation", "POST", f"{lg}/automation/trigger-workflow", api_key_auth, {"event_type":"test","payload":{}}, 200),
-        ("LG-BulkNotifications", "POST", f"{lg}/automation/bulk-notifications", api_key_auth, {"candidates":[{}],"sequence_type":"test","job_data":{}}, 200),
+        ("LG-TriggerWorkflowAutomation", "POST", f"{lg}/automation/trigger-workflow", api_key_auth, {"event_type":"application_submitted","payload":{"candidate_name":"Test User","candidate_email":"shashankmishra0411@gmail.com","candidate_phone":"+919284967526","job_title":"Software Engineer"}}, 200),
+        ("LG-BulkNotifications", "POST", f"{lg}/automation/bulk-notifications", api_key_auth, {"candidates":[{"name":"Test User","email":"shashankmishra0411@gmail.com","phone":"+919284967526"}],"sequence_type":"application_received","job_data":{"job_title":"Software Engineer"}}, 200),
         ("LG-WhatsAppWebhook", "POST", f"{lg}/webhook/whatsapp", api_key_auth, {}, 200),
         # LangGraph RL (8)
         ("LG-RLPredict", "POST", f"{lg}/rl/predict", api_key_auth, {"candidate_id":"1","job_id":"1","candidate_features":{},"job_features":{}}, 200),

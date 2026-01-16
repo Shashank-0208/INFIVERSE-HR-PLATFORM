@@ -20,6 +20,7 @@ security = HTTPBearer(auto_error=False)
 JWT_SECRET = os.getenv("JWT_SECRET", "")  # Backward compatibility
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")  # Preferred name
 JWT_SECRET_FALLBACK = os.getenv("SUPABASE_JWT_SECRET", "")  # Legacy compatibility
+CANDIDATE_JWT_SECRET_KEY = os.getenv("CANDIDATE_JWT_SECRET_KEY", "")  # Candidate-specific JWT secret
 
 # API Key for service-to-service communication (keep this)
 API_KEY_SECRET = os.getenv("API_KEY_SECRET", "")
@@ -32,27 +33,38 @@ def validate_api_key(api_key: str) -> bool:
     return api_key == API_KEY_SECRET
 
 
-def verify_jwt_token(token: str) -> Optional[Dict[str, Any]]:
+def verify_jwt_token(token: str, secret: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Verify a JWT token and return the payload.
     Uses HS256 with the JWT secret from environment settings.
+    Supports tokens with or without audience claim.
     """
     # Try different environment variable names for backward compatibility
-    jwt_secret = JWT_SECRET_KEY or JWT_SECRET or JWT_SECRET_FALLBACK
+    jwt_secret = secret or JWT_SECRET_KEY or JWT_SECRET or JWT_SECRET_FALLBACK
     
     if not jwt_secret:
         logger.error("JWT_SECRET_KEY not configured")
         return None
     
     try:
-        # JWT tokens use HS256 algorithm
-        payload = jwt.decode(
-            token,
-            jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated"
-        )
-        return payload
+        # First try with audience validation (for Supabase-compatible tokens)
+        try:
+            payload = jwt.decode(
+                token,
+                jwt_secret,
+                algorithms=["HS256"],
+                audience="authenticated"
+            )
+            return payload
+        except jwt.InvalidAudienceError:
+            # If audience validation fails, try without audience (for custom tokens)
+            payload = jwt.decode(
+                token,
+                jwt_secret,
+                algorithms=["HS256"],
+                options={"verify_aud": False}
+            )
+            return payload
     except jwt.ExpiredSignatureError:
         logger.warning("JWT token expired")
         return None
@@ -63,11 +75,14 @@ def verify_jwt_token(token: str) -> Optional[Dict[str, Any]]:
 
 def get_user_from_token(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Extract user information from JWT token payload"""
+    # Support both Supabase-style tokens (sub) and custom tokens (candidate_id, client_id, user_id)
+    user_id = payload.get("sub") or payload.get("candidate_id") or payload.get("client_id") or payload.get("user_id")
+    
     return {
-        "user_id": payload.get("sub"),
+        "user_id": user_id,
         "email": payload.get("email"),
-        "role": payload.get("user_metadata", {}).get("role", "candidate"),
-        "name": payload.get("user_metadata", {}).get("name", ""),
+        "role": payload.get("user_metadata", {}).get("role") or payload.get("role", "candidate"),
+        "name": payload.get("user_metadata", {}).get("name") or payload.get("name", ""),
         "aud": payload.get("aud"),
         "exp": payload.get("exp"),
     }
@@ -89,6 +104,7 @@ def get_auth(credentials: HTTPAuthorizationCredentials = Security(security)):
     Unified authentication: API key OR JWT token
     - API keys: For service-to-service communication
     - JWT: For authenticated users from frontend
+    Supports both client JWT tokens (JWT_SECRET_KEY) and candidate JWT tokens (CANDIDATE_JWT_SECRET_KEY)
     """
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -104,17 +120,32 @@ def get_auth(credentials: HTTPAuthorizationCredentials = Security(security)):
             "role": "admin"
         }
     
-    # Try JWT token
-    payload = verify_jwt_token(token)
-    if payload:
-        user_info = get_user_from_token(payload)
-        return {
-            "type": "jwt_token",
-            "user_id": user_info["user_id"],
-            "email": user_info["email"],
-            "role": user_info["role"],
-            "name": user_info["name"],
-        }
+    # Try candidate JWT token first (CANDIDATE_JWT_SECRET_KEY)
+    if CANDIDATE_JWT_SECRET_KEY:
+        payload = verify_jwt_token(token, secret=CANDIDATE_JWT_SECRET_KEY)
+        if payload:
+            user_info = get_user_from_token(payload)
+            return {
+                "type": "jwt_token",
+                "user_id": user_info["user_id"],
+                "email": user_info["email"],
+                "role": "candidate",  # Candidate tokens always have candidate role
+                "name": user_info["name"],
+            }
+    
+    # Try client JWT token (JWT_SECRET_KEY)
+    jwt_secret = JWT_SECRET_KEY or JWT_SECRET or JWT_SECRET_FALLBACK
+    if jwt_secret:
+        payload = verify_jwt_token(token, secret=jwt_secret)
+        if payload:
+            user_info = get_user_from_token(payload)
+            return {
+                "type": "jwt_token",
+                "user_id": user_info["user_id"],
+                "email": user_info["email"],
+                "role": user_info["role"],
+                "name": user_info["name"],
+            }
     
     raise HTTPException(status_code=401, detail="Invalid authentication token")
 

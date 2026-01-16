@@ -319,6 +319,10 @@ class CandidateSearch(BaseModel):
     def validate_location(cls, v):
         return v[:100] if v else None
 
+class BatchMatchRequest(BaseModel):
+    job_ids: List[str]
+    limit: Optional[int] = 10
+
 # Candidate Portal Models
 class CandidateRegister(BaseModel):
     name: str
@@ -830,8 +834,8 @@ async def bulk_upload_candidates(candidates: CandidateBulk, api_key: str = Depen
 @app.get("/v1/match/{job_id}/top", tags=["AI Matching Engine"])
 async def get_top_matches(job_id: str, limit: int = 10, api_key: str = Depends(get_api_key)):  # Changed from int to str for MongoDB ObjectId
     """AI-powered semantic candidate matching via Agent Service"""
-    if job_id < 1 or limit < 1 or limit > 50:
-        raise HTTPException(status_code=400, detail="Invalid parameters")
+    if limit < 1 or limit > 50:
+        raise HTTPException(status_code=400, detail="Invalid limit parameter (must be 1-50)")
     
     try:
         import httpx
@@ -1021,13 +1025,32 @@ async def batch_fallback_matching(job_ids: List[str]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Batch fallback failed: {str(e)}")
 
+class BatchMatchRequest(BaseModel):
+    job_ids: List[str]
+    limit: Optional[int] = 10
+
 @app.post("/v1/match/batch", tags=["AI Matching Engine"])
-async def batch_match_jobs(job_ids: List[str], api_key: str = Depends(get_api_key)):
+async def batch_match_jobs(
+    request: BatchMatchRequest = None,
+    job_ids: Optional[List[str]] = None,
+    limit: Optional[int] = None,
+    api_key: str = Depends(get_api_key)
+):
     """Batch AI matching via Agent Service"""
-    if not job_ids or len(job_ids) == 0:
+    # Support both JSON body and query params
+    if request:
+        job_id_list = request.job_ids
+        match_limit = request.limit or 10
+    elif job_ids:
+        job_id_list = job_ids
+        match_limit = limit or 10
+    else:
+        raise HTTPException(status_code=400, detail="job_ids list is required")
+    
+    if not job_id_list or len(job_id_list) == 0:
         raise HTTPException(status_code=400, detail="At least one job ID is required")
     
-    if len(job_ids) > 10:
+    if len(job_id_list) > 10:
         raise HTTPException(status_code=400, detail="Maximum 10 jobs can be processed in batch")
     
     try:
@@ -1038,7 +1061,7 @@ async def batch_match_jobs(job_ids: List[str], api_key: str = Depends(get_api_ke
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
                 f"{agent_url}/batch-match",
-                json={"job_ids": job_ids},
+                json={"job_ids": job_id_list},
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {os.getenv('API_KEY_SECRET')}"
@@ -1085,12 +1108,12 @@ async def batch_match_jobs(job_ids: List[str], api_key: str = Depends(get_api_ke
                 }
             else:
                 # Fallback to database batch matching
-                return await batch_fallback_matching(job_ids)
+                return await batch_fallback_matching(job_id_list)
                 
     except Exception as e:
-        log_error("batch_matching_error", str(e), {"job_ids": job_ids})
+        log_error("batch_matching_error", str(e), {"job_ids": job_id_list})
         # Fallback to database batch matching
-        return await batch_fallback_matching(job_ids)
+        return await batch_fallback_matching(job_id_list)
 
 # Assessment & Workflow (5 endpoints)
 @app.post("/v1/feedback", tags=["Assessment & Workflow"])

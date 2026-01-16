@@ -152,6 +152,11 @@ async def list_workflows():
             "error": str(e)
         }
 
+@router.get("/workflows", tags=["LangGraph Workflows"])
+async def list_workflows_alt():
+    """List All Workflows (Alternative endpoint)"""
+    return await list_workflows()
+
 @router.get("/workflow/health", tags=["LangGraph Workflows"])
 async def check_langgraph_health():
     """Check LangGraph Service Health"""

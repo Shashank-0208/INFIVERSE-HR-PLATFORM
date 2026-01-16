@@ -39,14 +39,21 @@ class AuthService {
         password
       });
 
-      if (response.data.token) {
+      // Backend returns 'candidate' but frontend expects 'user' - map it for compatibility
+      if (response.data.token && response.data.success) {
+        const userData = response.data.candidate || response.data.user;
         this.setAuthToken(response.data.token);
-        localStorage.setItem(this.USER_KEY, JSON.stringify(response.data.user));
+        localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
         return {
           success: true,
           token: response.data.token,
-          user: response.data.user
+          user: userData
         };
+      }
+
+      // Handle error response
+      if (response.data.error) {
+        return { success: false, error: response.data.error };
       }
 
       return { success: false, error: 'Invalid response from server' };
@@ -54,7 +61,7 @@ class AuthService {
       console.error('Login error:', error);
       return { 
         success: false, 
-        error: error.response?.data?.message || error.message || 'Login failed' 
+        error: error.response?.data?.error || error.response?.data?.message || error.message || 'Login failed' 
       };
     }
   }
@@ -76,22 +83,57 @@ class AuthService {
         // Note: role is typically assigned by the backend or stored separately
       });
 
+      // Handle error response first
+      if (response.data.error || !response.data.success) {
+        const errorMsg = response.data.error || 'Registration failed';
+        return { success: false, error: errorMsg };
+      }
+
+      // Backend returns: {"success": True, "message": "...", "candidate_id": "..."}
+      // Registration successful - auto-login the user
+      if (response.data.success && response.data.candidate_id) {
+        // Try to auto-login after successful registration
+        return await this.login(userData.email, userData.password);
+      }
+
+      // If backend returns candidate object directly (for compatibility)
+      if (response.data.success && response.data.candidate) {
+        return await this.login(userData.email, userData.password);
+      }
+
+      // If backend returns token directly
       if (response.data.token) {
+        const userData = response.data.candidate || response.data.user;
         this.setAuthToken(response.data.token);
-        localStorage.setItem(this.USER_KEY, JSON.stringify(response.data.user));
+        localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
         return {
           success: true,
           token: response.data.token,
-          user: response.data.user
+          user: userData
         };
+      }
+
+      // If we have success but no candidate_id or token, still try to login
+      if (response.data.success) {
+        return await this.login(userData.email, userData.password);
       }
 
       return { success: false, error: 'Invalid response from server' };
     } catch (error: any) {
       console.error('Registration error:', error);
+      // Handle duplicate email error
+      const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Registration failed';
+      
+      // Check for email already registered error
+      if (errorMsg.includes('already registered') || 
+          errorMsg.includes('Email already registered') ||
+          errorMsg.includes('already exists')) {
+        return { success: false, error: 'This email is already registered. Please use a different email or login instead.' };
+      }
+      
       return { 
         success: false, 
-        error: error.response?.data?.message || error.message || 'Registration failed' 
+        error: errorMsg
       };
     }
   }

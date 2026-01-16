@@ -81,21 +81,25 @@ class CommunicationManager:
                 logger.info(f"🧪 MOCK WhatsApp to {phone}: {message[:50]}...")
                 return {"status": "mock_sent", "channel": "whatsapp", "message_id": "mock_msg_123", "recipient": phone, "note": "Mock mode - add real Twilio credentials to send actual messages"}
             
-            # Normalize Indian phone number formats
+            # Normalize Indian phone number formats - Works with real phone numbers
             original_phone = phone
-            phone = phone.replace(' ', '').replace('-', '')  # Remove spaces and dashes
+            phone = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')  # Remove spaces, dashes, parentheses
             
             # Handle different Indian number formats
             if phone.startswith('91') and len(phone) == 12:  # 919284967526
                 phone = '+' + phone
             elif phone.startswith('+91') and len(phone) == 13:  # +919284967526 (correct)
                 pass  # Already correct
-            elif len(phone) == 10 and phone.isdigit():  # 92*****526 (any 10 digits)
+            elif len(phone) == 10 and phone.isdigit():  # 9284967526 (10 digits - Indian format)
                 phone = '+91' + phone
             elif phone.startswith('+9') and len(phone) == 11:  # +9284967526 (missing 1)
                 phone = '+91' + phone[1:]  # Keep the 9
             elif not phone.startswith('+') and len(phone) >= 10:
-                phone = f"+91{phone}"  # Default to Indian format
+                # Default to Indian format if no country code
+                if phone.isdigit() and len(phone) == 10:
+                    phone = f"+91{phone}"
+                else:
+                    phone = f"+{phone}"  # Add + if missing
             
             if phone != original_phone:
                 logger.info(f"🔧 Normalized phone: {original_phone} → {phone}")
@@ -130,7 +134,7 @@ class CommunicationManager:
             return {"status": "failed", "channel": "whatsapp", "error": str(e), "recipient": phone}
     
     async def send_email(self, recipient_email: str, subject: str, body: str, html_body: str = None) -> Dict:
-        """Send email via Gmail SMTP"""
+        """Send email via Gmail SMTP - Works with real email addresses without 2FA"""
         try:
             # Check if we have real Gmail credentials
             if (not self.gmail_email or 
@@ -138,6 +142,12 @@ class CommunicationManager:
                 self.gmail_email.startswith("<")):
                 logger.info(f"🧪 MOCK Email to {recipient_email}: {subject}")
                 return {"status": "mock_sent", "channel": "email", "recipient": recipient_email, "subject": subject, "note": "Mock mode - configure Gmail credentials in environment variables"}
+            
+            # Validate email format
+            import re
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, recipient_email):
+                return {"status": "failed", "channel": "email", "error": "Invalid email format", "recipient": recipient_email}
             
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
@@ -148,12 +158,16 @@ class CommunicationManager:
             if html_body:
                 msg.attach(MIMEText(html_body, 'html'))
             
+            # Use Gmail SMTP with app password (works without 2FA if app password is configured)
             with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
                 server.login(self.gmail_email, self.gmail_app_password)
                 server.send_message(msg)
             
             logger.info(f"✅ Email sent to {recipient_email}: {subject}")
             return {"status": "success", "channel": "email", "recipient": recipient_email, "subject": subject}
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(f"❌ Gmail authentication error: {str(e)}")
+            return {"status": "failed", "channel": "email", "error": f"Gmail authentication failed: {str(e)}. Ensure Gmail App Password is configured correctly.", "recipient": recipient_email}
         except Exception as e:
             logger.error(f"❌ Email error for {recipient_email}: {str(e)}")
             return {"status": "failed", "channel": "email", "error": str(e), "recipient": recipient_email}

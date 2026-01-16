@@ -519,45 +519,90 @@ async def send_notification(notification_data: dict, api_key: str = Depends(get_
         logger.error(f"❌ Notification sending failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class EmailTestRequest(BaseModel):
+    recipient_email: str
+    subject: Optional[str] = "BHIV HR Test Email"
+    message: Optional[str] = "This is a test email from BHIV HR Platform"
+
 @app.post("/test/send-email", tags=["Communication Tools"])
 async def test_send_email(
-    recipient_email: str,
-    subject: str = "BHIV HR Test Email",
-    message: str = "This is a test email from BHIV HR Platform",
+    request: EmailTestRequest = None,
+    recipient_email: Optional[str] = None,
+    subject: Optional[str] = "BHIV HR Test Email",
+    message: Optional[str] = "This is a test email from BHIV HR Platform",
     api_key: str = Depends(get_api_key)
 ):
-    """Test Email Sending"""
+    """Test Email Sending - Works with real email addresses"""
     try:
         from .communication import comm_manager
-        result = await comm_manager.send_email(recipient_email, subject, message)
+        
+        # Support both JSON body and query params
+        if request:
+            email = request.recipient_email
+            subj = request.subject or subject
+            msg = request.message or message
+        else:
+            email = recipient_email or "shashankmishra0411@gmail.com"
+            subj = subject
+            msg = message
+        
+        result = await comm_manager.send_email(email, subj, msg)
         return {"success": True, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class WhatsAppTestRequest(BaseModel):
+    phone: str
+    message: Optional[str] = "Test message from BHIV HR Platform"
 
 @app.post("/test/send-whatsapp", tags=["Communication Tools"])
 async def test_send_whatsapp(
-    phone: str,
-    message: str = "Test message from BHIV HR Platform",
+    request: WhatsAppTestRequest = None,
+    phone: Optional[str] = None,
+    message: Optional[str] = "Test message from BHIV HR Platform",
     api_key: str = Depends(get_api_key)
 ):
-    """Test WhatsApp Sending"""
+    """Test WhatsApp Sending - Works with Indian phone numbers (+91 format)"""
     try:
         from .communication import comm_manager
-        result = await comm_manager.send_whatsapp(phone, message)
+        
+        # Support both JSON body and query params
+        if request:
+            ph = request.phone
+            msg = request.message or message
+        else:
+            ph = phone or "+919284967526"
+            msg = message
+        
+        result = await comm_manager.send_whatsapp(ph, msg)
         return {"success": True, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class TelegramTestRequest(BaseModel):
+    chat_id: str
+    message: Optional[str] = "Test message from BHIV HR Platform"
+
 @app.post("/test/send-telegram", tags=["Communication Tools"])
 async def test_send_telegram(
-    chat_id: str,
-    message: str = "Test message from BHIV HR Platform",
+    request: TelegramTestRequest = None,
+    chat_id: Optional[str] = None,
+    message: Optional[str] = "Test message from BHIV HR Platform",
     api_key: str = Depends(get_api_key)
 ):
     """Test Telegram Sending"""
     try:
         from .communication import comm_manager
-        result = await comm_manager.send_telegram(chat_id, message)
+        
+        # Support both JSON body and query params
+        if request:
+            cid = request.chat_id
+            msg = request.message or message
+        else:
+            cid = chat_id or "test_chat_id"
+            msg = message
+        
+        result = await comm_manager.send_telegram(cid, msg)
         return {"success": True, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -613,17 +658,30 @@ async def test_send_automated_sequence(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class WorkflowAutomationRequest(BaseModel):
+    event_type: str
+    payload: dict
+
 @app.post("/automation/trigger-workflow", tags=["Communication Tools"])
 async def trigger_workflow_automation(
-    event_type: str,
-    payload: dict,
+    request: WorkflowAutomationRequest = None,
+    event_type: Optional[str] = None,
+    payload: Optional[dict] = None,
     api_key: str = Depends(get_api_key)
 ):
     """Trigger Portal Integration Workflows"""
     try:
         from .communication import comm_manager
         
-        result = await comm_manager.trigger_workflow_automation(event_type, payload)
+        # Support both JSON body and separate params
+        if request:
+            evt = request.event_type
+            pld = request.payload
+        else:
+            evt = event_type or "test"
+            pld = payload or {}
+        
+        result = await comm_manager.trigger_workflow_automation(evt, pld)
         
         return {
             "success": True,
@@ -633,18 +691,34 @@ async def trigger_workflow_automation(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class BulkNotificationRequest(BaseModel):
+    candidates: List[dict]
+    sequence_type: str
+    job_data: dict
+
 @app.post("/automation/bulk-notifications", tags=["Communication Tools"])
 async def send_bulk_notifications(
-    candidates: List[dict],
-    sequence_type: str,
-    job_data: dict,
+    request: BulkNotificationRequest = None,
+    candidates: Optional[List[dict]] = None,
+    sequence_type: Optional[str] = None,
+    job_data: Optional[dict] = None,
     api_key: str = Depends(get_api_key)
 ):
     """Send Bulk Notifications to Multiple Candidates"""
     try:
         from .communication import comm_manager
         
-        result = await comm_manager.send_bulk_notifications(candidates, sequence_type, job_data)
+        # Support both JSON body and separate params
+        if request:
+            cands = request.candidates
+            seq_type = request.sequence_type
+            job = request.job_data
+        else:
+            cands = candidates or []
+            seq_type = sequence_type or "application_received"
+            job = job_data or {}
+        
+        result = await comm_manager.send_bulk_notifications(cands, seq_type, job)
         
         return {
             "success": True,
@@ -772,20 +846,41 @@ async def start_rl_monitoring(api_key: str = Depends(get_api_key)):
 @app.get("/test-integration", tags=["System Diagnostics"])
 async def test_integration(api_key: str = Depends(get_api_key)):
     """Integration Testing and System Validation"""
-    return {
-        "service": "langgraph-orchestrator",
-        "status": "operational",
-        "integration_test": "passed",
-        "endpoints_available": 15,  # Updated count with RL endpoints
-        "workflow_engine": "active",
-        "rl_engine": "integrated",
-        "rl_database": "mongodb",
-        "rl_monitoring": "available",
-        "database_tracking": "enabled" if tracker.connection else "fallback_mode",
-        "progress_tracking": "detailed",
-        "fallback_support": "enabled",
-        "tested_at": datetime.now().isoformat()
-    }
+    try:
+        # Test database connection
+        db_status = "connected" if tracker._db else "fallback"
+        
+        # Test communication manager
+        comm_status = "available"
+        try:
+            from .communication import comm_manager
+            comm_status = "initialized"
+        except:
+            comm_status = "error"
+        
+        return {
+            "service": "langgraph-orchestrator",
+            "status": "operational",
+            "integration_test": "passed",
+            "endpoints_available": 15,
+            "workflow_engine": "active" if LANGGRAPH_AVAILABLE else "simulation",
+            "rl_engine": "integrated",
+            "rl_database": "mongodb",
+            "rl_monitoring": "available",
+            "database_tracking": db_status,
+            "communication_manager": comm_status,
+            "progress_tracking": "detailed",
+            "fallback_support": "enabled",
+            "tested_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "service": "langgraph-orchestrator",
+            "status": "error",
+            "integration_test": "failed",
+            "error": str(e),
+            "tested_at": datetime.now().isoformat()
+        }
 
 # Background task with detailed progress tracking
 async def _execute_workflow(workflow_id: str, state: dict, config: dict):

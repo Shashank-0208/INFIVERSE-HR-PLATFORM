@@ -18,7 +18,7 @@ async def rl_predict_match(
     try:
         langgraph_url = os.getenv("LANGGRAPH_SERVICE_URL", "http://localhost:9001")
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
                 f"{langgraph_url}/rl/predict",
                 json=request_data,
@@ -42,7 +42,7 @@ async def submit_rl_feedback(
     try:
         langgraph_url = os.getenv("LANGGRAPH_SERVICE_URL", "http://localhost:9001")
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
                 f"{langgraph_url}/rl/feedback",
                 json=feedback_data,
@@ -63,7 +63,7 @@ async def get_rl_analytics(api_key: str = Depends(get_api_key)):
     try:
         langgraph_url = os.getenv("LANGGRAPH_SERVICE_URL", "http://localhost:9001")
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.get(
                 f"{langgraph_url}/rl/analytics",
                 headers={"Authorization": f"Bearer {api_key}"}
@@ -83,7 +83,7 @@ async def get_rl_performance(api_key: str = Depends(get_api_key)):
     try:
         langgraph_url = os.getenv("LANGGRAPH_SERVICE_URL", "http://localhost:9001")
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.get(
                 f"{langgraph_url}/rl/performance",
                 headers={"Authorization": f"Bearer {api_key}"}

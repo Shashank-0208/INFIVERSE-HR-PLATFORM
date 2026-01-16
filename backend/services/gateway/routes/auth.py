@@ -74,6 +74,7 @@ async def verify_2fa(verify_data: TwoFAVerify, auth = Depends(auth_dependency)):
 async def login_with_2fa(login_data: LoginRequest):
     """Login with optional 2FA"""
     # Basic authentication (in production, verify against database)
+    # For testing: accept admin/admin123 or check MongoDB for user
     if login_data.username == "admin" and login_data.password == "admin123":
         # If 2FA is enabled for user, verify TOTP
         if login_data.totp_code:
@@ -84,12 +85,17 @@ async def login_with_2fa(login_data: LoginRequest):
                 raise HTTPException(status_code=401, detail="Invalid 2FA code")
         
         # Generate JWT token
-        jwt_secret = os.getenv("JWT_SECRET")
+        jwt_secret = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET")
+        if not jwt_secret:
+            raise HTTPException(status_code=500, detail="JWT secret not configured")
+        
         payload = {
             "user_id": login_data.username,
-            "exp": datetime.utcnow() + timedelta(hours=24),
-            "iat": datetime.utcnow(),
-            "type": "user_token"
+            "sub": login_data.username,
+            "exp": int(datetime.utcnow().timestamp()) + 86400,  # 24 hours
+            "iat": int(datetime.utcnow().timestamp()),
+            "type": "user_token",
+            "role": "admin"
         }
         
         token = jwt.encode(payload, jwt_secret, algorithm="HS256")

@@ -13,7 +13,7 @@ import os
 
 class BHIVEndpointTester:
     def __init__(self):
-        self.gateway_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
+        self.gateway_service_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
         self.agent_url = "https://bhiv-hr-agent-nhgg.onrender.com"
         self.api_key = "<YOUR_API_KEY>"
         self.headers = {"Authorization": f"Bearer {self.api_key}"}
@@ -48,7 +48,7 @@ class BHIVEndpointTester:
         if expected_status is None:
             expected_status = [200]
             
-        url = f"{self.gateway_url if service == 'Gateway' else self.agent_url}{endpoint}"
+        url = f"{self.gateway_service_url if service == 'Gateway' else self.agent_url}{endpoint}"
         
         try:
             start_time = time.time()

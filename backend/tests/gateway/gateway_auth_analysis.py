@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 async def analyze_gateway_auth():
     """Analyze Gateway authentication requirements"""
     
-    gateway_url = "http://localhost:8000"
+    gateway_service_url = "http://localhost:8000"
     
     logger.info("🔍 Analyzing Gateway Authentication")
     logger.info("=" * 50)
@@ -22,7 +22,7 @@ async def analyze_gateway_auth():
     logger.info("🔑 Test 1: No authentication")
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            response = await client.get(f"{gateway_url}/v1/jobs")
+            response = await client.get(f"{gateway_service_url}/v1/jobs")
             logger.info(f"Status: {response.status_code}")
             logger.info(f"Response: {response.text[:200]}")
     except Exception as e:
@@ -33,7 +33,7 @@ async def analyze_gateway_auth():
     try:
         headers = {'X-API-Key': '<YOUR_API_KEY>'}
         async with httpx.AsyncClient(timeout=5) as client:
-            response = await client.get(f"{gateway_url}/v1/jobs", headers=headers)
+            response = await client.get(f"{gateway_service_url}/v1/jobs", headers=headers)
             logger.info(f"Status: {response.status_code}")
             logger.info(f"Response: {response.text[:200]}")
     except Exception as e:
@@ -44,7 +44,7 @@ async def analyze_gateway_auth():
     try:
         headers = {'Authorization': 'Bearer <YOUR_API_KEY>'}
         async with httpx.AsyncClient(timeout=5) as client:
-            response = await client.get(f"{gateway_url}/v1/jobs", headers=headers)
+            response = await client.get(f"{gateway_service_url}/v1/jobs", headers=headers)
             logger.info(f"Status: {response.status_code}")
             logger.info(f"Response: {response.text[:200]}")
     except Exception as e:
@@ -54,7 +54,7 @@ async def analyze_gateway_auth():
     logger.info("\n🔑 Test 4: Health endpoint (public)")
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            response = await client.get(f"{gateway_url}/health")
+            response = await client.get(f"{gateway_service_url}/health")
             logger.info(f"Status: {response.status_code}")
             logger.info(f"Response: {response.text[:200]}")
     except Exception as e:
@@ -64,7 +64,7 @@ async def analyze_gateway_auth():
     logger.info("\n🔑 Test 5: OpenAPI docs (public)")
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            response = await client.get(f"{gateway_url}/docs")
+            response = await client.get(f"{gateway_service_url}/docs")
             logger.info(f"Status: {response.status_code}")
             logger.info(f"Content-Type: {response.headers.get('content-type', 'Unknown')}")
     except Exception as e:

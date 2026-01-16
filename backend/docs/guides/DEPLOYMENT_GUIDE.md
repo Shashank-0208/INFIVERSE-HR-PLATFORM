@@ -1,10 +1,10 @@
 # 🚀 BHIV HR Platform - Complete Deployment Guide
 
 **Enterprise AI-Powered Recruiting Platform Deployment**  
-**Version**: v4.3.0 with Complete RL Integration  
-**Updated**: December 9, 2025  
+**Version**: v4.3.1 with Complete RL Integration  
+**Updated**: December 16, 2025  
 **Status**: ✅ Production Ready  
-**Services**: 6/6 Operational | **Cost**: $0/month | **Uptime**: 99.9%
+**Services**: 6/6 Operational | **Cost**: $0/month | **Uptime**: 99.9% | **Database**: Authentication Fixed
 
 ---
 
@@ -227,7 +227,7 @@ curl -I http://localhost:8503  # Candidate Portal
    ```
    DATABASE_URL=postgresql://bhiv_user:password@hostname/bhiv_hr
    OPENAI_API_KEY=your-openai-key
-   GATEWAY_URL=https://your-gateway-url.onrender.com
+   GATEWAY_SERVICE_URL=https://your-gateway-url.onrender.com
    ```
 
 #### **Deploy LangGraph Service**
@@ -239,7 +239,7 @@ curl -I http://localhost:8503  # Candidate Portal
 2. **Environment Variables**
    ```
    DATABASE_URL=postgresql://bhiv_user:password@hostname/bhiv_hr
-   GATEWAY_URL=https://your-gateway-url.onrender.com
+   GATEWAY_SERVICE_URL=https://your-gateway-url.onrender.com
    OPENAI_API_KEY=your-openai-key
    ```
 
@@ -273,11 +273,11 @@ After all services are deployed, update environment variables:
 
 ```bash
 # Gateway Service
-AGENT_URL=https://your-agent-url.onrender.com
+AGENT_SERVICE_URL=https://your-agent-url.onrender.com
 LANGGRAPH_URL=https://your-langgraph-url.onrender.com
 
 # Portal Services
-GATEWAY_URL=https://your-gateway-url.onrender.com
+GATEWAY_SERVICE_URL=https://your-gateway-url.onrender.com
 API_BASE_URL=https://your-gateway-url.onrender.com
 ```
 
@@ -361,7 +361,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://bhiv_user:bhiv_password@db:5432/bhiv_hr
-      - AGENT_URL=http://agent:8001
+      - AGENT_SERVICE_URL=http://agent:8001
       - LANGGRAPH_URL=http://langgraph:8002
     depends_on:
       db:
@@ -378,7 +378,7 @@ services:
       - "8001:8001"
     environment:
       - DATABASE_URL=postgresql://bhiv_user:bhiv_password@db:5432/bhiv_hr
-      - GATEWAY_URL=http://gateway:8000
+      - GATEWAY_SERVICE_URL=http://gateway:8000
     depends_on:
       db:
         condition: service_healthy
@@ -389,7 +389,7 @@ services:
       - "8002:8002"
     environment:
       - DATABASE_URL=postgresql://bhiv_user:bhiv_password@db:5432/bhiv_hr
-      - GATEWAY_URL=http://gateway:8000
+      - GATEWAY_SERVICE_URL=http://gateway:8000
     depends_on:
       db:
         condition: service_healthy

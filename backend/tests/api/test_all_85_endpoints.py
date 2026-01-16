@@ -12,7 +12,7 @@ from typing import Dict, List, Any
 
 class EndpointTester:
     def __init__(self):
-        self.gateway_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
+        self.gateway_service_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
         self.agent_url = "https://bhiv-hr-agent-nhgg.onrender.com"
         self.api_key = "<YOUR_API_KEY>"
         self.timeout = 120
@@ -27,7 +27,7 @@ class EndpointTester:
     
     def test_endpoint(self, service, method, endpoint, data=None, auth_required=True):
         """Test a single endpoint"""
-        url = f"{self.gateway_url if service == 'Gateway' else self.agent_url}{endpoint}"
+        url = f"{self.gateway_service_url if service == 'Gateway' else self.agent_url}{endpoint}"
         headers = self.get_headers(auth_required)
         
         try:
@@ -75,7 +75,7 @@ class EndpointTester:
         print("=" * 60)
         print(f"Testing 85 endpoints with {self.timeout}s timeout")
         print(f"Updated: Indian phone validation and enhanced security features")
-        print(f"Gateway URL: {self.gateway_url}")
+        print(f"Gateway URL: {self.gateway_service_url}")
         print(f"Agent URL: {self.agent_url}")
         print()
         
@@ -276,7 +276,7 @@ def test_security_validation():
     """Test new security validation features"""
     print("\n[SECURITY] Testing Security Validation Features...")
     
-    gateway_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
+    gateway_service_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
     headers = {"Authorization": "Bearer <YOUR_API_KEY>", "Content-Type": "application/json"}
     
     # Test Indian phone validation
@@ -291,7 +291,7 @@ def test_security_validation():
     for test in phone_tests:
         try:
             response = requests.post(
-                f"{gateway_url}/v1/security/validate-phone",
+                f"{gateway_service_url}/v1/security/validate-phone",
                 headers=headers,
                 json={"phone": test["phone"]},
                 timeout=10
@@ -318,7 +318,7 @@ def test_security_validation():
     for test in input_tests:
         try:
             response = requests.post(
-                f"{gateway_url}/v1/security/test-input-validation",
+                f"{gateway_service_url}/v1/security/test-input-validation",
                 headers=headers,
                 json={"input_data": test["input"]},
                 timeout=10
@@ -339,12 +339,12 @@ def test_schema_validation():
     """Test database schema validation"""
     print("\n[SCHEMA] Testing Database Schema Validation...")
     
-    gateway_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
+    gateway_service_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
     headers = {"Authorization": "Bearer <YOUR_API_KEY>", "Content-Type": "application/json"}
     
     try:
         response = requests.get(
-            f"{gateway_url}/v1/database/schema",
+            f"{gateway_service_url}/v1/database/schema",
             headers=headers,
             timeout=15
         )

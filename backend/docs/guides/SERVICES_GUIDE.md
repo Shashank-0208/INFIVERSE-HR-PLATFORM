@@ -1,31 +1,33 @@
 # 🔧 BHIV HR Platform - Services Architecture Guide
 
-**Updated**: December 9, 2025 (Post-Handover)  
+**Updated**: January 16, 2026  
 **Architecture**: Microservices with 6 Core Services  
-**Status**: ✅ 6/6 Services Operational | 111 Endpoints Live | 99.9% Uptime | $0/month Cost  
-**Technology**: FastAPI 4.2.0, Streamlit 1.41.1, Python 3.12.7, PostgreSQL 17
+**Status**: ✅ 6/6 Services Operational | 112 Endpoints Live | 99.9% Uptime  
+**Technology**: FastAPI 4.2.0, Streamlit 1.41.1, Python 3.12.7, MongoDB Atlas
 
 ---
 
 ## 🏗️ System Architecture Overview
 
-### **Live Production System**
+### **Local Development System**
 
 | Service | URL | Port | Status | Endpoints |
 |---------|-----|------|--------|-----------|
-| **API Gateway** | [bhiv-hr-gateway-ltg0.onrender.com](https://bhiv-hr-gateway-ltg0.onrender.com) | 8000 | ✅ Live | 80 |
-| **AI Engine** | [bhiv-hr-agent-nhgg.onrender.com](https://bhiv-hr-agent-nhgg.onrender.com) | 9000 | ✅ Live | 6 |
-| **LangGraph Automation** | [bhiv-hr-langgraph.onrender.com](https://bhiv-hr-langgraph.onrender.com) | 9001 | ✅ Live | 25 |
-| **HR Portal** | [bhiv-hr-portal-u670.onrender.com](https://bhiv-hr-portal-u670.onrender.com) | 8501 | ✅ Live | UI |
-| **Client Portal** | [bhiv-hr-client-portal-3iod.onrender.com](https://bhiv-hr-client-portal-3iod.onrender.com) | 8502 | ✅ Live | UI |
-| **Candidate Portal** | [bhiv-hr-candidate-portal-abe6.onrender.com](https://bhiv-hr-candidate-portal-abe6.onrender.com) | 8503 | ✅ Live | UI |
+| **API Gateway** | http://localhost:8000 | 8000 | ✅ Running | 81 |
+| **AI Engine** | http://localhost:9000 | 9000 | ✅ Running | 6 |
+| **LangGraph Automation** | http://localhost:9001 | 9001 | ✅ Running | 25 |
+| **HR Portal** | Docker only | 8501 | ✅ Reference | UI |
+| **Client Portal** | Docker only | 8502 | ✅ Reference | UI |
+| **Candidate Portal** | Docker only | 8503 | ✅ Reference | UI |
 
-**Total**: 111 endpoints across 6 microservices + PostgreSQL database
+**Total**: 112 endpoints across 6 microservices + MongoDB Atlas database
+
+**Note:** Streamlit portals (HR, Client, Candidate) are available via Docker only and are for reference/updates.
 
 ### **Microservices Design Principles**
 - **Independent Deployment**: Each service has its own Dockerfile and deployment pipeline
 - **Unified Authentication**: Each service includes dedicated auth_manager.py
-- **Database Schema**: PostgreSQL v4.3.0 with 19 tables (13 core + 6 RL integration)
+- **Database**: MongoDB Atlas with 17+ collections
 - **Professional Organization**: Files organized in proper subfolders
 - **Security**: Enterprise-grade with CSP, XSS, HSTS headers
 
@@ -35,12 +37,12 @@
 
 ### **📍 Location**: `/services/gateway/`
 ### **🎯 Purpose**: Central API hub with triple authentication and unified routing
-### **🔗 Production URL**: https://bhiv-hr-gateway-ltg0.onrender.com
+### **🔗 Local URL**: http://localhost:8000
 
 #### **Service Architecture**
 - **Main Application**: `app/main.py` with FastAPI 4.2.0
 - **Authentication**: Unified `auth_manager.py` with triple auth system
-- **Database**: Direct PostgreSQL v4.3.0 integration
+- **Database**: MongoDB Atlas integration (Motor async driver)
 - **Security**: Dynamic rate limiting (60-500 requests/minute)
 - **Performance**: <100ms response time, 99.9% uptime
 
@@ -51,7 +53,7 @@
 - **2FA TOTP Support**: QR code generation and verification
 - **Enterprise Security**: Input validation, penetration testing endpoints
 
-#### **API Endpoint Categories (80 Total)**
+#### **API Endpoint Categories (81 Total)**
 ```
 Core API (3 endpoints):
 ├── GET  /                    - Service information
@@ -138,7 +140,7 @@ Additional Endpoints (29 endpoints):
 
 ### **📍 Location**: `/services/agent/`
 ### **🎯 Purpose**: Advanced AI matching with Phase 3 semantic engine and RL integration
-### **🔗 Production URL**: https://bhiv-hr-agent-nhgg.onrender.com
+### **🔗 Local URL**: http://localhost:9000
 
 #### **Service Architecture**
 - **Main Application**: `app.py` with AI processing capabilities
@@ -195,7 +197,7 @@ Diagnostics (1 endpoint):
 
 ### **📍 Location**: `/services/langgraph/`
 ### **🎯 Purpose**: AI workflow automation with multi-channel notifications
-### **🔗 Production URL**: https://bhiv-hr-langgraph.onrender.com
+### **🔗 Local URL**: http://localhost:9001
 
 #### **Service Architecture**
 - **Main Application**: `app/main.py` with LangGraph integration
@@ -269,7 +271,7 @@ Integration (1 endpoint):
 
 ### **📍 Location**: `/services/portal/`
 ### **🎯 Purpose**: HR team interface with real-time candidate management
-### **🔗 Production URL**: https://bhiv-hr-portal-u670.onrender.com
+### **🔗 Local URL**: Docker only (Reference)
 
 #### **Service Architecture**
 - **Main Application**: `app.py` with Streamlit 1.41.1
@@ -369,7 +371,7 @@ Client Portal Navigation:
 
 ### **📍 Location**: `/services/candidate_portal/`
 ### **🎯 Purpose**: Job seeker application system with profile management
-### **🔗 Production URL**: https://bhiv-hr-candidate-portal-abe6.onrender.com
+### **🔗 Local URL**: Docker only (Reference)
 
 #### **Service Architecture**
 - **Main Application**: `app.py` with Streamlit 1.41.1
@@ -405,13 +407,13 @@ Candidate Portal Navigation:
 
 ---
 
-## 🗄️ Database Service (PostgreSQL 17)
+## 🗄️ Database Service (MongoDB Atlas)
 
-### **📍 Location**: `/services/db/`
-### **🎯 Purpose**: Centralized data storage with advanced schema
-### **🔗 Connection**: PostgreSQL 17 on port 5432
+### **📍 Location**: MongoDB Atlas (Cloud)
+### **🎯 Purpose**: Centralized data storage with flexible schema
+### **🔗 Connection**: MongoDB Atlas connection string
 
-#### **Database Schema v4.3.0 (19 Tables)**
+#### **MongoDB Collections (17+ Collections)**
 ```
 Core Application Tables (13):
 ├── candidates            - Candidate profiles and information
@@ -521,12 +523,12 @@ Resume Upload → AI Processing → Database Sync → API Gateway → AI Matchin
 ### **Health Check Endpoints**
 ```
 Production Health Checks:
-├── https://bhiv-hr-gateway-ltg0.onrender.com/health
-├── https://bhiv-hr-agent-nhgg.onrender.com/health
-├── https://bhiv-hr-langgraph.onrender.com/health
-├── https://bhiv-hr-portal-u670.onrender.com/
-├── https://bhiv-hr-client-portal-3iod.onrender.com/
-└── https://bhiv-hr-candidate-portal-abe6.onrender.com/
+├── http://localhost:8000/health
+├── http://localhost:9000/health
+├── http://localhost:9001/health
+├── http://localhost:8501/ (Docker only)
+├── http://localhost:8502/ (Docker only)
+└── http://localhost:8503/ (Docker only)
 ```
 
 ### **Performance Metrics**
@@ -630,4 +632,4 @@ Environment Variables:
 
 *Built with Integrity, Honesty, Discipline, Hard Work & Gratitude*
 
-**Last Updated**: December 9, 2025 | **Services**: 6/6 Live | **Endpoints**: 111 Total | **Database**: Schema v4.3.0
+**Last Updated**: December 16, 2025 | **Services**: 6/6 Live | **Endpoints**: 111 Total | **Database**: Schema v4.3.1 - Authentication Fixed

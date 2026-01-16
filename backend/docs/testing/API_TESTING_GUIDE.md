@@ -34,12 +34,12 @@
 ### **Base URLs & Authentication**
 ```bash
 # Production URLs
-GATEWAY_URL="https://bhiv-hr-gateway-ltg0.onrender.com"
+GATEWAY_SERVICE_URL="https://bhiv-hr-gateway-ltg0.onrender.com"
 AGENT_URL="https://bhiv-hr-agent-nhgg.onrender.com"
 LANGGRAPH_URL="https://bhiv-hr-langgraph.onrender.com"
 HR_PORTAL_URL="https://bhiv-hr-portal-u670.onrender.com"
-CLIENT_PORTAL_URL="https://bhiv-hr-client-portal-3iod.onrender.com"
-CANDIDATE_PORTAL_URL="https://bhiv-hr-candidate-portal-abe6.onrender.com"
+CLIENT_PORTAL_SERVICE_URL="https://bhiv-hr-client-portal-3iod.onrender.com"
+CANDIDATE_PORTAL_SERVICE_URL="https://bhiv-hr-candidate-portal-abe6.onrender.com"
 
 # Local Development URLs
 LOCAL_GATEWAY="http://localhost:8000"

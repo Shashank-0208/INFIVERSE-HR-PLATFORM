@@ -1,8 +1,8 @@
 # 🔄 BHIV HR Platform - LangGraph Integration Guide
 
 **AI-Powered Workflow Automation & Orchestration**  
-**Version**: v4.3.0 with Advanced Workflow Engine  
-**Updated**: December 9, 2025  
+**Version**: v4.3.1 with Advanced Workflow Engine  
+**Updated**: December 16, 2025  
 **Status**: ✅ Production Ready  
 **Endpoints**: 25 workflow automation endpoints
 
@@ -128,8 +128,8 @@ cat > services/langgraph/.env << EOF
 DATABASE_URL=postgresql://bhiv_user:password@localhost:5432/bhiv_hr
 
 # Service Integration
-GATEWAY_URL=http://localhost:8000
-AGENT_URL=http://localhost:8001
+GATEWAY_SERVICE_URL=http://localhost:8000
+AGENT_SERVICE_URL=http://localhost:8001
 
 # AI Configuration
 OPENAI_API_KEY=your-openai-key-here
@@ -518,7 +518,7 @@ services:
         fromDatabase:
           name: bhiv-hr-database
           property: connectionString
-      - key: GATEWAY_URL
+      - key: GATEWAY_SERVICE_URL
         value: https://bhiv-hr-gateway-ltg0.onrender.com
       - key: OPENAI_API_KEY
         sync: false
@@ -530,8 +530,8 @@ services:
 ```bash
 # Core Configuration
 DATABASE_URL=postgresql://user:pass@host:port/db
-GATEWAY_URL=https://bhiv-hr-gateway-ltg0.onrender.com
-AGENT_URL=https://bhiv-hr-agent-nhgg.onrender.com
+GATEWAY_SERVICE_URL=https://bhiv-hr-gateway-ltg0.onrender.com
+AGENT_SERVICE_URL=https://bhiv-hr-agent-nhgg.onrender.com
 
 # AI Configuration
 OPENAI_API_KEY=sk-your-openai-key

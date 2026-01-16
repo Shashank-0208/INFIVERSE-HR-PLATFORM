@@ -168,7 +168,7 @@ class ConfigurationValidator:
                     issue_type="URL_CONFIG",
                     description="Candidate Portal not using production Gateway URL",
                     severity="HIGH",
-                    fix_suggestion="Update GATEWAY_URL to production URL"
+                    fix_suggestion="Update GATEWAY_SERVICE_URL to production URL"
                 ))
             
             # Check API key consistency

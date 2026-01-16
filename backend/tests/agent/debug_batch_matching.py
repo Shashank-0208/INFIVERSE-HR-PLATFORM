@@ -3,7 +3,7 @@ import json
 
 def debug_batch_matching():
     agent_url = "https://bhiv-hr-agent-nhgg.onrender.com"
-    gateway_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
+    gateway_service_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
     headers = {"Authorization": "Bearer <YOUR_API_KEY>"}
     
     print("Debugging Batch Matching Issue")
@@ -57,7 +57,7 @@ def debug_batch_matching():
     try:
         test_data = [1, 2]  # Gateway expects List[int], not {"job_ids": [...]}
         response = requests.post(
-            f"{gateway_url}/v1/match/batch", 
+            f"{gateway_service_url}/v1/match/batch", 
             json=test_data, 
             headers=headers, 
             timeout=30

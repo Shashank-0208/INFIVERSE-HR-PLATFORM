@@ -1,9 +1,9 @@
 # 🌳 BHIV HR Platform - Complete Project Tree Structure
 
-**Updated**: December 9, 2025 (Post-Handover)  
+**Updated**: January 16, 2026  
 **Architecture**: Microservices (6 Services + Database)  
-**Status**: ✅ 6/6 Services Operational | 111 Endpoints Live | 99.9% Uptime | $0/month Cost  
-**Technology**: FastAPI 4.2.0, Streamlit 1.41.1, Python 3.12.7, PostgreSQL 17
+**Status**: ✅ 6/6 Services Operational | 112 Endpoints Live | 99.9% Uptime  
+**Technology**: FastAPI 4.2.0, Streamlit 1.41.1, Python 3.12.7, MongoDB Atlas
 
 ---
 
@@ -11,8 +11,8 @@
 - **Total Files**: 200+ files across professional directory structure
 - **Architecture**: Microservices with unified authentication (auth_manager.py per service)
 - **Status**: ✅ Production-ready with 99.9% uptime and auto-restart
-- **Endpoints**: 111 total (80 Gateway + 6 Agent + 25 LangGraph)
-- **Database**: PostgreSQL 17 with Schema v4.3.0 (19 tables: 13 core + 6 RL integration)
+- **Endpoints**: 112 total (81 Gateway + 6 Agent + 25 LangGraph)
+- **Database**: MongoDB Atlas with 17+ collections
 
 ---
 
@@ -171,8 +171,8 @@ BHIV HR PLATFORM/
 │   │   └── LANGGRAPH_INTEGRATION_GUIDE.md
 │   ├── 📂 architecture/        # System architecture
 │   │   ├── PROJECT_STRUCTURE.md
-│   │   ├── SERVICES_ARCHITECTURE_SUMMARY.md
-│   │   ├── FILE_ORGANIZATION_SUMMARY.md
+│   │   ├── PROJECT_STRUCTURE.md
+│   │   ├── PROJECT_TREE_STRUCTURE.md
 │   │   ├── PROJECT_TREE_STRUCTURE.md
 │   │   └── DEPLOYMENT_STATUS.md
 │   ├── 📂 api/                 # API documentation
@@ -181,8 +181,7 @@ BHIV HR PLATFORM/
 │   │   └── SECURITY_AUDIT.md   # Comprehensive security analysis
 │   ├── 📂 testing/             # Testing documentation
 │   │   └── TESTING_STRATEGY.md # Testing approaches & guides
-│   ├── 📂 deployment/          # Deployment guides
-│   │   └── RENDER_DEPLOYMENT_GUIDE.md # Production deployment
+│   │   └── DEPLOYMENT_STATUS.md # Deployment information
 │   └── 📂 reports/             # Analysis reports
 │       └── PRODUCTION_READINESS_REPORT.md # Production verification
 │
@@ -222,8 +221,6 @@ BHIV HR PLATFORM/
 │   │   ├── api_key_manager.py  # API key management
 │   │   ├── security_audit_checker.py # Security auditing
 │   │   └── check_api_keys.py   # API key validation
-│   ├── 📂 deployment/          # Deployment utilities
-│   │   ├── local_deployment.py # Local deployment scripts
 │   │   ├── health_monitor.py   # Health monitoring
 │   │   └── service_validator.py # Service validation
 │   └── 📂 validation/          # Validation scripts
@@ -242,13 +239,8 @@ BHIV HR PLATFORM/
 │       ├── client_portal.dockerfile
 │       └── candidate_portal.dockerfile
 │
-├── 📁 deployment/              # 🚀 Docker & Deployment Configurations
-│   ├── docker-compose.yml      # Local development
-│   ├── docker-compose.production.yml # Production deployment
-│   ├── 📂 scripts/             # Deployment scripts
-│   │   ├── deploy_workflow_schema.py # Schema deployment
-│   │   ├── deploy_workflows_table.py # Workflow table setup
-│   │   ├── cleanup-docker.bat  # Docker cleanup
+# Docker deployment configuration at root level
+├── docker-compose.production.yml # Production Docker configuration
 │   │   └── health-check.sh     # Health monitoring
 │   └── 📂 render/              # Render platform configuration
 │       ├── gateway.yaml        # Gateway service config
@@ -287,12 +279,9 @@ BHIV HR PLATFORM/
 │       ├── job_posting_template.md
 │       └── assessment_template.md
 │
-├── 📁 data/                    # 📊 Production Data
-│   ├── candidates.csv          # Candidate data (10+ records)
-│   ├── jobs.csv                # Job data (19+ records)
-│   └── 📂 processed/           # Processed data files
-│       ├── extracted_resumes.json
-│       └── matching_results.json
+├── 📁 assets/                  # 📎 Static Assets
+│   └── 📁 data/                # Data files
+│       └── candidates.csv     # Candidate data export
 │
 ├── 📁 logs/                    # 📝 System Logs
 │   ├── 📂 gateway/             # Gateway service logs
@@ -346,7 +335,6 @@ Docker Configuration:
 
 Deployment Orchestration:
 ├── docker-compose.production.yml        # Production deployment
-├── deployment/render/                   # Render platform configs
 └── config/docker/                      # Service-specific Dockerfiles
 ```
 
@@ -506,7 +494,7 @@ python tests/run_all_tests.py
 git push origin main  # Triggers auto-deploy
 
 # Manual deployment validation
-python tools/deployment/health_monitor.py
+python tools/monitoring/service_connection_validator.py
 python validation/api/endpoint_validator.py
 ```
 

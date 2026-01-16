@@ -1,13 +1,14 @@
 """
 BHIV HR Platform - HR Portal Configuration
-Version: 3.1.0 with Phase 3 Features
-Updated: October 23, 2025
-Status: Production Ready - Fixed Database Connection
+Version: 4.3.0
+Updated: January 16, 2026
+Status: Production Ready - MongoDB Atlas
 
 Configuration for HR Portal Streamlit application:
-- API Gateway connection settings (FIXED)
+- API Gateway connection settings
 - HTTP client with connection pooling
 - Timeout and retry configurations
+- MongoDB Atlas database (via Gateway)
 - Production-ready defaults
 """
 
@@ -27,9 +28,9 @@ if os.getenv("ENVIRONMENT", "development") == "development":
                     os.environ.setdefault(key, value)
 
 # Version Information
-__version__ = "3.1.0"
-__updated__ = "2025-10-23"
-__status__ = "Production Ready - Database Fixed"
+__version__ = "4.3.0"
+__updated__ = "2026-01-16"
+__status__ = "Production Ready - MongoDB Atlas"
 
 # Environment Configuration
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
@@ -108,7 +109,7 @@ def setup_logging():
 PORTAL_CONFIG = {
     "title": "BHIV HR Platform - Dashboard",
     "version": __version__,
-    "api_endpoints": 55,
+    "api_endpoints": 81,  # Gateway service endpoints
     "features": [
         "Candidate Management",
         "Job Posting", 

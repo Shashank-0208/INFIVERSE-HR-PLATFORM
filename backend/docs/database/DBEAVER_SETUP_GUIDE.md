@@ -1,10 +1,10 @@
 # 🗄️ BHIV HR Platform - DBeaver Database Setup Guide
 
-**Updated**: December 9, 2025 (Post-Handover)  
-**Database**: PostgreSQL 17 (Schema v4.3.0)  
+**Updated**: December 16, 2025 (Database Authentication Fixed)  
+**Database**: PostgreSQL 17 (Schema v4.3.1)  
 **Architecture**: Microservices (6 Services + Database)  
 **Platform**: Render Cloud (Oregon, US West)  
-**Status**: ✅ Production Ready | 19 Tables | 111 Endpoints | 99.9% Uptime
+**Status**: ✅ Production Ready | 19 Tables | 111 Endpoints | 99.9% Uptime | Database Issues Resolved
 
 ---
 
@@ -15,7 +15,7 @@
 This comprehensive guide provides step-by-step instructions for setting up DBeaver connections to visualize and manage the BHIV HR Platform databases across different environments.
 
 ### **🏗️ Database Architecture Summary**
-- **Schema Version**: v4.3.0 with Phase 3 semantic engine + RL integration
+- **Schema Version**: v4.3.1 with Phase 3 semantic engine + RL integration
 - **Total Tables**: 19 tables (13 core business + 5 security/audit + 1 AI/performance + 6 RL integration)
 - **Extensions**: uuid-ossp, pg_stat_statements, pg_trgm, btree_gin
 - **Features**: Advanced triggers, 75+ indexes, comprehensive audit logging, RL system, workflow automation
@@ -34,8 +34,8 @@ This comprehensive guide provides step-by-step instructions for setting up DBeav
 ### **Connection Matrix**
 | Environment | Host | Database | Username | SSL | Status |
 |-------------|------|----------|----------|-----|--------|
-| **Local** | localhost | bhiv_hr | bhiv_user | Disabled | ✅ Active |
-| **Production** | `<internal_render_url>` | bhiv_hr | bhiv_user | Required | ✅ Live |
+| **Local** | localhost | bhiv_hr | bhiv_user | Disabled | ✅ Active - Auth Fixed |
+| **Production** | `<internal_render_url>` | bhiv_hr | bhiv_user | Required | ✅ Live - Auth Fixed |
 
 ### **Schema Statistics**
 - **Core Business Tables**: 8 (candidates, jobs, job_applications, feedback, interviews, offers, clients, users)
@@ -124,7 +124,7 @@ Main Connection Settings:
 │ Port:           5432                                       │
 │ Database:       bhiv_hr                                    │
 │ Username:       bhiv_user                                  │
-│ Password:       <local_development_password>               │
+│ Password:       bhiv_password                               │
 │ Show all databases: ☑ (checked)                           │
 │ Save password: ☑ (checked for convenience)                │
 └─────────────────────────────────────────────────────────────┘
@@ -178,7 +178,7 @@ Production Connection Settings:
 │ Port:           5432                                                │
 │ Database:       bhiv_hr                                             │
 │ Username:       bhiv_user                                           │
-│ Password:       <secured_production_password>                       │
+│ Password:       bhiv_password                                       │
 │ Show all databases: ☑ (checked)                                    │
 │ Save password: ☑ (checked - ensure secure environment)             │
 └─────────────────────────────────────────────────────────────────────┘
@@ -793,6 +793,26 @@ Preferences → Data Viewer:
 
 ### **Common Connection Issues & Solutions**
 
+#### **✅ Recent Fix: Database Authentication Issue (December 16, 2025)**
+
+**Issue Resolved:**
+- **Problem**: PostgreSQL password authentication failed for user "bhiv_user"
+- **Solution**: Database user password reset to match .env configuration
+- **Status**: ✅ **RESOLVED** - All database connections now working
+- **Impact**: Jobs API restored (27 jobs), Candidates API restored (34 candidates)
+
+**Verification in DBeaver:**
+```sql
+-- Test connection
+SELECT current_database(), current_user, 'Connection successful' as status;
+
+-- Verify current data
+SELECT 'candidates' as table_name, COUNT(*) as records FROM candidates
+UNION ALL
+SELECT 'jobs', COUNT(*) FROM jobs;
+-- Expected: candidates=34, jobs=27
+```
+
 #### **1. Local Database Connection Failures**
 ```bash
 # Issue: "Connection refused" or "Database not accessible"
@@ -807,6 +827,9 @@ docker-compose -f docker-compose.production.yml up -d
 
 # Verify database is running
 docker exec -it bhiv-hr-platform-db-1 psql -U bhiv_user -d bhiv_hr -c "\l"
+
+# Fix authentication issues (December 16, 2025 fix)
+docker exec bhiv-hr-platform-db-1 psql -U postgres -d bhiv_hr -c "ALTER USER bhiv_user PASSWORD 'bhiv_password';"
 
 # Check port availability
 netstat -an | findstr :5432
@@ -1288,7 +1311,7 @@ SELECT * FROM maintenance_report();
 - **[Project Structure](../../architecture/PROJECT_STRUCTURE.md)** - Complete architecture overview
 - **[Database Schema](../../services/db/consolidated_schema.sql)** - Full schema definition
 - **[API Documentation](../../api/API_DOCUMENTATION.md)** - REST API reference
-- **[Deployment Guide](../../deployment/RENDER_DEPLOYMENT_GUIDE.md)** - Production deployment
+- **[Deployment Guide](../guides/DEPLOYMENT_GUIDE.md)** - Production deployment
 - **[Connection Diagram](CONNECTION_DIAGRAM.md)** - Database connection architecture
 
 ### **Quick Reference Commands**
@@ -1313,10 +1336,10 @@ Ctrl+Shift+C    # Copy as INSERT
 ### **Connection String Templates**
 ```bash
 # Local Development
-postgresql://bhiv_user:<password>@localhost:5432/bhiv_hr
+postgresql://bhiv_user:bhiv_password@localhost:5432/bhiv_hr
 
 # Production (Internal - for reference only)
-postgresql://bhiv_user:<password>@<internal_render_host>:5432/bhiv_hr
+postgresql://bhiv_user:bhiv_password@<internal_render_host>:5432/bhiv_hr
 
 # Connection Parameters
 ?sslmode=require&application_name=DBeaver-BHIV&connect_timeout=30
@@ -1405,4 +1428,4 @@ postgresql://bhiv_user:<password>@<internal_render_host>:5432/bhiv_hr
 
 *Built with Integrity, Honesty, Discipline, Hard Work & Gratitude*
 
-**BHIV HR Platform v3.0.0** - Enterprise AI-powered recruiting platform with comprehensive database access and professional data management capabilities.
+**BHIV HR Platform v4.3.1** - Enterprise AI-powered recruiting platform with comprehensive database access and professional data management capabilities. Database authentication issues resolved December 16, 2025.

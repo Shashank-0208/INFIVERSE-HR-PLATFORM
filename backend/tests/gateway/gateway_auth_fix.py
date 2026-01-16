@@ -6,7 +6,7 @@ Gateway Authentication Fix - Update comprehensive test to use correct authentica
 import asyncio
 import httpx
 
-GATEWAY_URL = "http://localhost:8000"
+GATEWAY_SERVICE_URL = "http://localhost:8000"
 API_KEY = "<YOUR_API_KEY>"
 
 async def analyze_gateway_endpoints():
@@ -25,10 +25,10 @@ async def analyze_gateway_endpoints():
     async with httpx.AsyncClient(timeout=60) as client:
         # Get JWT token
         print("1. Setting up JWT token...")
-        response = await client.post(f"{GATEWAY_URL}/v1/client/register", json=test_client)
+        response = await client.post(f"{GATEWAY_SERVICE_URL}/v1/client/register", json=test_client)
         if response.status_code == 200:
             login_data = {"client_id": test_client["client_id"], "password": test_client["password"]}
-            response = await client.post(f"{GATEWAY_URL}/v1/client/login", json=login_data)
+            response = await client.post(f"{GATEWAY_SERVICE_URL}/v1/client/login", json=login_data)
             if response.status_code == 200:
                 client_token = response.json()['access_token']
                 print(f"JWT token obtained: {client_token[:30]}...")
@@ -88,10 +88,10 @@ async def analyze_gateway_endpoints():
                                {"password": "Test123!"} if "password/validate" in endpoint else \
                                {"user_id": "test_user"} if "2fa/setup" in endpoint else \
                                [1, 2] if "match/batch" in endpoint else {}
-                    response = await client.post(f"{GATEWAY_URL}{endpoint}", json=test_data, headers=api_headers)
+                    response = await client.post(f"{GATEWAY_SERVICE_URL}{endpoint}", json=test_data, headers=api_headers)
                 else:
                     # GET endpoints
-                    response = await client.get(f"{GATEWAY_URL}{endpoint}", headers=api_headers)
+                    response = await client.get(f"{GATEWAY_SERVICE_URL}{endpoint}", headers=api_headers)
                 api_status = response.status_code
             except Exception as e:
                 api_status = f"ERROR: {e}"
@@ -109,10 +109,10 @@ async def analyze_gateway_endpoints():
                                {"password": "Test123!"} if "password/validate" in endpoint else \
                                {"user_id": "test_user"} if "2fa/setup" in endpoint else \
                                [1, 2] if "match/batch" in endpoint else {}
-                    response = await client.post(f"{GATEWAY_URL}{endpoint}", json=test_data, headers=jwt_headers)
+                    response = await client.post(f"{GATEWAY_SERVICE_URL}{endpoint}", json=test_data, headers=jwt_headers)
                 else:
                     # GET endpoints
-                    response = await client.get(f"{GATEWAY_URL}{endpoint}", headers=jwt_headers)
+                    response = await client.get(f"{GATEWAY_SERVICE_URL}{endpoint}", headers=jwt_headers)
                 jwt_status = response.status_code
             except Exception as e:
                 jwt_status = f"ERROR: {e}"

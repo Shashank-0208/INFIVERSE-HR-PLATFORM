@@ -245,7 +245,7 @@ chmod +x run_test.sh
 ## Next Steps After Testing:
 
 1. Review `test_results.json` for detailed results
-2. If failures occur, check `handover/FAQ_OPERATIONS.md` for troubleshooting
+2. If failures occur, check `handover/FAQ.md` for troubleshooting
 3. Update `handover/TEST_EXECUTION_RESULTS.md` with actual results
 4. Report any issues to development team
 

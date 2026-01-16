@@ -195,11 +195,11 @@ class PortalWorkflowTester:
         integration_tests = []
         
         # Test if portals can communicate with backend
-        for portal_name, portal_url in URLS.items():
+        for portal_name, portal_service_url in URLS.items():
             if 'portal' in portal_name:
                 try:
                     # Check if portal has API endpoints
-                    api_response = self.session.get(f"{portal_url}/api/health", timeout=10)
+                    api_response = self.session.get(f"{portal_service_url}/api/health", timeout=10)
                     if api_response.status_code == 200:
                         print(f"  {portal_name}: [SUCCESS] API integration available")
                         integration_tests.append(True)

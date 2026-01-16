@@ -1,34 +1,34 @@
 # 📚 BHIV HR Platform - Complete API Documentation
 
-**Updated**: December 9, 2025 (Post-Handover)  
-**API Version**: v3.0.0 Production Ready  
-**Total Endpoints**: 111 (80 Gateway + 6 Agent + 25 LangGraph)  
-**Status**: ✅ 6/6 Services Operational | 111 Endpoints Live | 99.9% Uptime | $0/month Cost
+**Updated**: January 16, 2026  
+**API Version**: v4.3.0 Production Ready  
+**Total Endpoints**: 112 (81 Gateway + 6 Agent + 25 LangGraph)  
+**Status**: ✅ 6/6 Services Operational | 112 Endpoints Live | 99.9% Uptime | MongoDB Atlas
 
 ---
 
 ## 🌐 API Overview
 
-### **Live Production System**
+### **Local Development System**
 
-**Status**: ✅ **6/6 SERVICES OPERATIONAL** | **Cost**: $0/month | **Uptime**: 99.9% | **Total Endpoints**: 111
+**Status**: ✅ **6/6 SERVICES OPERATIONAL** | **Total Endpoints**: 112
 
-| Service | URL | Status |
-|---------|-----|--------|
-| **API Gateway** | [bhiv-hr-gateway-ltg0.onrender.com/docs](https://bhiv-hr-gateway-ltg0.onrender.com/docs) | ✅ 80 endpoints |
-| **AI Engine** | [bhiv-hr-agent-nhgg.onrender.com/docs](https://bhiv-hr-agent-nhgg.onrender.com/docs) | ✅ 6 endpoints |
-| **LangGraph Automation** | [bhiv-hr-langgraph.onrender.com](https://bhiv-hr-langgraph.onrender.com) | ✅ 25 endpoints |
-| **HR Portal** | [bhiv-hr-portal-u670.onrender.com](https://bhiv-hr-portal-u670.onrender.com/) | ✅ Live |
-| **Client Portal** | [bhiv-hr-client-portal-3iod.onrender.com](https://bhiv-hr-client-portal-3iod.onrender.com/) | ✅ Live |
-| **Candidate Portal** | [bhiv-hr-candidate-portal-abe6.onrender.com](https://bhiv-hr-candidate-portal-abe6.onrender.com/) | ✅ Live |
+| Service | URL | Endpoints | Status |
+|---------|-----|-----------|--------|
+| **API Gateway** | http://localhost:8000/docs | 81 | ✅ Running |
+| **AI Engine** | http://localhost:9000/docs | 6 | ✅ Running |
+| **LangGraph Automation** | http://localhost:9001/docs | 25 | ✅ Running |
+| **HR Portal** | Docker only | UI | ✅ Reference |
+| **Client Portal** | Docker only | UI | ✅ Reference |
+| **Candidate Portal** | Docker only | UI | ✅ Reference |
 
-**Demo Access**: Username: `demo_user` | Password: `demo_password` | API Key: Available in Render dashboard
+**Note:** Streamlit portals (HR, Client, Candidate) are available via Docker only and are for reference/updates.
 
 ### **Local Development URLs**
 - **Gateway**: http://localhost:8000
 - **Agent**: http://localhost:9000
 - **LangGraph**: http://localhost:9001
-- **Database**: PostgreSQL on localhost:5432
+- **Database**: MongoDB Atlas (Cloud)
 
 ### **Triple Authentication System**
 
@@ -37,7 +37,7 @@
 Authorization: Bearer <YOUR_API_KEY>
 ```
 **Required for**: All Gateway endpoints, Agent endpoints, LangGraph endpoints  
-**Demo API Key**: Available in Render dashboard (secured)  
+**API Key**: Set in environment variable `API_KEY_SECRET`  
 **Features**: Rate limiting (60-500 requests/minute), dynamic scaling
 
 #### **2. Client JWT Authentication**
@@ -58,10 +58,10 @@ Authorization: Bearer <candidate_jwt_token>
 
 ### **System Architecture**
 
-**Microservices Architecture**: 6 services + PostgreSQL database  
-**Technology Stack**: FastAPI 4.2.0, Streamlit 1.41.1, Python 3.12.7, PostgreSQL 17  
-**Database Schema**: v4.3.0 with 19 tables (13 core + 6 RL integration)  
-**Deployment**: Docker-based microservices on Render platform  
+**Microservices Architecture**: 6 services + MongoDB Atlas database  
+**Technology Stack**: FastAPI 4.2.0, Streamlit 1.41.1, Python 3.12.7, MongoDB Atlas  
+**Database**: MongoDB Atlas with 17+ collections  
+**Deployment**: Docker-based microservices (local development)  
 **Organization**: Professional structure with files in proper subfolders
 
 ### **Standard Response Format**
@@ -95,7 +95,7 @@ Authorization: Bearer <candidate_jwt_token>
 
 ## 🚀 Gateway Service API (80 Endpoints)
 
-**Base URL**: https://bhiv-hr-gateway-ltg0.onrender.com  
+**Base URL**: http://localhost:8000  
 **Authentication**: API Key (Bearer Token) + Unified Auth Management  
 **Rate Limit**: 60-500 requests/minute (dynamic based on CPU usage)  
 **Response Format**: JSON  
@@ -115,7 +115,7 @@ Authorization: Bearer <candidate_jwt_token>
 **Rate Limit**: 100 requests/minute
 
 ```bash
-curl -X GET https://bhiv-hr-gateway-ltg0.onrender.com/
+curl -X GET http://localhost:8000/
 ```
 
 **Example Response**:
@@ -127,7 +127,7 @@ curl -X GET https://bhiv-hr-gateway-ltg0.onrender.com/
   "endpoints": 80,
   "documentation": "/docs",
   "monitoring": "/metrics",
-  "live_demo": "https://bhiv-hr-portal-u670.onrender.com"
+  "live_demo": "http://localhost:8501"
 }
 ```
 
@@ -137,7 +137,7 @@ curl -X GET https://bhiv-hr-gateway-ltg0.onrender.com/
 **Rate Limit**: 200 requests/minute
 
 ```bash
-curl -X GET https://bhiv-hr-gateway-ltg0.onrender.com/health
+curl -X GET http://localhost:8000/health
 ```
 
 **Example Response**:
@@ -158,7 +158,7 @@ curl -X GET https://bhiv-hr-gateway-ltg0.onrender.com/health
 ```bash
 curl -X GET \
   -H "Authorization: Bearer <YOUR_API_KEY>" \
-  https://bhiv-hr-gateway-ltg0.onrender.com/test-candidates
+  http://localhost:8000/test-candidates
 ```
 
 **Example Response**:
@@ -186,7 +186,7 @@ curl -X GET \
 ```bash
 curl -X GET \
   -H "Authorization: Bearer <YOUR_API_KEY>" \
-  "https://bhiv-hr-gateway-ltg0.onrender.com/v1/jobs?limit=10&department=Engineering"
+  "http://localhost:8000/v1/jobs?limit=10&department=Engineering"
 ```
 
 **Query Parameters**:
@@ -242,7 +242,7 @@ curl -X POST \
     "employment_type": "full-time",
     "remote_allowed": true
   }' \
-  https://bhiv-hr-gateway-ltg0.onrender.com/v1/jobs
+  http://localhost:8000/v1/jobs
 ```
 
 **Example Response**:
@@ -273,7 +273,7 @@ curl -X POST \
 ```bash
 curl -X GET \
   -H "Authorization: Bearer <YOUR_API_KEY>" \
-  "https://bhiv-hr-gateway-ltg0.onrender.com/v1/candidates?limit=10&skills=Python&location=Mumbai"
+  "http://localhost:8000/v1/candidates?limit=10&skills=Python&location=Mumbai"
 ```
 
 **Query Parameters**:
@@ -318,7 +318,7 @@ curl -X GET \
 ```bash
 curl -X GET \
   -H "Authorization: Bearer <YOUR_API_KEY>" \
-  https://bhiv-hr-gateway-ltg0.onrender.com/v1/candidates/1
+  http://localhost:8000/v1/candidates/1
 ```
 
 **Example Response**:
@@ -350,7 +350,7 @@ curl -X GET \
 ```bash
 curl -X GET \
   -H "Authorization: Bearer <YOUR_API_KEY>" \
-  "https://bhiv-hr-gateway-ltg0.onrender.com/v1/candidates/search?skills=Python,Django&location=Mumbai&ai_match=true"
+  "http://localhost:8000/v1/candidates/search?skills=Python,Django&location=Mumbai&ai_match=true"
 ```
 
 **Query Parameters**:
@@ -409,7 +409,7 @@ curl -X POST \
     "validate_emails": true,
     "skip_duplicates": true
   }' \
-  https://bhiv-hr-gateway-ltg0.onrender.com/v1/candidates/bulk
+  http://localhost:8000/v1/candidates/bulk
 ```
 
 **Example Response**:
@@ -435,7 +435,7 @@ curl -X POST \
 ```bash
 curl -X GET \
   -H "Authorization: Bearer <YOUR_API_KEY>" \
-  "https://bhiv-hr-gateway-ltg0.onrender.com/v1/candidates/job/1?include_scores=true"
+  "http://localhost:8000/v1/candidates/job/1?include_scores=true"
 ```
 
 **Example Response**:
@@ -473,7 +473,7 @@ curl -X GET \
 ```bash
 curl -X GET \
   -H "Authorization: Bearer <YOUR_API_KEY>" \
-  "https://bhiv-hr-gateway-ltg0.onrender.com/v1/match/1/top?limit=5&threshold=0.7"
+  "http://localhost:8000/v1/match/1/top?limit=5&threshold=0.7"
 ```
 
 **Query Parameters**:
@@ -527,7 +527,7 @@ curl -X POST \
     "threshold": 0.7,
     "include_reasoning": true
   }' \
-  https://bhiv-hr-gateway-ltg0.onrender.com/v1/match/batch
+  http://localhost:8000/v1/match/batch
 ```
 
 **Example Response**:
@@ -719,7 +719,7 @@ curl -X POST -H "Content-Type: application/json" \
 ## 🔄 LangGraph Service API (25 Endpoints) - Workflow Automation
 
 ### **Base URL**
-- **Production**: https://bhiv-hr-langgraph.onrender.com
+- **Production**: http://localhost:9001
 - **Local**: http://localhost:9001
 
 ### **Advanced Workflow Features**
@@ -734,7 +734,7 @@ curl -X POST -H "Content-Type: application/json" \
 
 #### **GET /** - Service Information
 ```bash
-curl https://bhiv-hr-langgraph.onrender.com/
+curl http://localhost:9001/
 ```
 **Response:**
 ```json
@@ -749,7 +749,7 @@ curl https://bhiv-hr-langgraph.onrender.com/
 
 #### **GET /health** - Health Check
 ```bash
-curl https://bhiv-hr-langgraph.onrender.com/health
+curl http://localhost:9001/health
 ```
 **Response:**
 ```json
@@ -774,7 +774,7 @@ curl -X POST -H "Content-Type: application/json" \
        "candidate_name": "John Smith",
        "job_title": "Senior Python Developer"
      }' \
-     https://bhiv-hr-langgraph.onrender.com/tools/send-notification
+     http://localhost:9001/tools/send-notification
 ```
 **Response:**
 ```json
@@ -794,7 +794,7 @@ curl -X POST -H "Content-Type: application/json" \
 
 #### **GET /test/send-automated-sequence** - Test Automation Sequence
 ```bash
-curl https://bhiv-hr-langgraph.onrender.com/test/send-automated-sequence
+curl http://localhost:9001/test/send-automated-sequence
 ```
 **Response:**
 ```json
@@ -888,7 +888,7 @@ Authorization: Bearer <YOUR_API_KEY>
 # Step 1: Login to get JWT token
 curl -X POST -H "Content-Type: application/json" \
      -d '{"client_id": "TECH001", "password": "demo123"}' \
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/client/login
+     http://localhost:8000/v1/client/login
 
 # Step 2: Use JWT token
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -899,7 +899,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 # Step 1: Register or login to get JWT token
 curl -X POST -H "Content-Type: application/json" \
      -d '{"email": "candidate@example.com", "password": "password123"}' \
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/candidate/login
+     http://localhost:8000/v1/candidate/login
 
 # Step 2: Use candidate JWT token
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -982,9 +982,9 @@ Rate limits adjust based on system CPU usage:
 import requests
 
 # API Configuration
-BASE_URL = "https://bhiv-hr-gateway-ltg0.onrender.com"
-API_KEY = "<YOUR_API_KEY>"
-HEADERS = {"Authorization": f"Bearer {API_KEY}"}
+BASE_URL = "http://localhost:8000"
+API_KEY_SECRET = "<YOUR_API_KEY>"
+HEADERS = {"Authorization": f"Bearer {API_KEY_SECRET}"}
 
 # Get all jobs
 response = requests.get(f"{BASE_URL}/v1/jobs", headers=HEADERS)
@@ -997,11 +997,11 @@ matches = match_response.json()
 
 ### **JavaScript Integration Example**
 ```javascript
-const BASE_URL = "https://bhiv-hr-gateway-ltg0.onrender.com";
-const API_KEY = "<YOUR_API_KEY>";
+const BASE_URL = "http://localhost:8000";
+const API_KEY_SECRET = "<YOUR_API_KEY>";
 
 const headers = {
-  "Authorization": `Bearer ${API_KEY}`,
+  "Authorization": `Bearer ${API_KEY_SECRET}`,
   "Content-Type": "application/json"
 };
 
@@ -1021,7 +1021,7 @@ fetch(`${BASE_URL}/v1/match/1/top`, { headers })
 ## 📚 Interactive Documentation
 
 ### **Swagger UI**
-- **Gateway**: https://bhiv-hr-gateway-ltg0.onrender.com/docs
+- **Gateway**: http://localhost:8000/docs
 - **Agent**: https://bhiv-hr-agent-nhgg.onrender.com/docs
 
 ### **Live Demo Portals**
@@ -1030,8 +1030,8 @@ fetch(`${BASE_URL}/v1/match/1/top`, { headers })
 - **Candidate Portal**: https://bhiv-hr-candidate-portal-abe6.onrender.com/
 
 ### **Monitoring & Metrics**
-- **Prometheus Metrics**: https://bhiv-hr-gateway-ltg0.onrender.com/metrics
-- **Health Dashboard**: https://bhiv-hr-gateway-ltg0.onrender.com/health/detailed
+- **Prometheus Metrics**: http://localhost:8000/metrics
+- **Health Dashboard**: http://localhost:8000/health/detailed
 
 ---
 

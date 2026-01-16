@@ -1,9 +1,9 @@
 # 🏗️ BHIV HR Platform - Project Structure
 
 **Complete Architecture and Organization Guide**  
-**Updated**: December 9, 2025  
-**Version**: v3.0.0 Production Ready  
-**Status**: ✅ 6/6 Services Operational | 111 Endpoints Live | 99.9% Uptime
+**Updated**: January 16, 2026  
+**Version**: v4.3.0 Production Ready  
+**Status**: ✅ 6/6 Services Operational | 112 Endpoints Live | 99.9% Uptime
 
 ---
 
@@ -16,14 +16,12 @@ BHIV HR PLATFORM/
 ├── 📁 tests/             # Comprehensive Test Suite
 ├── 📁 tools/             # Utility Scripts and Tools
 ├── 📁 config/            # Environment Configuration
-├── 📁 data/              # Production Data
-├── 📁 assets/            # Static Assets (Resumes)
-├── 📁 logs/              # System Logs
+├── 📁 assets/            # Static Assets
+│   └── 📁 data/          # Data files
+│       └── candidates.csv # Candidate data
 ├── 📁 reports/           # Analysis Reports
 ├── 📁 scripts/           # Build and Deployment Scripts
 ├── 📁 validation/        # Validation Scripts
-├── 📁 deployment/        # Docker and Deployment Config
-├── 📁 utils/             # General Utilities
 ├── 📄 README.md          # Main Project Documentation
 ├── 📄 .env.example       # Environment Template
 ├── 📄 .gitignore         # Git Ignore Rules
@@ -34,28 +32,30 @@ BHIV HR PLATFORM/
 
 ## 🚀 Services Architecture
 
-### **Microservices Overview (111 Total Endpoints)**
+### **Microservices Overview (112 Total Endpoints)**
 ```
 services/
-├── 🚪 gateway/           # API Gateway (80 endpoints) - Core API
+├── 🚪 gateway/           # API Gateway (81 endpoints) - Core API
 ├── 🤖 agent/             # AI Agent (6 endpoints) - ML/RL Engine
 ├── 🔄 langgraph/         # Automation (25 endpoints) - Workflow Engine
-├── 🎯 portal/            # HR Portal (8 endpoints) - Streamlit UI
-├── 🏢 client_portal/     # Client Portal (7 endpoints) - Enterprise UI
-├── 👤 candidate_portal/  # Candidate Portal (7 endpoints) - Applicant UI
-└── 🗄️ db/               # Database Schema v4.3.0 (PostgreSQL 17)
+├── 🎯 portal/            # HR Portal (Docker only) - Streamlit UI (Reference)
+├── 🏢 client_portal/     # Client Portal (Docker only) - Enterprise UI (Reference)
+├── 👤 candidate_portal/  # Candidate Portal (Docker only) - Applicant UI (Reference)
+└── 🗄️ db/               # Database Schema (PostgreSQL - Legacy Reference Only)
 ```
 
 ### **Production Service Status**
 | Service | URL | Endpoints | Technology | Status |
 |---------|-----|-----------|------------|--------|
-| **API Gateway** | [bhiv-hr-gateway-ltg0.onrender.com](https://bhiv-hr-gateway-ltg0.onrender.com/docs) | 80 | FastAPI 4.2.0 | ✅ Live |
-| **AI Agent** | [bhiv-hr-agent-nhgg.onrender.com](https://bhiv-hr-agent-nhgg.onrender.com/docs) | 6 | FastAPI + ML | ✅ Live |
-| **LangGraph** | [bhiv-hr-langgraph.onrender.com](https://bhiv-hr-langgraph.onrender.com) | 25 | FastAPI + RL | ✅ Live |
-| **HR Portal** | [bhiv-hr-portal-u670.onrender.com](https://bhiv-hr-portal-u670.onrender.com/) | 8 | Streamlit 1.41.1 | ✅ Live |
-| **Client Portal** | [bhiv-hr-client-portal-3iod.onrender.com](https://bhiv-hr-client-portal-3iod.onrender.com/) | 7 | Streamlit 1.41.1 | ✅ Live |
-| **Candidate Portal** | [bhiv-hr-candidate-portal-abe6.onrender.com](https://bhiv-hr-candidate-portal-abe6.onrender.com/) | 7 | Streamlit 1.41.1 | ✅ Live |
-| **TOTAL** | **6 Services** | **111** | **Mixed Stack** | **✅ 100%** |
+| **API Gateway** | http://localhost:8000/docs | 80 | FastAPI 4.2.0 | ✅ Local |
+| **AI Agent** | http://localhost:9000/docs | 6 | FastAPI + ML | ✅ Local |
+| **LangGraph** | http://localhost:9001/docs | 25 | FastAPI + RL | ✅ Local |
+| **HR Portal** | Docker only | UI | Streamlit 1.41.1 | ✅ Reference |
+| **Client Portal** | Docker only | UI | Streamlit 1.41.1 | ✅ Reference |
+| **Candidate Portal** | Docker only | UI | Streamlit 1.41.1 | ✅ Reference |
+| **TOTAL** | **6 Services** | **112** | **Mixed Stack** | **✅ 100%** |
+
+**Note:** Streamlit portals (HR, Client, Candidate) are available via Docker only and are for reference/updates. The main platform uses the 3 core services (Gateway, Agent, LangGraph).
 
 ### **Gateway Service (Port 8000)**
 ```
@@ -68,9 +68,7 @@ services/gateway/
 │   ├── ai_integration.py # AI service integration
 │   ├── auth.py          # Authentication endpoints
 │   └── rl_routes.py     # Reinforcement Learning routes
-├── 📁 logs/             # Service logs
-│   ├── bhiv_hr_platform.log
-│   └── gateway.log
+    # (No logs/ folder by default; see service configs for log file location)
 ├── 📄 config.py         # Configuration management
 ├── 📄 dependencies.py   # Dependency injection
 ├── 📄 monitoring.py     # Performance monitoring
@@ -171,53 +169,49 @@ services/candidate_portal/ # Candidate Portal (8503)
 └── 📄 README.md         # Portal documentation
 ```
 
-### **Database Service - PostgreSQL 17 Schema v4.3.0**
+### **Database Service - MongoDB Atlas (Current)**
+**Current Database**: MongoDB Atlas (Cloud)  
+**Legacy Reference**: PostgreSQL schemas in `services/db/` (not in use, for reference only)
+
+### **MongoDB Collections (17+ Collections)**
 ```
-services/db/
-├── 📁 database/         # Database migrations and scripts
-│   └── 📁 migrations/   # Version-controlled migration files
-├── 📄 consolidated_schema.sql    # Complete schema v4.3.0 (19 tables)
-├── 📄 deploy_schema_production.sql # Production deployment script
-├── 📄 fix_clients_table.sql     # Schema optimization fixes
-├── 📄 Dockerfile                # PostgreSQL 17 configuration
-└── 📄 README.md                 # Database documentation
-```
+Core Application Collections:
+├── jobs                   # Job postings and requirements
+├── candidates             # Candidate profiles and data
+├── job_applications       # Job applications and status tracking
+├── clients                # Client company information
+├── users                  # HR user management and authentication
+├── interviews             # Interview scheduling and results
+├── feedback               # Values assessment and BHIV scoring
+└── offers                 # Job offers and negotiation tracking
 
-### **Database Schema v4.3.0 (19 Tables)**
-```sql
--- Core Application Tables (8)
-candidates              # Candidate profiles and data
-jobs                   # Job postings and requirements
-applications           # Job applications and status tracking
-interviews             # Interview scheduling and results
-feedback               # Values assessment and BHIV scoring
-clients                # Client company information
-users                  # HR user management and authentication
-offers                 # Job offers and negotiation tracking
+Workflow & System Collections:
+├── workflows              # LangGraph workflow execution tracking
+├── audit_logs            # Complete system audit trail
+├── notifications          # Multi-channel notification log
+├── matching_cache         # AI matching results cache
+├── company_scoring_preferences # Client-specific scoring weights
+└── schema_version         # Database schema versioning
 
--- System & Security Tables (5)
-api_keys               # API authentication management
-rate_limits            # Dynamic rate limiting configuration
-audit_logs             # Complete system audit trail
-workflow_executions    # LangGraph workflow tracking
-notifications          # Multi-channel notification log
+Reinforcement Learning Collections:
+├── rl_predictions         # ML prediction results
+├── rl_feedback            # ML feedback collection
+├── rl_training_data       # Training dataset management
+├── rl_model_performance   # ML system performance tracking
+└── rl_models              # Model versioning and metadata
 
--- Reinforcement Learning Tables (6)
-rl_feedback            # ML feedback collection
-rl_predictions         # ML prediction results
-rl_models              # Model versioning and metadata
-rl_training_data       # Training dataset management
-rl_performance_metrics # ML system performance tracking
-rl_experiments         # A/B testing and experimentation
+System Collections:
+├── rate_limits            # API rate limiting configuration
+└── csp_violations         # Content Security Policy violations
 ```
 
 ### **Database Features**
-- **75+ Indexes**: Optimized query performance
-- **Audit Triggers**: Complete change tracking
-- **Generated Columns**: Automated calculations
-- **Referential Integrity**: Data consistency enforcement
+- **MongoDB Atlas**: Cloud-hosted, scalable NoSQL database
+- **Connection Pooling**: Efficient async/sync connections (Motor & PyMongo)
+- **Indexes**: Optimized query performance with compound indexes
+- **Document-based**: Flexible schema for HR data
 - **RL Integration**: ML feedback and learning system
-- **Connection Pooling**: Efficient resource management
+- **Audit Logging**: Complete activity tracking
 
 ---
 
@@ -235,9 +229,8 @@ docs/
 │   └── [29 other guide files]
 ├── 📁 architecture/     # System architecture docs
 │   ├── PROJECT_STRUCTURE.md     # This file
-│   ├── SERVICES_ARCHITECTURE_SUMMARY.md # Service details
 │   ├── DEPLOYMENT_STATUS.md     # Deployment information
-│   └── FILE_ORGANIZATION_SUMMARY.md # Organization report
+│   └── PROJECT_TREE_STRUCTURE.md # Complete file tree structure
 ├── 📁 api/              # API documentation
 │   └── API_DOCUMENTATION.md     # Complete API reference
 ├── 📁 database/         # Database documentation
@@ -245,10 +238,6 @@ docs/
 │   ├── CONNECTION_DIAGRAM.md    # Connection guide
 │   ├── DBEAVER_SETUP_GUIDE.md   # Database client setup
 │   └── QUICK_QUERIES.sql        # Useful SQL queries
-├── 📁 deployment/       # Deployment guides
-│   ├── RENDER_DEPLOYMENT_GUIDE.md # Render platform guide
-│   ├── ENVIRONMENT_VARIABLES_FINAL_UPDATE_SUMMARY.md
-│   └── [8 other deployment files]
 ├── 📁 security/         # Security documentation
 │   ├── SECURITY_AUDIT.md        # Security analysis
 │   ├── API_KEYS_SUMMARY.md      # API key management
@@ -360,13 +349,14 @@ config/
 
 ### **Environment Variables**
 ```bash
-# Service URLs (Production)
-GATEWAY_SERVICE_URL=https://bhiv-hr-gateway-ltg0.onrender.com
-AGENT_SERVICE_URL=https://bhiv-hr-agent-nhgg.onrender.com
-LANGGRAPH_SERVICE_URL=https://bhiv-hr-langgraph.onrender.com
-PORTAL_SERVICE_URL=https://bhiv-hr-portal-u670.onrender.com
-CLIENT_PORTAL_SERVICE_URL=https://bhiv-hr-client-portal-3iod.onrender.com
-CANDIDATE_PORTAL_SERVICE_URL=https://bhiv-hr-candidate-portal-abe6.onrender.com
+
+# Service URLs (Localhost)
+GATEWAY_SERVICE_URL=http://localhost:8000
+AGENT_SERVICE_URL=http://localhost:9000
+LANGGRAPH_SERVICE_URL=http://localhost:9001
+PORTAL_SERVICE_URL=http://localhost:8501
+CLIENT_PORTAL_SERVICE_URL=http://localhost:8502
+CANDIDATE_PORTAL_SERVICE_URL=http://localhost:8503
 
 # Security (Placeholders for Git safety)
 API_KEY_SECRET=<YOUR_API_KEY_SECRET>
@@ -390,12 +380,10 @@ GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
 ## 📊 Data Structure
 
 ```
-data/
-├── 📄 candidates.csv           # Candidate data export
-└── 📄 COMPLETE_ENDPOINT_COUNT.json # Endpoint inventory
-
 assets/
-└── 📁 resumes/                 # Resume files (29 PDFs/DOCX)
+├── 📁 data/
+│   └── 📄 candidates.csv       # Candidate data export
+└── 📁 resumes/                 # Resume files (if any)
     ├── AdarshYadavResume.pdf
     ├── Anmol_Resume.pdf
     └── [27 other resume files]
@@ -410,14 +398,8 @@ logs/
 ## 🚀 Deployment Structure
 
 ```
-deployment/
-├── 📁 scripts/          # Deployment scripts
-│   ├── deploy_to_render.cmd     # Render deployment
-│   ├── unified-deploy.sh        # Unified deployment
-│   ├── health-check.sh          # Health monitoring
-│   └── [3 other scripts]
-├── 📄 render-deployment.yml     # Render configuration
-└── 📄 README.md                 # Deployment documentation
+# Docker deployment configuration at root level
+├── 📄 docker-compose.production.yml # Production Docker configuration
 ```
 
 ---
@@ -549,8 +531,9 @@ git commit -m "Update message"
 git push origin main
 
 # 2. Render auto-deploys from main branch
+
 # 3. Verify deployment
-curl https://bhiv-hr-gateway-ltg0.onrender.com/health
+curl http://localhost:8000/health
 ```
 
 ---
@@ -564,11 +547,12 @@ curl https://bhiv-hr-gateway-ltg0.onrender.com/health
 - **Security**: [docs/security/SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md)
 - **Testing**: [docs/testing/TESTING_STRATEGY.md](../testing/TESTING_STRATEGY.md)
 
-### **Live Platform Access**
-- **API Gateway**: https://bhiv-hr-gateway-ltg0.onrender.com/docs
-- **HR Portal**: https://bhiv-hr-portal-u670.onrender.com/
-- **Client Portal**: https://bhiv-hr-client-portal-3iod.onrender.com/
-- **Candidate Portal**: https://bhiv-hr-candidate-portal-abe6.onrender.com/
+
+### **Localhost Platform Access**
+- **API Gateway**: http://localhost:8000/docs
+- **HR Portal**: http://localhost:8501/
+- **Client Portal**: http://localhost:8502/
+- **Candidate Portal**: http://localhost:8503/
 
 ---
 
@@ -576,4 +560,4 @@ curl https://bhiv-hr-gateway-ltg0.onrender.com/health
 
 *Built with Integrity, Honesty, Discipline, Hard Work & Gratitude*
 
-**Status**: ✅ 6/6 Services Operational | **Endpoints**: 111 Live | **Database**: v4.3.0 | **Updated**: December 9, 2025
+**Status**: ✅ 6/6 Services Operational | **Endpoints**: 112 Live | **Database**: MongoDB Atlas | **Updated**: January 16, 2026

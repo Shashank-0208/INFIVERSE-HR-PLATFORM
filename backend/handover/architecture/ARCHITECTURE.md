@@ -774,7 +774,7 @@
 1. Candidate fills application form
    ↓
 2. POST /v1/candidate/apply
-   Headers: Authorization: Bearer <candidate_jwt>
+   Headers: Authorization: Bearer <candidate_jwt_secret_key>
    Body: {candidate_id, job_id, cover_letter}
    ↓
 3. Gateway validates JWT token
@@ -818,7 +818,7 @@
 1. HR logs into HR Portal
    ↓
 2. Portal calls GET /v1/candidates
-   Headers: Authorization: Bearer <api_key>
+   Headers: Authorization: Bearer <api_key_secret>
    ↓
 3. Gateway queries database
    SELECT * FROM candidates ORDER BY created_at DESC

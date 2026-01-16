@@ -1,41 +1,39 @@
 # Client Portal Service
 
-**Streamlit 1.41.1 + Python 3.12.7-slim**  
-**Production URL**: https://bhiv-hr-client-portal-3iod.onrender.com  
-**Status**: ✅ Operational  
+Streamlit-based portal for external clients to post jobs, review candidates, and manage interviews in the BHIV HR Platform.
+
+---
 
 ## Overview
-
-External client interface for enterprise job posting and candidate review.
+Allows enterprise clients to securely post jobs, review AI-matched candidates, and coordinate interviews. Integrates with backend via secure API and JWT authentication.
 
 ## Key Features
-
-- **Enterprise Authentication**: JWT-based secure login
-- **Job Posting**: Create and manage job listings
-- **Candidate Review**: Access AI-matched candidates
-- **Interview Coordination**: Schedule and manage interviews
-- **Real-time Sync**: Instant updates with HR portal
+- **Enterprise Authentication:** JWT-secured login and session management
+- **Job Posting:** Create, edit, and manage job listings
+- **Candidate Review:** View and shortlist AI-matched candidates
+- **Interview Coordination:** Schedule and manage interviews
+- **Real-Time Sync:** Instant updates with HR and candidate portals
 
 ## Architecture
-
 ```
 client_portal/
-├── app.py              # Client interface (800+ lines)
-├── auth_service.py     # Enterprise authentication
-├── config.py           # Configuration
-└── requirements.txt    # Streamlit dependencies
+├── app.py           # Streamlit UI
+├── auth_manager.py  # Authentication logic
+├── config.py        # Configuration
+└── requirements.txt # Dependencies
 ```
 
-## Authentication
-
-- **Demo Credentials**: TECH001 / demo123
-- **JWT Tokens**: Secure session management
-- **Account Protection**: Lockout and session timeout
+## Security & Environment
+- JWT tokens for secure sessions
+- API keys and secrets loaded from environment variables
 
 ## Local Development
-
 ```bash
 cd services/client_portal
 pip install -r requirements.txt
 streamlit run app.py --server.port 8502
 ```
+
+## Notes
+- Demo credentials available for testing
+- Integrates with backend and gateway services

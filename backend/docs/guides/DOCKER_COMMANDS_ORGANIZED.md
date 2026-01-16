@@ -1,10 +1,10 @@
 # 🐳 BHIV HR Platform - Docker Management Guide
 
 **Complete Docker Operations & Commands**  
-**Updated**: December 9, 2025  
+**Updated**: December 16, 2025  
 **Status**: ✅ Production Ready  
 **Services**: 6 microservices + PostgreSQL database  
-**Deployment**: Docker Compose with production configuration
+**Deployment**: Docker Compose with production configuration | **Database**: Authentication Fixed
 
 ---
 
@@ -43,14 +43,17 @@
 
 ### **Essential Operations**
 ```bash
-# Start all services (recommended)
-docker-compose -f docker-compose.production.yml up -d
-
-# Stop all services (preserves database)
+# 1. STOP (keeps database)
 docker-compose -f docker-compose.production.yml down
 
-# Restart all services
-docker-compose -f docker-compose.production.yml restart
+# 2. CLEANUP (Safe - keeps database)
+docker builder prune --all --force
+docker container prune -f
+docker image prune -a -f
+docker system df
+
+# 3. REBUILD & START
+docker-compose -f docker-compose.production.yml up -d --build
 
 # View service status
 docker ps
@@ -261,15 +264,16 @@ docker system df
 
 ### **Development Cleanup**
 ```bash
-# Stop services (keeps database)
+# 1. STOP (keeps database)
 docker-compose -f docker-compose.production.yml down
 
-# Remove containers and networks (keeps volumes)
-docker-compose -f docker-compose.production.yml down --remove-orphans
+# 2. CLEANUP (Safe - keeps database)
+docker builder prune --all --force
+docker container prune -f
+docker image prune -a -f
+docker system df
 
-# Clean rebuild (preserves database)
-docker-compose -f docker-compose.production.yml down
-docker builder prune -f
+# 3. REBUILD & START
 docker-compose -f docker-compose.production.yml up -d --build
 ```
 
@@ -290,21 +294,29 @@ docker-compose -f docker-compose.production.yml up -d --build
 
 ### **Daily Development Workflow**
 ```bash
-# 1. Start development session
-docker-compose -f docker-compose.production.yml up -d
+# 1. STOP (keeps database)
+docker-compose -f docker-compose.production.yml down
 
-# 2. Check service status
+# 2. CLEANUP (Safe - keeps database)
+docker builder prune --all --force
+docker container prune -f
+docker image prune -a -f
+
+# 3. REBUILD & START
+docker-compose -f docker-compose.production.yml up -d --build
+
+# 4. Check service status
 docker ps
 curl http://localhost:8000/health
 
-# 3. View logs during development
+# 5. View logs during development
 docker-compose -f docker-compose.production.yml logs -f gateway
 
-# 4. Make code changes, then rebuild specific service
+# 6. Make code changes, then rebuild specific service
 docker-compose -f docker-compose.production.yml build gateway
 docker-compose -f docker-compose.production.yml up -d gateway
 
-# 5. End development session
+# 7. End development session
 docker-compose -f docker-compose.production.yml down
 ```
 
@@ -328,15 +340,16 @@ docker-compose -f docker-compose.production.yml logs gateway | grep ERROR
 
 ### **Deployment Workflow**
 ```bash
-# 1. Pre-deployment cleanup
+# 1. STOP (keeps database)
 docker-compose -f docker-compose.production.yml down
-docker builder prune -f
 
-# 2. Fresh build
-docker-compose -f docker-compose.production.yml build --no-cache
+# 2. CLEANUP (Safe - keeps database)
+docker builder prune --all --force
+docker container prune -f
+docker image prune -a -f
 
-# 3. Deploy with health checks
-docker-compose -f docker-compose.production.yml up -d
+# 3. REBUILD & START
+docker-compose -f docker-compose.production.yml up -d --build
 
 # 4. Verify deployment
 sleep 60
@@ -541,8 +554,11 @@ docker-compose -f docker-compose.production.yml up -d --force-recreate
 ### **Essential Commands**
 ```bash
 # Start/Stop
-docker-compose -f docker-compose.production.yml up -d
-docker-compose -f docker-compose.production.yml down
+docker-compose -f docker-compose.production.yml down  # STOP
+docker builder prune --all --force                    # CLEANUP
+docker container prune -f                             # CLEANUP
+docker image prune -a -f                              # CLEANUP
+docker-compose -f docker-compose.production.yml up -d --build  # START
 
 # Build/Rebuild
 docker-compose -f docker-compose.production.yml build

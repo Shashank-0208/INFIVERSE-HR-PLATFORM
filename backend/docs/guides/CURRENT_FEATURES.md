@@ -1,9 +1,9 @@
 # 🚀 BHIV HR Platform - Current Features
 
 **Enterprise AI-Powered Recruiting Platform with Intelligent Workflow Automation**  
-**Updated**: December 9, 2025  
-**Version**: v3.0.0 Production Ready  
-**Status**: ✅ 6/6 Services Operational | 111 Endpoints Live | 99.9% Uptime
+**Updated**: December 16, 2025  
+**Version**: v4.3.1 Production Ready  
+**Status**: ✅ 6/6 Services Operational | 111 Endpoints Live | 99.9% Uptime | Database Issues Resolved
 
 ---
 
@@ -371,18 +371,11 @@ BHIV HR PLATFORM/
 ├── config/                      # Environment configuration
 │   ├── .env.example             # Environment template
 │   └── production/              # Production configs
-├── deployment/                  # Deployment configuration
-│   ├── docker-compose.production.yml  # Production deployment
-│   ├── scripts/                 # Deployment scripts
-│   └── render-deployment.yml    # Render configuration
-├── data/                        # Production data
-│   ├── candidates/              # Candidate data
-│   ├── jobs/                    # Job postings
-│   └── analytics/               # System analytics
+# Docker deployment configuration at root level
+├── docker-compose.production.yml # Production Docker configuration
 └── assets/                      # Static assets
-    ├── resumes/                 # Resume files (29 files)
-    ├── templates/               # Email templates
-    └── images/                  # UI assets
+    └── data/                    # Data files
+        └── candidates.csv      # Candidate data export
 ```
 
 ---
@@ -390,7 +383,7 @@ BHIV HR PLATFORM/
 ## 🧪 Testing & Validation
 
 ### **Comprehensive Test Coverage**
-- **111 Endpoints**: 100% tested and functional (80 Gateway + 6 Agent + 25 LangGraph)
+- **112 Endpoints**: 100% tested and functional (81 Gateway + 6 Agent + 25 LangGraph)
 - **Security Tests**: Triple authentication, input validation, security headers
 - **Integration Tests**: Cross-service communication and data flow
 - **Performance Tests**: Load testing, stress testing, and scalability
@@ -415,9 +408,9 @@ tests/
 ## 📊 Production Data
 
 ### **Real Data Available**
-- **29 Resume Files**: Processed PDF/DOCX in assets/resumes/
-- **10+ Candidates**: Complete profiles with skills
-- **6+ Active Jobs**: Multi-client job postings
+- **Candidate Data**: Available in assets/data/candidates.csv
+- **34 Candidates**: Complete profiles with skills (updated December 16, 2025)
+- **27 Active Jobs**: Multi-client job postings (updated December 16, 2025)
 - **3+ Client Companies**: TECH001, STARTUP01, ENTERPRISE01
 - **Assessment Data**: 5-point BHIV values framework
 - **Interview Records**: Complete scheduling system
@@ -508,7 +501,7 @@ GET /v1/reports/summary            # Comprehensive system summary
 ### **Documentation**
 - **Quick Start**: [QUICK_START_GUIDE.md](QUICK_START_GUIDE.md)
 - **API Reference**: [API_DOCUMENTATION.md](../api/API_DOCUMENTATION.md)
-- **Architecture**: [SERVICES_ARCHITECTURE_SUMMARY.md](../architecture/SERVICES_ARCHITECTURE_SUMMARY.md)
+- **Architecture**: [SERVICES_GUIDE.md](SERVICES_GUIDE.md) | [PROJECT_STRUCTURE.md](../architecture/PROJECT_STRUCTURE.md)
 - **Security**: [SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md)
 - **Testing**: [TESTING_STRATEGY.md](../testing/TESTING_STRATEGY.md)
 

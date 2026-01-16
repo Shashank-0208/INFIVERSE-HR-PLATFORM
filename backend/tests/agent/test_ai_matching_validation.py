@@ -11,7 +11,7 @@ import time
 from typing import Dict, List, Any
 
 # Configuration
-GATEWAY_URL = "https://bhiv-hr-gateway-ltg0.onrender.com"
+GATEWAY_SERVICE_URL = "https://bhiv-hr-gateway-ltg0.onrender.com"
 AGENT_URL = "https://bhiv-hr-agent-nhgg.onrender.com"
 API_KEY = "<YOUR_API_KEY>"
 HEADERS = {
@@ -31,7 +31,7 @@ class AIMatchingTester:
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.get(
-                    f"{GATEWAY_URL}/v1/match/1/top?limit=3",
+                    f"{GATEWAY_SERVICE_URL}/v1/match/1/top?limit=3",
                     headers=HEADERS
                 )
                 
@@ -83,7 +83,7 @@ class AIMatchingTester:
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(
-                    f"{GATEWAY_URL}/v1/match/batch",
+                    f"{GATEWAY_SERVICE_URL}/v1/match/batch",
                     headers=HEADERS,
                     json=[1, 2]
                 )

@@ -1,44 +1,42 @@
 # HR Portal Service
 
-**Streamlit 1.41.1 + Python 3.12.7-slim**  
-**Production URL**: https://bhiv-hr-portal-u670.onrender.com  
-**Status**: ✅ Operational  
+Streamlit-based internal dashboard for HR teams to manage candidates, jobs, and AI-powered matching in the BHIV HR Platform.
+
+---
 
 ## Overview
-
-Internal HR dashboard for candidate management, job posting, and AI-powered matching.
+Centralized HR dashboard for managing candidates, posting jobs, running AI-powered matching, and tracking analytics. Integrates with backend and gateway for real-time data.
 
 ## Key Features
-
-- **Dashboard**: Real-time metrics and analytics
-- **Candidate Search**: Advanced filtering with AI matching
-- **Job Management**: Create and manage job postings
-- **Values Assessment**: 5-point BHIV values evaluation
-- **Batch Upload**: Secure candidate data import
+- **Dashboard:** Real-time metrics and analytics
+- **Candidate Search:** Advanced filtering and AI matching
+- **Job Management:** Create, edit, and manage job postings
+- **Values Assessment:** 5-point BHIV values evaluation
+- **Batch Upload:** Secure candidate data import
+- **Security:** File validation, path traversal protection, and 2FA
 
 ## Architecture
-
 ```
 portal/
-├── app.py              # Streamlit interface (1500+ lines)
-├── batch_upload.py     # Batch processing
-├── config.py           # Configuration
-├── file_security.py    # File security
-├── components/         # UI components
-└── requirements.txt    # Streamlit 1.41.1 dependencies
+├── app.py           # Streamlit UI
+├── batch_upload.py  # Batch processing
+├── config.py        # Configuration
+├── file_security.py # File security
+├── components/      # UI components
+└── requirements.txt # Dependencies
 ```
 
-## Features
-
-- **Real-time Data**: Live updates from Gateway API
-- **Security**: File validation and path traversal protection
-- **2FA Integration**: QR code generation with function-level imports
-- **Performance**: Optimized Streamlit components
+## Security & Environment
+- 2FA integration (QR code generation)
+- API keys and secrets loaded from environment variables
 
 ## Local Development
-
 ```bash
 cd services/portal
 pip install -r requirements.txt
 streamlit run app.py --server.port 8501
 ```
+
+## Notes
+- Real-time data from Gateway API
+- Optimized Streamlit components for performance

@@ -32,9 +32,9 @@ class AuthManager:
     
     def __init__(self):
         self.api_key = os.getenv("API_KEY_SECRET", "prod_api_key_XUqM2msdCa4CYIaRywRNXRVc477nlI3AQ-lr6cgTB2o")
-        self.gateway_url = os.getenv("GATEWAY_SERVICE_URL", "http://localhost:8000")
-        self.agent_url = os.getenv("AGENT_SERVICE_URL", "http://localhost:9000")
-        self.langgraph_url = os.getenv("LANGGRAPH_SERVICE_URL", "http://localhost:9001")
+        self.gateway_service_url = os.getenv("GATEWAY_SERVICE_URL", "http://localhost:8000")
+        self.agent_service_url = os.getenv("AGENT_SERVICE_URL", "http://localhost:9000")
+        self.langgraph_service_url = os.getenv("LANGGRAPH_SERVICE_URL", "http://localhost:9001")
         
     def get_headers(self) -> Dict[str, str]:
         """Get authentication headers"""
@@ -84,9 +84,9 @@ class AuthManager:
         results = {}
         
         services = {
-            "gateway": f"{self.gateway_url}/health",
-            "agent": f"{self.agent_url}/health", 
-            "langgraph": f"{self.langgraph_url}/health"
+            "gateway": f"{self.gateway_service_url}/health",
+            "agent": f"{self.AGENT_SERVICE_URL}/health", 
+            "langgraph": f"{self.langgraph_service_url}/health"
         }
         
         for service, url in services.items():

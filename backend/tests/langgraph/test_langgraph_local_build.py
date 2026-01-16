@@ -199,7 +199,7 @@ def main():
     # Check if service is running
     if not check_dependencies():
         print("\n[INFO] To start the service:")
-        print("docker-compose -f deployment/docker/docker-compose.production.yml up -d langgraph")
+        print("docker-compose -f docker-compose.production.yml up -d langgraph")
         return
     
     # Run tests

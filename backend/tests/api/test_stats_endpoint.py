@@ -11,7 +11,7 @@ async def test_stats_endpoint():
     """Test the dynamic /v1/candidates/stats endpoint"""
     
     # Use local gateway URL
-    gateway_url = "http://localhost:8000"
+    gateway_service_url = "http://localhost:8000"
     api_key = os.getenv("API_KEY_SECRET", "<YOUR_API_KEY>")
     
     headers = {
@@ -20,12 +20,12 @@ async def test_stats_endpoint():
     }
     
     print("Testing /v1/candidates/stats endpoint...")
-    print(f"Gateway URL: {gateway_url}")
+    print(f"Gateway URL: {gateway_service_url}")
     
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.get(
-                f"{gateway_url}/v1/candidates/stats",
+                f"{gateway_service_url}/v1/candidates/stats",
                 headers=headers
             )
             

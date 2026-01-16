@@ -55,7 +55,7 @@
 API_KEY_SECRET=<secure_api_key>
 
 # Usage Pattern
-Authorization: Bearer <api_key>
+Authorization: Bearer <api_key_secret>
 ```
 
 #### **Layer 2: JWT Token Authentication**

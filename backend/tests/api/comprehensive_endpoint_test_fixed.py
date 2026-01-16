@@ -19,12 +19,12 @@ logger = logging.getLogger(__name__)
 class BHIVEndpointTester:
     def __init__(self):
         self.services = {
-            "gateway": os.getenv('GATEWAY_URL', "http://localhost:8000"),
+            "gateway": os.getenv('GATEWAY_SERVICE_URL', "http://localhost:8000"),
             "agent": os.getenv('AGENT_SERVICE_URL', "http://localhost:9000"), 
             "langgraph": os.getenv('LANGGRAPH_URL', "http://localhost:9001"),
-            "hr_portal": os.getenv('PORTAL_URL', "http://localhost:8501"),
-            "client_portal": os.getenv('CLIENT_PORTAL_URL', "http://localhost:8502"),
-            "candidate_portal": os.getenv('CANDIDATE_PORTAL_URL', "http://localhost:8503")
+            "hr_portal": os.getenv('PORTAL_SERVICE_URL', "http://localhost:8501"),
+            "client_portal": os.getenv('CLIENT_PORTAL_SERVICE_URL', "http://localhost:8502"),
+            "candidate_portal": os.getenv('CANDIDATE_PORTAL_SERVICE_URL', "http://localhost:8503")
         }
         
         self.api_key = os.getenv("API_KEY_SECRET", "<YOUR_API_KEY>")

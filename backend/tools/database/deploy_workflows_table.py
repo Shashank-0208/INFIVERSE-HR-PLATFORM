@@ -26,7 +26,7 @@ def deploy_workflows_table():
             id SERIAL PRIMARY KEY,
             workflow_id VARCHAR(100) UNIQUE NOT NULL,
             workflow_type VARCHAR(100) NOT NULL CHECK (workflow_type IN ('candidate_application', 'candidate_shortlisted', 'interview_scheduled', 'custom')),
-            status VARCHAR(50) DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed', 'cancelled')),
+            status VARCHAR(50) DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed', 'cancelled', 'completed_with_warnings')),
             candidate_id INTEGER REFERENCES candidates(id) ON DELETE SET NULL,
             job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
             client_id VARCHAR(100) REFERENCES clients(client_id) ON DELETE SET NULL,

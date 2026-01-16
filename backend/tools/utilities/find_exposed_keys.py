@@ -48,7 +48,7 @@ def main():
         ".env",
         "services/langgraph/config.py",
         "services/langgraph/dependencies.py", 
-        "deployment/docker/docker-compose.production.yml",
+        "docker-compose.production.yml",
         "config/.env.render",
         "config/production.env"
     ]

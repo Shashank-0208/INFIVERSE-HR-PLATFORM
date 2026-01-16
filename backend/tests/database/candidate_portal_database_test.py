@@ -13,7 +13,7 @@ import uuid
 
 # Database connection
 DATABASE_URL = "postgresql://bhiv_user:JwvtCqKDYsVgnTiAEtSNAKaDHkksATRA@dpg-d4kjncvpm1nc738abapg-a.oregon-postgres.render.com/bhiv_hr_i7zb"
-GATEWAY_URL = "https://bhiv-hr-gateway-ltg0.onrender.com"
+GATEWAY_SERVICE_URL = "https://bhiv-hr-gateway-ltg0.onrender.com"
 
 def generate_unique_credentials():
     """Generate unique test credentials"""
@@ -115,7 +115,7 @@ def test_candidate_registration_api():
         
         # Call registration API
         response = requests.post(
-            f"{GATEWAY_URL}/v1/candidate/register",
+            f"{GATEWAY_SERVICE_URL}/v1/candidate/register",
             json=test_data,
             timeout=15
         )
@@ -178,7 +178,7 @@ def test_candidate_login_api(test_data):
         }
         
         response = requests.post(
-            f"{GATEWAY_URL}/v1/candidate/login",
+            f"{GATEWAY_SERVICE_URL}/v1/candidate/login",
             json=login_data,
             timeout=15
         )
@@ -217,7 +217,7 @@ def test_job_application_flow(candidate_id, token):
     
     try:
         # First, get available jobs
-        response = requests.get(f"{GATEWAY_URL}/v1/jobs", timeout=10)
+        response = requests.get(f"{GATEWAY_SERVICE_URL}/v1/jobs", timeout=10)
         if response.status_code == 200:
             jobs_data = response.json()
             jobs = jobs_data.get("jobs", [])
@@ -236,7 +236,7 @@ def test_job_application_flow(candidate_id, token):
                 
                 headers = {"Authorization": f"Bearer {token}"}
                 app_response = requests.post(
-                    f"{GATEWAY_URL}/v1/candidate/apply",
+                    f"{GATEWAY_SERVICE_URL}/v1/candidate/apply",
                     json=application_data,
                     headers=headers,
                     timeout=15
@@ -304,7 +304,7 @@ def test_profile_update(candidate_id, token):
         
         headers = {"Authorization": f"Bearer {token}"}
         response = requests.put(
-            f"{GATEWAY_URL}/v1/candidate/profile/{candidate_id}",
+            f"{GATEWAY_SERVICE_URL}/v1/candidate/profile/{candidate_id}",
             json=update_data,
             headers=headers,
             timeout=15

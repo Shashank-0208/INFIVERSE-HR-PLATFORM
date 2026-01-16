@@ -158,11 +158,11 @@ PYTHON_VERSION=3.12.7
 
 ```bash
 # Windows
-type .env | findstr API_KEY
+type .env | findstr API_KEY_SECRET
 type .env | findstr DATABASE_URL
 
 # Linux/Mac
-grep API_KEY .env
+grep API_KEY_SECRET .env
 grep DATABASE_URL .env
 
 # Verify all required secrets exist
@@ -999,8 +999,8 @@ curl -H "Authorization: Bearer <YOUR_API_KEY>" \
 python tools/security/get_all_api_keys.py
 
 # Verify JWT secrets match
-type .env | findstr JWT_SECRET  # Windows
-grep JWT_SECRET .env            # Linux/Mac
+type .env | findstr JWT_SECRET_KEY  # Windows
+grep JWT_SECRET_KEY .env            # Linux/Mac
 ```
 
 **Solutions:**
@@ -1021,8 +1021,8 @@ python tools/utilities/fix_portal_auth.py
 # Solution 5: Generate new API key
 docker-compose -f docker-compose.production.yml exec db \
   psql -U bhiv_user -d bhiv_hr -c "
-  UPDATE clients SET api_key = gen_random_uuid() 
-  WHERE client_id='TECH001' RETURNING api_key"
+  UPDATE clients SET api_key_secret = gen_random_uuid() 
+  WHERE client_id='TECH001' RETURNING api_key_secret"
 ```
 
 #### **Issue 4: AI Matching Not Working**
@@ -1561,8 +1561,8 @@ curl http://localhost:8000/v1/security/csp-violations
 # Rotate API keys (every 90 days)
 docker-compose -f docker-compose.production.yml exec db \
   psql -U bhiv_user -d bhiv_hr -c "
-  UPDATE clients SET api_key = gen_random_uuid() 
-  WHERE client_id='TECH001' RETURNING api_key"
+  UPDATE clients SET api_key_secret = gen_random_uuid() 
+  WHERE client_id='TECH001' RETURNING api_key_secret"
 
 # Update JWT secrets
 # 1. Generate new secret: openssl rand -hex 32
@@ -1654,7 +1654,7 @@ curl https://bhiv-hr-agent-nhgg.onrender.com/health
 curl https://bhiv-hr-langgraph.onrender.com/health
 
 # Step 5: Test critical endpoints
-curl -H "Authorization: Bearer <API_KEY>" \
+curl -H "Authorization: Bearer <API_KEY_SECRET>" \
   https://bhiv-hr-gateway-ltg0.onrender.com/v1/candidates
 
 # Step 6: Monitor for errors
@@ -1865,8 +1865,8 @@ Database:
 **Related Documents**:
 - [Quick Start Guide](../docs/guides/QUICK_START_GUIDE.md)
 - [Troubleshooting Guide](../docs/guides/TROUBLESHOOTING_GUIDE.md)
-- [FAQ Operations](FAQ_OPERATIONS.md)
-- [Deployment Guide](../docs/deployment/RENDER_DEPLOYMENT_GUIDE.md)
+- [FAQ Operations](FAQ.md)
+- [Deployment Guide](../docs/guides/DEPLOYMENT_GUIDE.md)
 - [Security Audit](../docs/security/SECURITY_AUDIT.md)
 
 ---

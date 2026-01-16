@@ -11,7 +11,7 @@ import uuid
 
 # Database connection
 DATABASE_URL = "postgresql://bhiv_user:JwvtCqKDYsVgnTiAEtSNAKaDHkksATRA@dpg-d4kjncvpm1nc738abapg-a.oregon-postgres.render.com/bhiv_hr_i7zb"
-GATEWAY_URL = "https://bhiv-hr-gateway-ltg0.onrender.com"
+GATEWAY_SERVICE_URL = "https://bhiv-hr-gateway-ltg0.onrender.com"
 API_KEY = "<YOUR_API_KEY>"
 
 def check_database_tables():
@@ -81,7 +81,7 @@ def test_candidate_registration_direct():
     try:
         # Try registration without authentication first
         response = requests.post(
-            f"{GATEWAY_URL}/v1/candidate/register",
+            f"{GATEWAY_SERVICE_URL}/v1/candidate/register",
             json=test_data,
             timeout=20
         )
@@ -179,7 +179,7 @@ def test_jobs_for_candidates():
     try:
         # Try with API key
         headers = {"Authorization": f"Bearer {API_KEY}"}
-        response = requests.get(f"{GATEWAY_URL}/v1/jobs", headers=headers, timeout=15)
+        response = requests.get(f"{GATEWAY_SERVICE_URL}/v1/jobs", headers=headers, timeout=15)
         
         print(f"Jobs API Status: {response.status_code}")
         

@@ -1,9 +1,9 @@
 # 🔗 BHIV HR Platform - Database Connection Architecture
 
-**Updated**: December 9, 2025 (Post-Handover)  
-**Database**: PostgreSQL 17 (Schema v4.3.0)  
+**Updated**: December 16, 2025 (Database Authentication Fixed)  
+**Database**: PostgreSQL 17 (Schema v4.3.1)  
 **Architecture**: Microservices (6 Services + Database)  
-**Status**: ✅ Production Ready | 19 Tables | 111 Endpoints | 99.9% Uptime  
+**Status**: ✅ Production Ready | 19 Tables | 111 Endpoints | 99.9% Uptime | Database Issues Resolved  
 **Platform**: Render Cloud (Oregon, US West)
 
 ---
@@ -26,7 +26,7 @@
 │  │  │ DB: bhiv_hr                 ││          │  │ DB: bhiv_hr                     ││   │
 │  │  │ User: bhiv_user             ││          │  │ User: bhiv_user                 ││   │
 │  │  │ SSL: Disabled               ││          │  │ SSL: Required (TLS 1.2+)       ││   │
-│  │  │ Schema: v4.3.0              ││          │  │ Schema: v4.3.0                  ││   │
+│  │  │ Schema: v4.3.1              ││          │  │ Schema: v4.3.1                  ││   │
 │  │  │ Tables: 19 (13+6 RL)        ││          │  │ Tables: 19 (13 core + 6 RL)    ││   │
 │  │  └─────────────────────────────┘│          │  └─────────────────────────────────┘│   │
 │  └─────────────────────────────────┘          └─────────────────────────────────────┘   │
@@ -373,7 +373,7 @@ Host: localhost
 Port: 5432
 Database: bhiv_hr
 Username: bhiv_user
-Password: <local_development_password>
+Password: bhiv_password
 SSL Configuration:
   SSL Mode: disable
   SSL Factory: (not required)
@@ -395,7 +395,7 @@ Host: <internal_render_postgresql_host>
 Port: 5432
 Database: bhiv_hr
 Username: bhiv_user
-Password: <secured_production_password>
+Password: bhiv_password
 SSL Configuration:
   SSL Mode: require (MANDATORY)
   SSL Factory: org.postgresql.ssl.DefaultJavaSSLFactory
@@ -770,4 +770,4 @@ Storage Requirements:
 
 *Built with Integrity, Honesty, Discipline, Hard Work & Gratitude*
 
-**BHIV HR Platform v3.0.0** - Enterprise AI-powered recruiting platform with production-grade database architecture and optimized connection management.
+**BHIV HR Platform v4.3.1** - Enterprise AI-powered recruiting platform with production-grade database architecture and optimized connection management. Database authentication issues resolved December 16, 2025.

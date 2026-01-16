@@ -7,7 +7,7 @@ import os
 
 def fix_docker_compose():
     """Fix Docker compose file"""
-    file_path = "deployment/docker/docker-compose.production.yml"
+    file_path = "docker-compose.production.yml"
     
     try:
         with open(file_path, 'r', encoding='utf-8') as f:

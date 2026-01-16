@@ -112,7 +112,7 @@ import requests
 import pytest
 from datetime import datetime
 
-BASE_URL = "https://bhiv-hr-gateway-ltg0.onrender.com"
+BASE_URL = "http://localhost:8000"
 API_KEY = "<YOUR_API_KEY>"
 HEADERS = {"Authorization": f"Bearer {API_KEY}", "Accept": "application/json"}
 
@@ -332,7 +332,7 @@ class TestGatewaySecurity:
 #### **AI Matching Engine Testing**
 ```python
 # tests/agent/test_ai_agent_comprehensive.py
-AGENT_URL = "https://bhiv-hr-agent-nhgg.onrender.com"
+AGENT_URL = "http://localhost:9000"
 
 class TestAIAgent:
     def test_agent_health_check(self):
@@ -414,7 +414,7 @@ class TestAIAgent:
 #### **Workflow Automation Testing**
 ```python
 # tests/langgraph/test_langgraph_comprehensive.py
-LANGGRAPH_URL = "https://bhiv-hr-langgraph.onrender.com"
+LANGGRAPH_URL = "http://localhost:9001"
 
 class TestLangGraphWorkflows:
     def test_langgraph_health_status(self):
@@ -1056,9 +1056,9 @@ jobs:
     - name: Run ${{ matrix.test-category }} Tests
       env:
         API_KEY: ${{ secrets.API_KEY }}
-        GATEWAY_URL: https://bhiv-hr-gateway-ltg0.onrender.com
-        AGENT_URL: https://bhiv-hr-agent-nhgg.onrender.com
-        LANGGRAPH_URL: https://bhiv-hr-langgraph.onrender.com
+        GATEWAY_URL: http://localhost:8000
+        AGENT_URL: http://localhost:9000
+        LANGGRAPH_URL: http://localhost:9001
       run: |
         pytest tests/${{ matrix.test-category }}/ -v \
           --tb=short \
@@ -1116,12 +1116,9 @@ jobs:
         API_KEY: ${{ secrets.API_KEY }}
       run: |
         # Validate all 6 services are operational
-        curl -f https://bhiv-hr-gateway-ltg0.onrender.com/health
-        curl -f https://bhiv-hr-agent-nhgg.onrender.com/health
-        curl -f https://bhiv-hr-langgraph.onrender.com/health
-        curl -f https://bhiv-hr-portal-u670.onrender.com/
-        curl -f https://bhiv-hr-client-portal-3iod.onrender.com/
-        curl -f https://bhiv-hr-candidate-portal-abe6.onrender.com/
+        curl -f http://localhost:8000/health
+        curl -f http://localhost:9000/health
+        curl -f http://localhost:9001/health
     
     - name: Generate Deployment Report
       run: |

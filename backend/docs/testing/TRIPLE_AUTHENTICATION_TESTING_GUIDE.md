@@ -547,7 +547,7 @@ cp .env.example .env
 # Edit .env with your API keys and database credentials
 
 # Start all services
-docker-compose -f deployment/docker/docker-compose.production.yml up -d
+docker-compose -f docker-compose.production.yml up -d
 ```
 
 ### **Service Health Verification**

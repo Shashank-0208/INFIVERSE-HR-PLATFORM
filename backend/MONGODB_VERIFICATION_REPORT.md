@@ -171,7 +171,7 @@ The `seed_mongodb.py` script creates:
    - Can be replaced with MongoDB adapter if needed
 
 ### Deployment Scripts (Legacy)
-- `deployment/scripts/*.py` - Old PostgreSQL deployment scripts
+- Old PostgreSQL deployment scripts (removed)
 - `tests/database/*.py` - PostgreSQL test scripts
 - `tools/database/*.py` - PostgreSQL utility scripts
 - **Status:** Not used in production, can be archived

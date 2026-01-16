@@ -340,7 +340,7 @@ sequenceDiagram
 **Authentication Methods**:
 
 1. **API Key Authentication** (Primary for API access)
-   - Header: `Authorization: Bearer <API_KEY>`
+   - Header: `Authorization: Bearer <API_KEY_SECRET>`
    - Validated in Gateway: `validate_api_key()` function
    - Used by: External API clients, service-to-service calls
 
@@ -954,8 +954,8 @@ TELEGRAM_BOT_TOKEN=<token>
 
 **Portal Services**:
 ```
-GATEWAY_URL=http://localhost:8000
-API_KEY=<secret>
+GATEWAY_SERVICE_URL=http://localhost:8000
+API_KEY_SECRET=<secret>
 ```
 
 ### Deployment Architecture

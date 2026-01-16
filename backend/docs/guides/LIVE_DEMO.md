@@ -1,9 +1,9 @@
 # 🌐 BHIV HR Platform - Live Demo Guide
 
 **Enterprise AI-Powered Recruiting Platform**  
-**Version**: v4.3.0 Production Ready  
-**Updated**: December 9, 2025  
-**Status**: ✅ 6/6 Services Operational | **Cost**: $0/month | **Uptime**: 99.9%
+**Version**: v4.3.1 Production Ready  
+**Updated**: December 16, 2025  
+**Status**: ✅ 6/6 Services Operational | **Cost**: $0/month | **Uptime**: 99.9% | **Database**: Authentication Fixed
 
 ---
 

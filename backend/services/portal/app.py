@@ -4,12 +4,11 @@ import pandas as pd
 from datetime import datetime
 import numpy as np
 import os
-from config import API_BASE, API_KEY_SECRET, headers, http_client, LANGGRAPH_SERVICE_URL, GATEWAY_SERVICE_URL
-from auth_manager import init_auth, get_auth_headers
+from .config import API_BASE, API_KEY_SECRET, headers, http_client, LANGGRAPH_SERVICE_URL, GATEWAY_SERVICE_URL
+from .auth_manager import init_auth, get_auth_headers
 
-# Import portal configuration
 try:
-    from config import setup_logging, ENVIRONMENT
+    from .config import setup_logging, ENVIRONMENT
     setup_logging()
 except Exception as e:
     st.error(f"Configuration error: {e}")

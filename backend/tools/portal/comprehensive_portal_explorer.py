@@ -42,7 +42,7 @@ class ComprehensivePortalExplorer:
             "Candidate Portal": "https://bhiv-hr-candidate-portal.onrender.com/"
         }
         self.gateway_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
-        self.agent_url = "https://bhiv-hr-agent-nhgg.onrender.com"
+        self.agent_service_url = "https://bhiv-hr-agent-nhgg.onrender.com"
         self.api_key = "<YOUR_API_KEY>"
         
         # Analysis results
@@ -742,8 +742,8 @@ class ComprehensivePortalExplorer:
         api_endpoints = {
             "Gateway Health": f"{self.gateway_url}/health",
             "Gateway Jobs": f"{self.gateway_url}/v1/jobs",
-            "Agent Health": f"{self.agent_url}/health",
-            "Agent Match": f"{self.agent_url}/match"
+            "Agent Health": f"{self.agent_service_url}/health",
+            "Agent Match": f"{self.agent_service_url}/match"
         }
         
         headers = {"Authorization": f"Bearer {self.api_key}"}

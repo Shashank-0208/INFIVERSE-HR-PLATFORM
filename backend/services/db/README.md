@@ -1,43 +1,39 @@
 # Database Service
 
-**PostgreSQL 17**  
-**Schema Version**: v4.1.0  
-**Tables**: 17 total  
-**Status**: ✅ Operational  
+PostgreSQL schema and SQL scripts for the BHIV HR Platform backend.
+
+---
 
 ## Overview
-
-PostgreSQL database with comprehensive schema for HR platform operations.
+Defines the relational database schema for all HR platform operations, including candidates, jobs, feedback, interviews, and more. Used by backend services for persistent storage.
 
 ## Schema Structure
+**Core Application Tables:**
+- `candidates`: Candidate profiles and authentication
+- `jobs`: Job postings (HR and client)
+- `feedback`: 5-point BHIV values assessment
+- `interviews`: Scheduling and management
+- `offers`: Job offer management
+- `users`: Internal HR users (with 2FA)
+- `clients`: External client companies (JWT auth)
+- `audit_logs`: Security and compliance
+- `rate_limits`: API rate limiting
+- `csp_violations`: Content Security Policy monitoring
+- `matching_cache`: AI matching results cache
+- `company_scoring_preferences`: RL/AI learning engine
 
-### Core Application Tables (12)
-- **candidates**: Candidate profiles with authentication
-- **jobs**: Job postings from clients and HR
-- **feedback**: Values assessment (5-point BHIV values)
-- **interviews**: Interview scheduling and management
-- **offers**: Job offer management
-- **users**: Internal HR users with 2FA support
-- **clients**: External client companies with JWT auth
-- **audit_logs**: Security and compliance tracking
-- **rate_limits**: API rate limiting by IP and endpoint
-- **csp_violations**: Content Security Policy monitoring
-- **matching_cache**: AI matching results cache
-- **company_scoring_preferences**: Phase 3 learning engine
-
-### System Tables (5)
-- **client_auth**: Enhanced authentication
-- **client_sessions**: Session management
-- **schema_version**: Version tracking (v4.1.0)
-- **pg_stat_statements**: Performance monitoring
-- **pg_stat_statements_info**: Statistics metadata
+**System Tables:**
+- `client_auth`, `client_sessions`, `schema_version`, `pg_stat_statements`, `pg_stat_statements_info`
 
 ## Key Features
+- Data validation with CHECK constraints
+- 25+ performance indexes (GIN for full-text search)
+- Triggers for audit logging and timestamps
+- PostgreSQL functions for advanced operations
 
-- **Constraints**: CHECK constraints for data validation
-- **Indexes**: 25+ performance indexes including GIN for full-text search
-- **Triggers**: Auto-update timestamps and audit logging
-- **Functions**: PostgreSQL functions for complex operations
+## Usage
+- Used by backend microservices for persistent storage
+- Schema managed via SQL scripts in this folder
 - **Generated Columns**: Automatic average score calculation
 
 ## Local Development

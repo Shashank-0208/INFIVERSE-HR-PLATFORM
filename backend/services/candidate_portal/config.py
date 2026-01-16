@@ -41,7 +41,7 @@ class Config:
             raise ValueError("CANDIDATE_JWT_SECRET_KEY environment variable is required")
         
         # Database Configuration - Optional (portal uses Gateway API, not direct DB)
-        # MongoDB URI for reference, but portal doesn't connect directly
+        # MongoDB Atlas URI for reference, but portal doesn't connect directly
         self.DATABASE_URL = os.getenv("DATABASE_URL", "")
         
         # LangGraph Service URL (optional for candidate portal)

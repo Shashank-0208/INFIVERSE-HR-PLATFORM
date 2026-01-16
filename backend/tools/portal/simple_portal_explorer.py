@@ -16,8 +16,8 @@ class SimplePortalExplorer:
             "Client Portal": "https://bhiv-hr-client-portal-3iod.onrender.com/",
             "Candidate Portal": "https://bhiv-hr-candidate-portal.onrender.com/"
         }
-        self.gateway_url = "https://bhiv-hr-gateway-ltg0.onrender.com"
-        self.agent_url = "https://bhiv-hr-agent-nhgg.onrender.com"
+        self.AGENT_SERVICE_URL = "https://bhiv-hr-gateway-ltg0.onrender.com"
+        self.agent_service_url = "https://bhiv-hr-agent-nhgg.onrender.com"
         self.api_key = "<YOUR_API_KEY>"
     
     def test_connectivity(self):
@@ -47,9 +47,9 @@ class SimplePortalExplorer:
         # Test APIs
         headers = {"Authorization": f"Bearer {self.api_key}"}
         api_tests = {
-            "Gateway Health": f"{self.gateway_url}/health",
-            "Gateway Jobs": f"{self.gateway_url}/v1/jobs",
-            "Agent Health": f"{self.agent_url}/health"
+            "Gateway Health": f"{self.AGENT_SERVICE_URL}/health",
+            "Gateway Jobs": f"{self.AGENT_SERVICE_URL}/v1/jobs",
+            "Agent Health": f"{self.agent_service_url}/health"
         }
         
         for name, url in api_tests.items():

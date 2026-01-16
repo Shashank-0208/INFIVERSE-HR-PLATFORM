@@ -153,12 +153,12 @@ pip install -r tests/requirements.txt
 export API_KEY_SECRET="your-production-api-key"
 
 # Optional - enhanced test will discover alternatives if needed
-export GATEWAY_URL="https://bhiv-hr-gateway-ltg0.onrender.com"
-export AGENT_URL="https://bhiv-hr-agent-nhgg.onrender.com"
-export LANGGRAPH_URL="https://bhiv-hr-langgraph.onrender.com"
+export GATEWAY_SERVICE_URL="https://bhiv-hr-gateway-ltg0.onrender.com"
+export AGENT_SERVICE_URL="https://bhiv-hr-agent-nhgg.onrender.com"
+export LANGGRAPH_SERVICE_URL="https://bhiv-hr-langgraph.onrender.com"
 export HR_PORTAL_URL="https://bhiv-hr-portal-u670.onrender.com"
-export CLIENT_PORTAL_URL="https://bhiv-hr-client-portal-3iod.onrender.com"
-export CANDIDATE_PORTAL_URL="https://bhiv-hr-candidate-portal-abe6.onrender.com"
+export CLIENT_PORTAL_SERVICE_URL="https://bhiv-hr-client-portal-3iod.onrender.com"
+export CANDIDATE_PORTAL_SERVICE_URL="https://bhiv-hr-candidate-portal-abe6.onrender.com"
 ```
 
 ### Enhanced Discovery Features
@@ -200,7 +200,7 @@ python run_comprehensive_tests.py
 
 ### With Custom Service URLs
 ```bash
-export LANGGRAPH_URL="https://your-custom-langgraph-url.com"
+export LANGGRAPH_SERVICE_URL="https://your-custom-langgraph-url.com"
 export API_KEY_SECRET="your-production-api-key"
 python run_comprehensive_tests.py
 ```

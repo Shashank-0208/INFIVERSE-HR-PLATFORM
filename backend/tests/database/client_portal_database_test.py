@@ -11,7 +11,7 @@ import uuid
 
 # Database connection
 DATABASE_URL = "postgresql://bhiv_user:JwvtCqKDYsVgnTiAEtSNAKaDHkksATRA@dpg-d4kjncvpm1nc738abapg-a.oregon-postgres.render.com/bhiv_hr_i7zb"
-GATEWAY_URL = "https://bhiv-hr-gateway-ltg0.onrender.com"
+GATEWAY_SERVICE_URL = "https://bhiv-hr-gateway-ltg0.onrender.com"
 
 def check_client_database_tables():
     """Check all required tables for client portal"""
@@ -70,7 +70,7 @@ def test_client_authentication():
         }
         
         response = requests.post(
-            f"{GATEWAY_URL}/v1/client/login",
+            f"{GATEWAY_SERVICE_URL}/v1/client/login",
             json=login_data,
             timeout=20
         )
@@ -148,7 +148,7 @@ def test_jobs_management_for_client(token):
         headers = {"Authorization": f"Bearer {token}"}
         
         # Test getting jobs
-        response = requests.get(f"{GATEWAY_URL}/v1/jobs", headers=headers, timeout=15)
+        response = requests.get(f"{GATEWAY_SERVICE_URL}/v1/jobs", headers=headers, timeout=15)
         
         print(f"Jobs API Status: {response.status_code}")
         
@@ -180,7 +180,7 @@ def test_candidates_access_for_client(token):
     
     try:
         headers = {"Authorization": f"Bearer {token}"}
-        response = requests.get(f"{GATEWAY_URL}/v1/candidates", headers=headers, timeout=15)
+        response = requests.get(f"{GATEWAY_SERVICE_URL}/v1/candidates", headers=headers, timeout=15)
         
         print(f"Candidates API Status: {response.status_code}")
         
@@ -215,7 +215,7 @@ def test_ai_matching_for_client(token):
         
         # Test AI matching with job ID 1
         response = requests.get(
-            f"{GATEWAY_URL}/v1/match/1/top",
+            f"{GATEWAY_SERVICE_URL}/v1/match/1/top",
             headers=headers,
             timeout=20
         )
@@ -253,7 +253,7 @@ def test_feedback_system_for_client(token):
         headers = {"Authorization": f"Bearer {token}"}
         
         # Get existing feedback
-        response = requests.get(f"{GATEWAY_URL}/v1/feedback", headers=headers, timeout=15)
+        response = requests.get(f"{GATEWAY_SERVICE_URL}/v1/feedback", headers=headers, timeout=15)
         
         print(f"Feedback API Status: {response.status_code}")
         

@@ -1,7 +1,0 @@
-Defaulting to user installation because normal site-packages is not writeable
-Requirement already satisfied: nltk in c:\users\shash\appdata\roaming\python\python313\site-packages (3.9.2)
-Requirement already satisfied: click in c:\users\shash\appdata\roaming\python\python313\site-packages (from nltk) (8.3.0)
-Requirement already satisfied: joblib in c:\users\shash\appdata\roaming\python\python313\site-packages (from nltk) (1.5.2)
-Requirement already satisfied: regex>=2021.8.3 in c:\users\shash\appdata\roaming\python\python313\site-packages (from nltk) (2025.9.18)
-Requirement already satisfied: tqdm in c:\users\shash\appdata\roaming\python\python313\site-packages (from nltk) (4.67.1)
-Requirement already satisfied: colorama in c:\users\shash\appdata\roaming\python\python313\site-packages (from click->nltk) (0.4.6)

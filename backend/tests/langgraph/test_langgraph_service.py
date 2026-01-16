@@ -38,7 +38,7 @@ async def test_langgraph_service():
     try:
         from config import settings
         print(f"[OK] Configuration loaded - Environment: {settings.environment}")
-        print(f"   - Gateway URL: {settings.gateway_url}")
+        print(f"   - Gateway URL: {settings.gateway_service_url}")
         print(f"   - LangGraph Port: {settings.langgraph_port}")
     except Exception as e:
         print(f"[ERROR] Configuration error: {e}")

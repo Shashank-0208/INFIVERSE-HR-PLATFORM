@@ -1,20 +1,21 @@
 # ⚡ BHIV HR Platform - Quick Start Guide
 
 **Get Started in 5 Minutes**  
-**Updated**: December 9, 2025  
-**Platform**: Production Ready + Local Development  
-**Version**: v3.0.0 Enterprise Ready  
-**Status**: ✅ All 6 Services Operational | 111 Endpoints Live | 99.95% Uptime
+**Updated**: January 16, 2026  
+**Platform**: Production Ready - Local Development  
+**Version**: v4.3.0  
+**Status**: ✅ 3/3 Services Operational | 112 Endpoints Live | MongoDB Atlas
 
 ---
 
 ## 🚀 Choose Your Path
 
-### **🌐 Option 1: Use Live Production Platform (Recommended)**
-**No setup required - Start immediately!**
 
-### **💻 Option 2: Local Development Setup**
-**Full control - Run on your machine**
+### **💻 Option 1: Python Virtual Environment (Recommended)**
+**Full control - Run services directly**
+
+### **🐳 Option 2: Docker Compose**
+**Containerized - All services in Docker**
 
 ---
 
@@ -23,67 +24,56 @@
 ### **🎯 Instant Access**
 All services are live and operational - no installation needed!
 
-#### **Production Service URLs (111 Total Endpoints)**
+
+#### **Localhost Service URLs (112 Total Endpoints)**
 ```bash
 # API Gateway (80 endpoints - FastAPI 4.2.0)
-https://bhiv-hr-gateway-ltg0.onrender.com/docs
+http://localhost:8000/docs
 
-# AI Agent Service (6 endpoints - Phase 3 AI Engine + RL Integration)  
-https://bhiv-hr-agent-nhgg.onrender.com/docs
+# AI Agent Service (6 endpoints - Semantic Matching + ML)
+http://localhost:9000/docs
 
-# LangGraph Workflow Service (9 endpoints - AI Automation + Multi-Channel)
-https://bhiv-hr-langgraph.onrender.com
+# LangGraph Workflow Service (26 endpoints - Automation + Notifications)
+http://localhost:9001/docs
 
-# HR Portal (8 endpoints - Complete HR workflow)
-https://bhiv-hr-portal-u670.onrender.com/
-
-# Client Portal (7 endpoints - Enterprise interface)
-https://bhiv-hr-client-portal-3iod.onrender.com/
-
-# Candidate Portal (7 endpoints - Job seeker interface)
-https://bhiv-hr-candidate-portal-abe6.onrender.com/
+# Note: Streamlit portals (HR, Client, Candidate) available via Docker only
 ```
 
 #### **Service Status Overview**
 | Service | Endpoints | Type | Status | Response Time |
 |---------|-----------|------|--------|---------------|
-| **Gateway** | 74 | FastAPI | ✅ Live | <85ms |
+| **Gateway** | 80 | FastAPI | ✅ Live | <85ms |
 | **AI Agent** | 6 | FastAPI | ✅ Live | <15ms |
-| **LangGraph** | 9 | FastAPI | ✅ Live | <120ms |
-| **HR Portal** | 8 | Streamlit | ✅ Live | <1.8s |
-| **Client Portal** | 7 | Streamlit | ✅ Live | <1.9s |
-| **Candidate Portal** | 7 | Streamlit | ✅ Live | <2.1s |
-| **TOTAL** | **111** | **Mixed** | **✅ 100%** | **Excellent** |
+| **LangGraph** | 26 | FastAPI | ✅ Live | <120ms |
+| **TOTAL** | **112** | **FastAPI** | **✅ 100%** | **Excellent** |
 
-#### **🔑 Demo Credentials**
+#### **🔑 Authentication**
 ```bash
-# Client Portal Login
-Username: TECH001
-Password: demo123
+# API Testing Key (from .env)
+API_KEY_SECRET=<YOUR_API_KEY>
 
-# API Testing Key
-API Key: <YOUR_API_KEY>
+# Generate secrets:
+python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 #### **⚡ 30-Second Test**
 ```bash
 # 1. Test API Health
-curl https://bhiv-hr-gateway-ltg0.onrender.com/health
+curl http://localhost:8000/health
 
-# 2. Get Real Data (10+ candidates)
+# 2. Get Candidates
 curl -H "Authorization: Bearer <YOUR_API_KEY>" \
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/candidates
+     http://localhost:8000/v1/candidates
 
 # 3. AI Matching Test
 curl -H "Authorization: Bearer <YOUR_API_KEY>" \
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/match/1/top
+     http://localhost:8000/v1/match/1/top
 
-# 4. Access HR Portal
-# Visit: https://bhiv-hr-portal-u670.onrender.com/
+# 4. Test Agent Service
+curl http://localhost:9000/health
 
-# 5. Login to Client Portal
-# Visit: https://bhiv-hr-client-portal-3iod.onrender.com/
-# Use: TECH001 / demo123
+# 5. Test LangGraph Service
+curl http://localhost:9001/health
 ```
 
 ---
@@ -93,32 +83,68 @@ curl -H "Authorization: Bearer <YOUR_API_KEY>" \
 ### **📋 Prerequisites**
 ```bash
 # Required Software
-✅ Docker & Docker Compose
-✅ Python 3.12.7 (recommended)
+✅ Python 3.12+
+✅ MongoDB Atlas account
 ✅ Git
-✅ 8GB RAM minimum
-✅ 10GB free disk space
+✅ Docker Desktop (optional)
 ```
 
-### **🚀 Quick Setup**
+### **🚀 Method 1: Python Virtual Environment (Recommended)**
 ```bash
-# Step 1: Clone Repository (30 seconds)
-git clone https://github.com/shashankmishraa/BHIV-HR-Platform.git
-cd BHIV-HR-Platform
+# Step 1: Clone Repository
+git clone <repository-url>
+cd Infiverse-HR/backend
 
-# Step 2: Environment Setup (30 seconds)
-cp .env.example .env
-# Edit .env if needed (optional for quick start)
+# Step 2: Create Virtual Environment
+# Windows
+python -m venv venv
+venv\Scripts\activate
 
-# Step 3: Start All Services (3-4 minutes)
-docker-compose -f deployment/docker/docker-compose.production.yml up -d
+# Linux/Mac
+python3 -m venv venv
+source venv/bin/activate
 
-# Step 4: Verify Services (30 seconds)
-curl http://localhost:8000/health    # Gateway
-curl http://localhost:9000/health    # AI Agent
-open http://localhost:8501           # HR Portal
-open http://localhost:8502           # Client Portal
-open http://localhost:8503           # Candidate Portal
+# Step 3: Install Dependencies
+pip install -r requirements.txt
+
+# Step 4: Configure Environment
+copy .env.example .env  # Windows
+cp .env.example .env    # Linux/Mac
+# Edit .env with MongoDB connection and secrets
+
+# Step 5: Start Services
+python run_services.py
+
+# Step 6: Verify
+curl http://localhost:8000/health
+curl http://localhost:9000/health
+curl http://localhost:9001/health
+```
+
+### **🐳 Method 2: Docker Compose**
+```bash
+# Step 1: Clone Repository
+git clone <repository-url>
+cd Infiverse-HR/backend
+
+# Step 2: Configure Environment
+copy .env.example .env  # Windows
+cp .env.example .env    # Linux/Mac
+# Edit .env with MongoDB connection and secrets
+
+# Step 3: Start All Services
+docker-compose -f docker-compose.production.yml up -d --build
+
+# Step 4: View Logs
+docker-compose -f docker-compose.production.yml logs -f
+
+# Step 5: Verify
+curl http://localhost:8000/health
+curl http://localhost:9000/health
+curl http://localhost:9001/health
+
+# Step 6: Stop Services
+docker-compose -f docker-compose.production.yml down
 ```
 
 ### **🔧 Local Service Configuration**
@@ -126,17 +152,12 @@ open http://localhost:8503           # Candidate Portal
 # API Services
 Gateway API:      http://localhost:8000    # 80 endpoints
 AI Agent API:     http://localhost:9000    # 6 endpoints
-LangGraph API:    http://localhost:9001    # 9 endpoints
-
-# Portal Services  
-HR Portal:        http://localhost:8501    # 8 endpoints
-Client Portal:    http://localhost:8502    # 7 endpoints
-Candidate Portal: http://localhost:8503    # 7 endpoints
+LangGraph API:    http://localhost:9001    # 26 endpoints
 
 # Database
-PostgreSQL:       localhost:5432          # Schema v4.3.0
+MongoDB Atlas:    Cloud-hosted              # MongoDB Atlas
 
-# Total Endpoints: 111 (80+6+25)
+# Total Endpoints: 112 (80+6+26)
 ```
 
 ---
@@ -145,9 +166,9 @@ PostgreSQL:       localhost:5432          # Schema v4.3.0
 
 ### **1. Explore the HR Portal (2 minutes)**
 ```bash
+
 # Visit HR Portal
-http://localhost:8501  # Local
-https://bhiv-hr-portal-u670.onrender.com/  # Production
+http://localhost:8501
 
 # Try These Features:
 ✅ Dashboard Overview - See real-time metrics
@@ -160,9 +181,9 @@ https://bhiv-hr-portal-u670.onrender.com/  # Production
 
 ### **2. Test Client Portal (1 minute)**
 ```bash
+
 # Visit Client Portal
-http://localhost:8502  # Local
-https://bhiv-hr-client-portal-3iod.onrender.com/  # Production
+http://localhost:8502
 
 # Login Credentials:
 Username: TECH001
@@ -177,9 +198,9 @@ Password: demo123
 
 ### **3. Try Candidate Portal (1 minute)**
 ```bash
+
 # Visit Candidate Portal
-http://localhost:8503  # Local
-https://bhiv-hr-candidate-portal-abe6.onrender.com/  # Production
+http://localhost:8503
 
 # Features:
 ✅ Register Account - Create candidate profile
@@ -190,25 +211,20 @@ https://bhiv-hr-candidate-portal-abe6.onrender.com/  # Production
 
 ### **4. API Testing (1 minute)**
 ```bash
+
 # Test Gateway API (80 endpoints)
 curl -H "Authorization: Bearer <YOUR_API_KEY>" \
-     http://localhost:8000/v1/jobs  # Local
-     # OR
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/jobs  # Production
+     http://localhost:8000/v1/jobs
 
 # Test AI Agent (6 endpoints with RL integration)
 curl -X POST -H "Content-Type: application/json" \
      -d '{"job_id": 1}' \
-     http://localhost:9000/match  # Local
-     # OR
-     https://bhiv-hr-agent-nhgg.onrender.com/match  # Production
+     http://localhost:9000/match
 
-# Test LangGraph Workflows (9 endpoints)
+# Test LangGraph Workflows (25 endpoints)
 curl -X POST -H "Content-Type: application/json" \
      -d '{"candidate_id": 1, "job_id": 1}' \
-     http://localhost:9001/workflows/application/start  # Local
-     # OR
-     https://bhiv-hr-langgraph.onrender.com/workflows/application/start  # Production
+     http://localhost:9001/workflows/application/start
 
 # Test Portal Endpoints (22 total)
 curl http://localhost:8501/health  # HR Portal
@@ -220,53 +236,44 @@ curl http://localhost:8503/health  # Candidate Portal
 
 ## 🔥 Key Features to Try
 
-### **🤖 AI-Powered Matching & Automation**
-```bash
-# 1. Get AI Matches for Job (Phase 3 Engine)
-curl -H "Authorization: Bearer <YOUR_API_KEY>" \
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/match/1/top
+## 🔥 Key Features to Try
 
-# 2. Batch Processing (Multiple Jobs)
+### **🤖 AI-Powered Matching**
+```bash
+# 1. Get AI Matches for Job
+curl -H "Authorization: Bearer <YOUR_API_KEY>" \
+     http://localhost:8000/v1/match/1/top
+
+# 2. Batch Processing
 curl -X POST -H "Authorization: Bearer <YOUR_API_KEY>" \
      -H "Content-Type: application/json" \
-     -d '{"job_ids": [1, 2, 3]}' \
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/match/batch
+     -d '{"job_ids": ["1", "2"]}' \
+     http://localhost:8000/v1/match/batch
 
-# 3. Candidate Analysis (Semantic + RL)
-curl https://bhiv-hr-agent-nhgg.onrender.com/analyze/1
+# 3. Candidate Analysis
+curl http://localhost:9000/analyze/1
 
-# 4. RL-Enhanced Prediction
+# 4. LangGraph Workflow
 curl -X POST -H "Content-Type: application/json" \
      -d '{"candidate_id": 1, "job_id": 1}' \
-     https://bhiv-hr-agent-nhgg.onrender.com/rl/predict
-
-# 5. LangGraph Workflow Automation
-curl -X POST -H "Content-Type: application/json" \
-     -d '{"candidate_id": 1, "job_id": 1}' \
-     https://bhiv-hr-langgraph.onrender.com/workflows/application/start
-
-# 6. Multi-Channel Notification
-curl -X POST -H "Content-Type: application/json" \
-     -d '{"recipient": "test@example.com", "message": "Test notification", "channels": ["email", "whatsapp"]}' \
-     https://bhiv-hr-langgraph.onrender.com/tools/send-notification
+     http://localhost:9001/workflows/application/start
 ```
 
 ### **📊 Values Assessment**
 ```bash
-# Submit 5-Point BHIV Values Assessment
+# Submit BHIV Values Assessment
 curl -X POST -H "Authorization: Bearer <YOUR_API_KEY>" \
      -H "Content-Type: application/json" \
      -d '{
-       "candidate_id": 1,
-       "job_id": 1,
+       "candidate_id": "1",
+       "job_id": "1",
        "integrity": 5,
        "honesty": 4,
        "discipline": 4,
        "hard_work": 5,
-       "gratitude": 4,
-       "comments": "Excellent candidate"
+       "gratitude": 4
      }' \
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/feedback
+     http://localhost:8000/v1/feedback
 ```
 
 ### **🔒 Security Features**
@@ -274,55 +281,53 @@ curl -X POST -H "Authorization: Bearer <YOUR_API_KEY>" \
 # Test 2FA Setup
 curl -X POST -H "Authorization: Bearer <YOUR_API_KEY>" \
      -H "Content-Type: application/json" \
-     -d '{"user_id": "test_user"}' \
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/2fa/setup
+     -d '{"user_id": 1}' \
+     http://localhost:8000/v1/auth/2fa/setup
 
 # Test Input Validation
 curl -X POST -H "Authorization: Bearer <YOUR_API_KEY>" \
      -H "Content-Type: application/json" \
-     -d '{"input_data": "<script>alert(\"test\")</script>"}' \
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/security/test-input-validation
+     -d '{"input_data": "test"}' \
+     http://localhost:8000/v1/security/test-input-validation
 ```
 
 ---
 
 ## 📊 Real Data Available
 
-### **Production Database**
+### **MongoDB Atlas Database**
 ```bash
-# Current Real Data (Production Database):
-✅ 10+ Candidates - Complete profiles with skills and experience
-✅ 6+ Jobs - Active job postings from 3+ client companies  
-✅ 29 Resume Files - Processed PDF/DOCX files in assets/resumes/
-✅ 3+ Client Companies - TECH001, STARTUP01, ENTERPRISE01
-✅ 3+ HR Users - Admin, HR Manager, Recruiter roles
-✅ Assessment Data - 5-point BHIV values framework (Integrity, Honesty, Discipline, Hard Work, Gratitude)
-✅ Interview Data - Complete scheduling and management system
-✅ LangGraph Workflows - Automated candidate processing and notifications
-✅ Database Schema v4.3.0 - 13 core tables + 6 RL tables with Phase 3 AI engine + RL integration + LangGraph workflow management
-✅ Portal Endpoints - 22 additional endpoints across HR, Client, and Candidate portals
-✅ Multi-Channel Notifications - Email, WhatsApp, SMS, Telegram integration
-✅ Real-time Monitoring - Advanced performance metrics and health checks
+# Current Collections:
+✅ candidates - Candidate profiles
+✅ jobs - Job postings
+✅ applications - Job applications
+✅ interviews - Interview scheduling
+✅ feedback - Values assessments
+✅ offers - Job offers
+✅ clients - Client companies
+✅ users - HR users
+✅ workflow_executions - LangGraph workflows
+✅ notifications - Notification log
+✅ rl_predictions - ML predictions
+✅ rl_feedback - ML feedback
+✅ matching_cache - Matching results
+✅ audit_logs - System audit trail
 ```
 
 ### **Data Verification**
 ```bash
-# Check Database Status (Schema v4.3.0)
+# Check Database Status
 curl -H "Authorization: Bearer <YOUR_API_KEY>" \
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/database/schema
+     http://localhost:8000/v1/database/schema
 
 # Get Candidate Statistics
 curl -H "Authorization: Bearer <YOUR_API_KEY>" \
-     https://bhiv-hr-gateway-ltg0.onrender.com/v1/candidates/stats
+     http://localhost:8000/v1/candidates/stats
 
-# Check All Service Health (111 Endpoints)
-curl https://bhiv-hr-gateway-ltg0.onrender.com/health
-curl https://bhiv-hr-agent-nhgg.onrender.com/health
-curl https://bhiv-hr-langgraph.onrender.com/health
-
-# Get System Performance Metrics
-curl https://bhiv-hr-gateway-ltg0.onrender.com/metrics
-curl https://bhiv-hr-gateway-ltg0.onrender.com/health/detailed
+# Check Service Health
+curl http://localhost:8000/health
+curl http://localhost:9000/health
+curl http://localhost:9001/health
 ```
 
 ---
@@ -331,35 +336,29 @@ curl https://bhiv-hr-gateway-ltg0.onrender.com/health/detailed
 
 ### **Local Development Commands**
 ```bash
-# Start Services
-docker-compose -f deployment/docker/docker-compose.production.yml up -d
+# Start Services (Python)
+python run_services.py
+
+# Start Services (Docker)
+docker-compose -f docker-compose.production.yml up -d
 
 # View Logs
-docker-compose -f deployment/docker/docker-compose.production.yml logs -f
+tail -f logs/bhiv_hr_platform.log
 
 # Stop Services
-docker-compose -f deployment/docker/docker-compose.production.yml down
-
-# Restart Single Service
-docker-compose -f deployment/docker/docker-compose.production.yml restart gateway
-
-# Database Access
-psql postgresql://bhiv_user:password@localhost:5432/bhiv_hr
+Ctrl+C  # Python
+docker-compose -f docker-compose.production.yml down  # Docker
 ```
 
 ### **Testing Commands**
 ```bash
-# Run API Tests
-python tests/api/test_endpoints.py
+# Run Complete Test Suite (112 endpoints)
+python tests/test_complete_112_endpoints.py
 
-# Run Security Tests
-python tests/security/test_security.py
-
-# Run All Tests
-python tests/run_all_tests.py
-
-# Test Specific Portal
-python tests/integration/test_client_portal.py
+# Test Individual Services
+curl http://localhost:8000/health
+curl http://localhost:9000/health
+curl http://localhost:9001/health
 ```
 
 ---
@@ -367,52 +366,39 @@ python tests/integration/test_client_portal.py
 ## 🔧 Configuration
 
 ### **Environment Variables**
-```bash
-# Database Configuration
-DATABASE_URL=postgresql://bhiv_user:password@localhost:5432/bhiv_hr
+```env
+# Database
+DATABASE_URL=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/bhiv_hr
 
-# API Configuration
-API_KEY_SECRET=<YOUR_API_KEY>
-JWT_SECRET_KEY=fallback_jwt_secret_key_for_client_auth_2025
-CANDIDATE_JWT_SECRET_KEY=candidate_jwt_secret_key_2025
+# Authentication
+API_KEY_SECRET=<your-api-key>
+JWT_SECRET_KEY=<your-jwt-secret>
+CANDIDATE_JWT_SECRET_KEY=<your-candidate-jwt-secret>
+GATEWAY_SECRET_KEY=<your-gateway-secret>
 
 # Service URLs
-GATEWAY_SERVICE_URL=http://gateway:8000
-AGENT_SERVICE_URL=http://agent:9000
-LANGGRAPH_SERVICE_URL=http://langgraph:9001
+GATEWAY_SERVICE_URL=http://localhost:8000
+AGENT_SERVICE_URL=http://localhost:9000
+LANGGRAPH_SERVICE_URL=http://localhost:9001
 ```
 
 ### **Service Configuration**
 ```bash
 # Gateway Service (Port 8000) - 80 Endpoints
-- FastAPI 4.2.0 (High-performance async)
-- Triple authentication system
-- RL integration with feedback loops
-- LangGraph workflow integration
-- Dynamic rate limiting (60-500 req/min)
-- Real-time monitoring and metrics
+- FastAPI 4.2.0
+- JWT authentication
+- Rate limiting
+- MongoDB integration
 
 # AI Agent Service (Port 9000) - 6 Endpoints
-- FastAPI 4.2.0 (AI-optimized)
-- Phase 3 semantic matching engine
-- Reinforcement learning integration
-- Sentence transformers (advanced NLP)
-- <15ms response time
+- FastAPI + Sentence Transformers
+- Semantic matching
+- ML predictions
 
-# LangGraph Service (Port 9001) - 9 Endpoints
-- FastAPI 4.2.0 (Workflow-optimized)
-- AI-powered workflow automation
-- Multi-channel notifications (Email, WhatsApp, SMS, Telegram)
-- Real-time status tracking
-- RL-enhanced decision making
-
-# Portal Services (Ports 8501-8503) - 22 Endpoints Total
-- Streamlit 1.41.1 (Interactive web apps)
-- HR Portal: 8 endpoints (Complete HR workflow)
-- Client Portal: 7 endpoints (Enterprise interface)
-- Candidate Portal: 7 endpoints (Job seeker interface)
-- Real-time data synchronization
-- Responsive design and accessibility
+# LangGraph Service (Port 9001) - 26 Endpoints
+- FastAPI + LangGraph
+- Workflow automation
+- Multi-channel notifications
 ```
 
 ---
@@ -439,14 +425,14 @@ sudo systemctl restart docker  # Linux
 #### **Database Connection Issues**
 ```bash
 # Check Database Container
-docker-compose -f deployment/docker/docker-compose.production.yml ps
+docker-compose -f docker-compose.production.yml ps
 
 # Check Database Logs
-docker-compose -f deployment/docker/docker-compose.production.yml logs db
+docker-compose -f docker-compose.production.yml logs db
 
 # Reset Database
-docker-compose -f deployment/docker/docker-compose.production.yml down -v
-docker-compose -f deployment/docker/docker-compose.production.yml up -d
+docker-compose -f docker-compose.production.yml down -v
+docker-compose -f docker-compose.production.yml up -d
 ```
 
 #### **API Authentication Issues**
@@ -526,9 +512,9 @@ curl http://localhost:8502/  # Should return HTML
 curl http://localhost:8503/  # Should return HTML
 
 # Check Streamlit Logs
-docker-compose -f deployment/docker/docker-compose.production.yml logs portal
-docker-compose -f deployment/docker/docker-compose.production.yml logs client_portal
-docker-compose -f deployment/docker/docker-compose.production.yml logs candidate_portal
+docker-compose -f docker-compose.production.yml logs portal
+docker-compose -f docker-compose.production.yml logs client_portal
+docker-compose -f docker-compose.production.yml logs candidate_portal
 ```
 
 ### **Performance Issues**
@@ -556,7 +542,7 @@ curl http://localhost:9001/workflows/stats  # Workflow analytics
 
 ### **After Quick Start**
 1. **Explore Documentation**: Read [CURRENT_FEATURES.md](CURRENT_FEATURES.md) for complete feature list
-2. **API Integration**: Check [API_DOCUMENTATION.md](../api/API_DOCUMENTATION.md) for all 111 endpoints
+2. **API Integration**: Check [API_DOCUMENTATION.md](../api/API_DOCUMENTATION.md) for all 112 endpoints
 3. **Security Setup**: Review [SECURITY_AUDIT.md](security/SECURITY_AUDIT.md) for security features
 4. **Production Deploy**: Follow [RENDER_DEPLOYMENT_GUIDE.md](deployment/RENDER_DEPLOYMENT_GUIDE.md)
 
@@ -569,7 +555,7 @@ python tools/database_sync_manager.py
 
 # Custom Configuration
 # Edit config/production.env
-# Modify deployment/docker/docker-compose.production.yml
+# Modify docker-compose.production.yml
 
 # Monitoring Setup
 # Access Prometheus metrics at /metrics
@@ -623,15 +609,16 @@ matches = requests.get(f"{BASE_URL}/v1/match/1/top", headers=headers).json()
 ### **Documentation Links**
 - **Complete Features**: [CURRENT_FEATURES.md](CURRENT_FEATURES.md)
 - **API Reference**: [API_DOCUMENTATION.md](api/API_DOCUMENTATION.md)
-- **Architecture**: [SERVICES_ARCHITECTURE_SUMMARY.md](architecture/SERVICES_ARCHITECTURE_SUMMARY.md)
+- **Architecture**: [SERVICES_GUIDE.md](SERVICES_GUIDE.md) | [PROJECT_STRUCTURE.md](../architecture/PROJECT_STRUCTURE.md)
 - **Deployment**: [DEPLOYMENT_STATUS.md](architecture/DEPLOYMENT_STATUS.md)
 
-### **Live Platform URLs**
-- **Gateway API**: https://bhiv-hr-gateway-ltg0.onrender.com/docs
-- **Agent API**: https://bhiv-hr-agent-nhgg.onrender.com/docs
-- **HR Portal**: https://bhiv-hr-portal-u670.onrender.com/
-- **Client Portal**: https://bhiv-hr-client-portal-3iod.onrender.com/
-- **Candidate Portal**: https://bhiv-hr-candidate-portal-abe6.onrender.com/
+
+### **Localhost Platform URLs**
+- **Gateway API**: http://localhost:8000/docs
+- **Agent API**: http://localhost:9000/docs
+- **HR Portal**: http://localhost:8501/
+- **Client Portal**: http://localhost:8502/
+- **Candidate Portal**: http://localhost:8503/
 
 ### **Demo Credentials**
 ```bash
@@ -649,4 +636,4 @@ API Key: <YOUR_API_KEY>
 
 *Built with Integrity, Honesty, Discipline, Hard Work & Gratitude*
 
-**Last Updated**: December 9, 2025 | **Setup Time**: 0-5 minutes | **Services**: 6/6 Live | **Endpoints**: 111 Total | **Status**: ✅ Production Ready
+**Last Updated**: January 16, 2026 | **Setup Time**: 5 minutes | **Services**: 3/3 Live | **Endpoints**: 112 Total | **Status**: ✅ Production Ready | **Database**: MongoDB Atlas

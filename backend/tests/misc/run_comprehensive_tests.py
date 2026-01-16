@@ -55,7 +55,7 @@ async def run_tests():
     
     # Check for custom service URLs
     custom_urls = {}
-    for service in ['GATEWAY_URL', 'AGENT_URL', 'LANGGRAPH_URL', 'HR_PORTAL_URL', 'CLIENT_PORTAL_URL', 'CANDIDATE_PORTAL_URL']:
+    for service in ['GATEWAY_SERVICE_URL', 'AGENT_SERVICE_URL', 'LANGGRAPH_SERVICE_URL', 'PORTAL_SERVICE_URL', 'CLIENT_PORTAL_SERVICE_URL', 'CANDIDATE_PORTAL_SERVICE_URL']:
         url = os.getenv(service)
         if url:
             custom_urls[service] = url

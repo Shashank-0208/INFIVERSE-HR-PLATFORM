@@ -428,14 +428,14 @@ class BHIVEndpointTester:
         
         portal_results = {}
         
-        for portal_name, portal_url in [
+        for portal_name, portal_service_url in [
             ("hr_portal", self.services["hr_portal"]),
             ("client_portal", self.services["client_portal"]),
             ("candidate_portal", self.services["candidate_portal"])
         ]:
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
-                    response = await client.get(portal_url)
+                    response = await client.get(portal_service_url)
                     portal_results[portal_name] = {
                         "status": "✅ ACCESSIBLE" if response.status_code == 200 else f"❌ ERROR ({response.status_code})",
                         "response_time": response.elapsed.total_seconds() if hasattr(response, 'elapsed') else 0,

@@ -12,7 +12,7 @@ from typing import List, Dict
 import os
 
 # API Configuration
-API_BASE = os.getenv("GATEWAY_URL", "http://localhost:8000")
+API_BASE = os.getenv("GATEWAY_SERVICE_URL", "http://localhost:8000")
 API_KEY = os.getenv("API_KEY_SECRET", "myverysecureapikey123")
 headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
 

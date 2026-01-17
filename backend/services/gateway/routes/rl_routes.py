@@ -3,8 +3,11 @@ from typing import Dict, Any
 import httpx
 import os
 import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
+# Add gateway directory to path for dependencies import
+gateway_dir = os.path.dirname(os.path.dirname(__file__))
+sys.path.insert(0, gateway_dir)
+
 from dependencies import get_api_key
 
 router = APIRouter(prefix="/rl", tags=["RL + Feedback Agent"])

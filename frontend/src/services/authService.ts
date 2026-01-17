@@ -12,7 +12,9 @@ interface RegisterRequest {
   email: string;
   password: string;
   name: string;
-  // Note: role may be handled separately depending on user type
+  role?: string; // 'candidate' | 'recruiter' | 'client'
+  company?: string; // For recruiter/client
+  phone?: string;
 }
 
 interface AuthResponse {
@@ -66,56 +68,104 @@ class AuthService {
     }
   }
 
-  // Register new user
+  // Register new user - supports candidate, recruiter, and client
   async register(userData: RegisterRequest): Promise<AuthResponse> {
     try {
-      const response = await axios.post(`${this.API_BASE_URL}/v1/candidate/register`, {
-        email: userData.email,
-        password: userData.password,
-        name: userData.name,
-        // Map role to appropriate fields for candidate registration
-        phone: '',
-        location: '',
-        experience_years: 0,
-        technical_skills: '',
-        education_level: '',
-        seniority_level: '',
-        // Note: role is typically assigned by the backend or stored separately
-      });
+      const role = userData.role || 'candidate';
+      
+      let response;
+      
+      if (role === 'client') {
+        // Client registration requires client_id and company_name
+        const client_id = userData.email.split('@')[0] + '_' + Date.now(); // Generate client_id from email
+        
+        response = await axios.post(`${this.API_BASE_URL}/v1/client/register`, {
+          client_id: client_id,
+          company_name: userData.company || userData.name + "'s Company",
+          contact_email: userData.email,
+          password: userData.password
+        });
+        
+        // Client registration successful - don't auto-login, just return success
+        if (response.data.success) {
+          // Store role for later login
+          const userObj = {
+            id: response.data.client_id || client_id,
+            email: userData.email,
+            name: userData.name,
+            role: 'client',
+            company: userData.company
+          };
+          
+          return {
+            success: true,
+            user: userObj,
+            // Note: Client login uses client_id, not email - handled separately
+          };
+        }
+      } else if (role === 'recruiter') {
+        // Recruiter registration - use candidate endpoint for now (backend doesn't have recruiter endpoint)
+        // TODO: Create /v1/recruiter/register endpoint in backend
+        response = await axios.post(`${this.API_BASE_URL}/v1/candidate/register`, {
+          email: userData.email,
+          password: userData.password,
+          name: userData.name,
+          phone: userData.phone || '',
+          location: '',
+          experience_years: 0,
+          technical_skills: '',
+          education_level: '',
+          seniority_level: ''
+        });
+        
+        // Registration successful - store role but don't auto-login
+        if (response.data.success) {
+          const userObj = {
+            id: response.data.candidate_id || '',
+            email: userData.email,
+            name: userData.name,
+            role: 'recruiter' // Override role from candidate registration
+          };
+          
+          return {
+            success: true,
+            user: userObj
+          };
+        }
+      } else {
+        // Candidate registration (default)
+        response = await axios.post(`${this.API_BASE_URL}/v1/candidate/register`, {
+          email: userData.email,
+          password: userData.password,
+          name: userData.name,
+          phone: userData.phone || '',
+          location: '',
+          experience_years: 0,
+          technical_skills: '',
+          education_level: '',
+          seniority_level: ''
+        });
+        
+        // Registration successful - store role but don't auto-login
+        if (response.data.success) {
+          const userObj = {
+            id: response.data.candidate_id || '',
+            email: userData.email,
+            name: userData.name,
+            role: 'candidate'
+          };
+          
+          return {
+            success: true,
+            user: userObj
+          };
+        }
+      }
 
-      // Handle error response first
+      // Handle error response
       if (response.data.error || !response.data.success) {
         const errorMsg = response.data.error || 'Registration failed';
         return { success: false, error: errorMsg };
-      }
-
-      // Backend returns: {"success": True, "message": "...", "candidate_id": "..."}
-      // Registration successful - auto-login the user
-      if (response.data.success && response.data.candidate_id) {
-        // Try to auto-login after successful registration
-        return await this.login(userData.email, userData.password);
-      }
-
-      // If backend returns candidate object directly (for compatibility)
-      if (response.data.success && response.data.candidate) {
-        return await this.login(userData.email, userData.password);
-      }
-
-      // If backend returns token directly
-      if (response.data.token) {
-        const userData = response.data.candidate || response.data.user;
-        this.setAuthToken(response.data.token);
-        localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
-        return {
-          success: true,
-          token: response.data.token,
-          user: userData
-        };
-      }
-
-      // If we have success but no candidate_id or token, still try to login
-      if (response.data.success) {
-        return await this.login(userData.email, userData.password);
       }
 
       return { success: false, error: 'Invalid response from server' };

@@ -11,7 +11,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, userData: { name: string; role: string }) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, userData: { name: string; role: string; company?: string; phone?: string }) => Promise<{ error: any; user?: User }>;
   signOut: () => Promise<void>;
   userRole: string | null;
   userName: string | null;
@@ -98,18 +98,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const handleSignUp = async (email: string, password: string, userData: { name: string; role: string }) => {
+  const handleSignUp = async (email: string, password: string, userData: { name: string; role: string; company?: string; phone?: string }) => {
     try {
       const authService = (await import('../services/authService')).default;
       const result = await authService.register({
         email,
         password,
-        name: userData.name
+        name: userData.name,
+        role: userData.role,
+        company: userData.company,
+        phone: userData.phone
       });
 
-      if (result.success) {
-        // Auto-login after successful registration
-        return handleSignIn(email, password);
+      if (result.success && result.user) {
+        // Store user data and role
+        const role = userData.role || result.user.role || 'candidate';
+        
+        localStorage.setItem('user_role', role);
+        localStorage.setItem('user_email', email);
+        localStorage.setItem('user_name', userData.name);
+        localStorage.setItem('user_data', JSON.stringify(result.user));
+        
+        // Set user in state
+        setUser(result.user);
+        
+        // Don't auto-login - just return success so AuthPage can redirect
+        return { error: null, user: result.user };
       } else {
         return { error: result.error || 'Registration failed' };
       }

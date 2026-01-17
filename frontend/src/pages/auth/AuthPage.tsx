@@ -108,6 +108,8 @@ export default function AuthPage() {
         const { error } = await signUp(formData.email, formData.password, {
           name: formData.fullName,
           role: selectedRole,
+          company: formData.company || undefined,
+          phone: formData.phone || undefined
         })
         
         if (error) {
@@ -126,14 +128,13 @@ export default function AuthPage() {
           return
         }
         
-        // Set role in localStorage
-        localStorage.setItem('user_role', selectedRole)
-        localStorage.setItem('user_email', formData.email)
-        localStorage.setItem('user_name', formData.fullName)
+        // Role is already stored by AuthContext - just verify
+        const storedRole = localStorage.getItem('user_role') || selectedRole
         
-        toast.success(`Account created successfully as ${roleConfig[selectedRole].title}!`)
+        console.log('✅ Signup successful! Role:', storedRole, 'Redirecting to:', roleConfig[storedRole as UserRole]?.redirectPath)
+        toast.success(`Account created successfully as ${roleConfig[storedRole as UserRole]?.title || selectedRole}!`)
         setIsLoading(false)
-        navigate(roleConfig[selectedRole].redirectPath)
+        navigate(roleConfig[storedRole as UserRole]?.redirectPath || roleConfig[selectedRole].redirectPath)
       } else {
         // LOGIN: Authenticate and redirect based on user's role
         const { error } = await signIn(formData.email, formData.password)

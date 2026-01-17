@@ -55,8 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleSignIn = async (email: string, password: string) => {
     try {
+      // Get role from localStorage (stored during signup) to determine login endpoint
+      const storedRole = localStorage.getItem('user_role') || 'candidate';
+      
       const authService = (await import('../services/authService')).default;
-      const result = await authService.login(email, password);
+      const result = await authService.login(email, password, storedRole);
       
       if (result.success && result.token && result.user) {
         // Extract role from JWT token (token contains role in payload)
@@ -118,6 +121,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('user_email', email);
         localStorage.setItem('user_name', userData.name);
         localStorage.setItem('user_data', JSON.stringify(result.user));
+        
+        // Store client_id for client login (client login uses client_id, not email)
+        if (role === 'client' && result.user.id) {
+          localStorage.setItem('client_id', result.user.id);
+        }
         
         // Set user in state
         setUser(result.user);

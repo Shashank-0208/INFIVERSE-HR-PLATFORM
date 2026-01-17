@@ -33,23 +33,72 @@ class AuthService {
     this.API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
   }
 
-  // Login user and store JWT token
-  async login(email: string, password: string): Promise<AuthResponse> {
+  // Login user and store JWT token - supports candidate, recruiter, and client
+  async login(email: string, password: string, role?: string): Promise<AuthResponse> {
     try {
-      const response = await axios.post(`${this.API_BASE_URL}/v1/candidate/login`, {
+      // Determine role from parameter or localStorage
+      const userRole = role || localStorage.getItem('user_role') || 'candidate';
+      
+      let response;
+      
+      if (userRole === 'client') {
+        // Client login requires client_id (stored in localStorage during signup)
+        const storedUserData = this.getUserData();
+        const client_id = localStorage.getItem('client_id') || storedUserData?.id || null;
+        
+        // Try client login first (if we have client_id)
+        if (client_id) {
+          try {
+            response = await axios.post(`${this.API_BASE_URL}/v1/client/login`, {
+              client_id: client_id,
+              password: password
+            });
+            
+            if (response.data.success && response.data.access_token) {
+              const userData = {
+                id: response.data.client_id,
+                email: email,
+                name: response.data.company_name || '',
+                role: 'client',
+                company: response.data.company_name
+              };
+              this.setAuthToken(response.data.access_token);
+              localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
+              return {
+                success: true,
+                token: response.data.access_token,
+                user: userData
+              };
+            }
+          } catch (clientError: any) {
+            // If client login fails, fall back to candidate login
+            console.log('Client login failed, trying candidate login...');
+          }
+        }
+      }
+      
+      // For recruiter and candidate (or client fallback), use candidate login
+      // Backend candidate login works for both candidates and recruiters (stored as candidates)
+      response = await axios.post(`${this.API_BASE_URL}/v1/candidate/login`, {
         email,
         password
       });
 
-      // Backend returns 'candidate' but frontend expects 'user' - map it for compatibility
+      // Backend returns 'candidate' but we need to set correct role
       if (response.data.token && response.data.success) {
         const userData = response.data.candidate || response.data.user;
+        
+        // Override role from localStorage if available (for recruiter)
+        const actualRole = userRole === 'recruiter' ? 'recruiter' : (userData.role || 'candidate');
+        const userWithRole = { ...userData, role: actualRole };
+        
         this.setAuthToken(response.data.token);
-        localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
+        localStorage.setItem(this.USER_KEY, JSON.stringify(userWithRole));
+        
         return {
           success: true,
           token: response.data.token,
-          user: userData
+          user: userWithRole
         };
       }
 
@@ -88,9 +137,14 @@ class AuthService {
         
         // Client registration successful - don't auto-login, just return success
         if (response.data.success) {
+          const final_client_id = response.data.client_id || client_id;
+          
+          // Store client_id in localStorage for login
+          localStorage.setItem('client_id', final_client_id);
+          
           // Store role for later login
           const userObj = {
-            id: response.data.client_id || client_id,
+            id: final_client_id,
             email: userData.email,
             name: userData.name,
             role: 'client',
@@ -100,7 +154,7 @@ class AuthService {
           return {
             success: true,
             user: userObj,
-            // Note: Client login uses client_id, not email - handled separately
+            // Note: Client login uses client_id, not email - stored in localStorage
           };
         }
       } else if (role === 'recruiter') {

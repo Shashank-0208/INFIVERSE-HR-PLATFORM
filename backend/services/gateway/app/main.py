@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, Security, Response, Request
+import json
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -263,11 +264,14 @@ class ClientLogin(BaseModel):
     client_id: str
     password: str
 
+import uuid
+
 class ClientRegister(BaseModel):
     client_id: str
     company_name: str
     contact_email: str
     password: str
+    client_code: str = None  # Optional, will be generated if not provided
 
 class TwoFASetup(BaseModel):
     user_id: str
@@ -1466,27 +1470,37 @@ async def export_job_report(job_id: str, api_key: str = Depends(get_api_key)):  
 @app.post("/v1/client/register", tags=["Client Portal API"])
 async def client_register(client_data: ClientRegister):
     """Client Registration"""
+    from fastapi import status
     try:
         db = await get_mongo_db()
-        
+
         # Check if client_id already exists
         existing_client = await db.clients.find_one({"client_id": client_data.client_id})
         if existing_client:
-            return {"success": False, "error": "Client ID already exists"}
-        
+            raise HTTPException(status_code=400, detail="Client ID already exists")
+
         # Check if email already exists
         existing_email = await db.clients.find_one({"email": client_data.contact_email})
         if existing_email:
-            return {"success": False, "error": "Email already registered"}
-        
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Generate unique client_code if not provided
+        client_code = client_data.client_code or str(uuid.uuid4())
+
+        # Check if client_code already exists (should be unique)
+        existing_code = await db.clients.find_one({"client_code": client_code})
+        if existing_code:
+            raise HTTPException(status_code=400, detail="Client code already exists. Please try again.")
+
         # Hash password
         password_hash = bcrypt.hashpw(client_data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        
+
         # Insert client
         document = {
             "client_id": client_data.client_id,
             "company_name": client_data.company_name,
             "email": client_data.contact_email,
+            "client_code": client_code,
             "password_hash": password_hash,
             "status": "active",
             "failed_login_attempts": 0,
@@ -1494,15 +1508,23 @@ async def client_register(client_data: ClientRegister):
             "created_at": datetime.now(timezone.utc)
         }
         await db.clients.insert_one(document)
-        
-        return {
-            "success": True,
-            "message": "Client registration successful",
-            "client_id": client_data.client_id,
-            "company_name": client_data.company_name
-        }
+
+        from fastapi import Response
+        return Response(
+            content=json.dumps({
+                "success": True,
+                "message": "Client registration successful",
+                "client_id": client_data.client_id,
+                "company_name": client_data.company_name,
+                "client_code": client_code
+            }),
+            status_code=status.HTTP_201_CREATED,
+            media_type="application/json"
+        )
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/v1/client/login", tags=["Client Portal API"])
 async def client_login(login_data: ClientLogin):

@@ -238,7 +238,7 @@ def main():
     
     for svc_name in services_to_start:
         config = SERVICES[svc_name]
-        check_health(config["health_url"], timeout=20)
+        check_health(config["health_url"], timeout=30)
     
     # Print summary
     print("\n" + "=" * 60)

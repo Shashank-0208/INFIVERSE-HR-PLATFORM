@@ -19,14 +19,27 @@ from pymongo import MongoClient
 logger = logging.getLogger(__name__)
 
 class Phase3SemanticEngine:
-    """Production Phase 3 Semantic Engine with advanced AI capabilities"""
+    """Production Phase 3 Semantic Engine with advanced AI capabilities (Singleton Pattern)"""
+    
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
     
     def __init__(self):
+        # Only initialize once
+        if Phase3SemanticEngine._initialized:
+            return
+            
         self.model = None
         self.company_preferences = defaultdict(dict)
         self.cache = {}
         self.executor = ThreadPoolExecutor(max_workers=4)
         self._initialize()
+        Phase3SemanticEngine._initialized = True
     
     def _initialize(self):
         """Initialize semantic model and learning components"""

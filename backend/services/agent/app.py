@@ -180,6 +180,8 @@ def get_db_connection():
     """Get MongoDB database connection"""
     try:
         db = get_mongo_db()
+        # Test the connection by attempting a simple operation
+        db.command('ping')
         return db
     except Exception as e:
         logger.error(f"Failed to get MongoDB connection: {e}")
@@ -219,7 +221,7 @@ def test_database(auth = Depends(auth_dependency)):
     db = None
     try:
         db = get_db_connection()
-        if not db:
+        if db is None:
             return {"status": "failed", "error": "Connection failed"}
         
         # MongoDB version of candidate count and sample query
@@ -244,7 +246,7 @@ async def match_candidates(request: MatchRequest, auth = Depends(auth_dependency
     
     try:
         db = get_db_connection()
-        if not db:
+        if db is None:
             logger.error("Database connection failed")
             return {
                 "job_id": request.job_id,

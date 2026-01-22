@@ -1,25 +1,6 @@
 GATEWAY ENDPOINTS:
 
 
-
-**Authentication:-**
-
-POST/auth/2fa/setup; Setup 2Fa
-
-
-
-POST/auth/2fa/verify; Verify 2Fa
-
-
-
-POST/auth/login; Login With 2Fa
-
-
-
-GET/auth/2fa/status/{user\_id}; Get 2Fa Status
-
-
-
 **AI Integration:-**
 
 POST/api/v1/test-communication; Test Communication System

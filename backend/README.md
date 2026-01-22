@@ -22,11 +22,15 @@
 
 | Service | URL | Endpoints | Status |
 |---------|-----|-----------|--------|
+| **Frontend (React)** | http://localhost:3000 | Web UI | ✅ Running |
 | **API Gateway** | http://localhost:8000/docs | 81 | ✅ Running |
 | **AI Agent** | http://localhost:9000/docs | 6 | ✅ Running |
 | **LangGraph** | http://localhost:9001/docs | 25 | ✅ Running |
 
-**Note:** Streamlit portals (HR, Client, Candidate) are available via Docker only and are for reference. The main frontend is served separately on port 3000.
+**Note:** 
+- Frontend serves the main web application on port 3000
+- Streamlit portals (HR, Client, Candidate) are available via Docker only and are for reference
+- Backend API documentation is available at the `/docs` endpoints
 
 ---
 
@@ -34,9 +38,47 @@
 
 ### Prerequisites
 - **Python 3.12+** - [Download](https://www.python.org/downloads/)
+- **Node.js 18+** - [Download](https://nodejs.org/)
 - **MongoDB Atlas Account** - [Sign Up](https://www.mongodb.com/cloud/atlas/register)
 - **Git** - [Download](https://git-scm.com/downloads/)
 - **Docker Desktop** (Optional - for Docker method)
+
+### 📝 Complete Setup (Backend + Frontend)
+
+**Option 1: Quick Start Script (Windows)**
+```bash
+# Clone repository
+git clone <repository-url>
+cd Infiverse-HR
+
+# Run both backend and frontend
+run_project.bat
+```
+
+**Option 2: Manual Setup**
+
+*Terminal 1 - Backend:*
+```bash
+cd Infiverse-HR/backend
+python -m venv venv
+venv\Scripts\activate  # Windows
+# source venv/bin/activate  # Linux/Mac
+pip install -r requirements.txt
+# Configure .env file (see backend setup below)
+python run_services.py
+```
+
+*Terminal 2 - Frontend:*
+```bash
+cd Infiverse-HR/frontend
+npm install
+# Configure .env file (see frontend setup below)
+npm run dev
+```
+
+**Access the application:**
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:8000/docs
 
 ---
 
@@ -220,6 +262,75 @@ docker-compose -f docker-compose.production.yml down
 # Stop and remove volumes
 docker-compose -f docker-compose.production.yml down -v
 ```
+
+---
+
+## 🎨 Frontend Setup (Port 3000)
+
+**Modern React TypeScript frontend with three portal system**
+
+### Prerequisites
+- **Node.js 18+** - [Download](https://nodejs.org/)
+- **npm or yarn** - Comes with Node.js
+
+### Frontend Setup Steps
+
+#### Step 1: Navigate to Frontend Directory
+```bash
+cd Infiverse-HR/frontend
+```
+
+#### Step 2: Install Dependencies
+```bash
+npm install
+```
+
+#### Step 3: Configure Environment
+```bash
+# Windows
+copy .env.example .env
+
+# Linux/Mac
+cp .env.example .env
+```
+
+**Edit `.env` file:**
+```env
+# API Configuration
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+#### Step 4: Start Frontend Development Server
+```bash
+npm run dev
+```
+
+#### Step 5: Access Frontend
+Open your browser and navigate to: **http://localhost:3000**
+
+### Frontend Features
+
+| Portal | URL | Features |
+|--------|-----|----------|
+| **Recruiter Console** | `/recruiter` | Job creation, applicant management, feedback |
+| **Candidate Portal** | `/candidate` | Profile management, applications, interviews |
+| **Client View** | `/client` | Analytics, shortlist review, approvals |
+
+### Frontend Build Commands
+
+| Command | Purpose |
+|---------|----------|
+| `npm run dev` | Start development server (Port 3000) |
+| `npm run build` | Build for production |
+| `npm run preview` | Preview production build |
+| `npm run lint` | Type checking |
+
+### Tech Stack
+- **React 18** with TypeScript
+- **Vite** for fast builds
+- **Tailwind CSS** for styling
+- **React Router** for navigation
+- **Axios** for API calls
 
 ---
 

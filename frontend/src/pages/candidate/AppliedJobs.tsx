@@ -31,7 +31,7 @@ export default function AppliedJobs() {
     }
 
     // If authenticated but no candidate ID, show empty state
-    if (!candidateId || !backendCandidateId) {
+    if (!backendCandidateId) {
       setApplications([])
       setLoading(false)
       return
@@ -39,7 +39,8 @@ export default function AppliedJobs() {
 
     try {
       setLoading(true)
-      const data = await getCandidateApplications(candidateId)
+      // Use backend_candidate_id for applications
+      const data = await getCandidateApplications(backendCandidateId)
       setApplications(data)
     } catch (error) {
       console.error('Failed to load applications:', error)

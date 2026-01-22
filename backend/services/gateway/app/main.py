@@ -2234,6 +2234,58 @@ async def candidate_login(login_data: CandidateLogin):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.get("/v1/candidate/profile/{candidate_id}", tags=["Candidate Portal"])
+async def get_candidate_profile(candidate_id: str, auth = Depends(get_auth)):
+    """Get Candidate Profile (JWT authenticated)"""
+    try:
+        db = await get_mongo_db()
+        
+        # Verify the candidate_id matches the authenticated user (if using candidate token)
+        auth_info = auth
+        if auth_info.get("type") == "candidate_token":
+            token_candidate_id = str(auth_info.get("candidate_id", ""))
+            # Compare as strings to handle ObjectId vs string differences
+            if token_candidate_id and token_candidate_id != str(candidate_id):
+                # Also try ObjectId comparison
+                try:
+                    if ObjectId(token_candidate_id) != ObjectId(candidate_id):
+                        raise HTTPException(status_code=403, detail="You can only view your own profile")
+                except:
+                    # If ObjectId conversion fails, use string comparison
+                    if token_candidate_id != str(candidate_id):
+                        raise HTTPException(status_code=403, detail="You can only view your own profile")
+        
+        # Try to convert to ObjectId if valid, otherwise search by string id
+        try:
+            doc = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
+        except:
+            doc = await db.candidates.find_one({"id": candidate_id})
+        
+        if not doc:
+            return {"error": "Candidate not found", "candidate_id": candidate_id}
+        
+        candidate = {
+            "id": str(doc["_id"]),
+            "name": doc.get("name"),
+            "email": doc.get("email"),
+            "phone": doc.get("phone"),
+            "location": doc.get("location"),
+            "experience_years": doc.get("experience_years"),
+            "technical_skills": doc.get("technical_skills"),
+            "seniority_level": doc.get("seniority_level"),
+            "education_level": doc.get("education_level"),
+            "resume_path": doc.get("resume_path"),
+            "resume_url": doc.get("resume_path"),  # Alias for frontend compatibility
+            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None
+        }
+        
+        return candidate
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"error": str(e), "candidate_id": candidate_id}
+
 @app.put("/v1/candidate/profile/{candidate_id}", tags=["Candidate Portal"])
 async def update_candidate_profile(candidate_id: str, profile_data: CandidateProfileUpdate, auth = Depends(get_auth)):
     """Update Candidate Profile"""

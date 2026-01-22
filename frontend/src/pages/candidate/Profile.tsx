@@ -29,9 +29,39 @@ export default function CandidateProfile() {
     try {
       setProfileLoading(true)
       console.log('Profile: Loading profile for candidate:', candidateId)
+      
+      // First, try to load from localStorage as backup
+      const cachedProfile = localStorage.getItem('candidate_profile_data')
+      if (cachedProfile) {
+        try {
+          const parsed = JSON.parse(cachedProfile)
+          if (parsed && parsed.id === candidateId) {
+            console.log('Profile: Using cached profile data')
+            setSavedProfile(parsed)
+            setFormData({
+              name: parsed.name || '',
+              email: parsed.email || '',
+              phone: parsed.phone || '',
+              location: parsed.location || '',
+              totalExperience: (parsed.experience_years || parsed.totalExperience)?.toString() || '',
+              skills: parsed.technical_skills || (Array.isArray(parsed.skills) ? parsed.skills.join(', ') : (parsed.skills || '')),
+              educationLevel: parsed.education_level || parsed.educationLevel || '',
+              expectedSalary: parsed.expectedSalary?.toString() || '',
+              resume: null,
+            })
+          }
+        } catch (e) {
+          console.warn('Failed to parse cached profile:', e)
+        }
+      }
+      
+      // Then try to load from backend
       const data = await getCandidateProfile(candidateId)
-      console.log('Profile: Received data:', data)
+      console.log('Profile: Received data from backend:', data)
       if (data) {
+        // Store in localStorage as backup
+        localStorage.setItem('candidate_profile_data', JSON.stringify({ ...data, id: candidateId }))
+        
         setSavedProfile(data)
         // Map backend field names to frontend state
         setFormData({
@@ -46,11 +76,37 @@ export default function CandidateProfile() {
           resume: null,
         })
       } else {
-        // If no data returned, clear saved profile
-        setSavedProfile(null)
+        // If no data from backend but we have cached data, keep using cached
+        if (!cachedProfile) {
+          setSavedProfile(null)
+        }
       }
     } catch (error) {
       console.error('Failed to load profile:', error)
+      // On error, try to use cached profile if available
+      const cachedProfile = localStorage.getItem('candidate_profile_data')
+      if (cachedProfile) {
+        try {
+          const parsed = JSON.parse(cachedProfile)
+          if (parsed) {
+            console.log('Profile: Using cached profile due to error')
+            setSavedProfile(parsed)
+            setFormData({
+              name: parsed.name || '',
+              email: parsed.email || '',
+              phone: parsed.phone || '',
+              location: parsed.location || '',
+              totalExperience: (parsed.experience_years || parsed.totalExperience)?.toString() || '',
+              skills: parsed.technical_skills || (Array.isArray(parsed.skills) ? parsed.skills.join(', ') : (parsed.skills || '')),
+              educationLevel: parsed.education_level || parsed.educationLevel || '',
+              expectedSalary: parsed.expectedSalary?.toString() || '',
+              resume: null,
+            })
+          }
+        } catch (e) {
+          console.warn('Failed to use cached profile:', e)
+        }
+      }
       // Don't clear savedProfile on error, keep existing data
     } finally {
       setProfileLoading(false)
@@ -154,6 +210,26 @@ export default function CandidateProfile() {
       // Check if update was successful
       if (response?.success !== false && !response?.error) {
         toast.success('Profile updated successfully!')
+        
+        // Update local state immediately
+        const updatedProfile = {
+          ...savedProfile,
+          name: formData.name,
+          phone: formData.phone,
+          location: formData.location,
+          technical_skills: formData.skills,
+          experience_years: formData.totalExperience ? parseInt(formData.totalExperience) : 0,
+          education_level: formData.educationLevel,
+          skills: formData.skills,
+          totalExperience: formData.totalExperience ? parseInt(formData.totalExperience) : 0,
+          educationLevel: formData.educationLevel,
+          resumeFileName: resumeFileName || savedProfile?.resumeFileName,
+          id: candidateId,
+        }
+        
+        // Save to localStorage immediately for persistence
+        localStorage.setItem('candidate_profile_data', JSON.stringify(updatedProfile))
+        setSavedProfile(updatedProfile)
         
         // Reload profile from backend to ensure we have the latest data
         console.log('Profile: Reloading profile from backend after update...')

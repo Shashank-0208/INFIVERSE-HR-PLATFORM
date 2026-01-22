@@ -99,6 +99,10 @@ export const candidateLogin = async (data: CandidateLoginRequest) => {
     if (response.data.success) {
       localStorage.setItem('auth_token', response.data.token || '')
       localStorage.setItem('candidate_id', response.data.candidate_id)
+      // Also store as backend_candidate_id for consistency
+      if (response.data.candidate_id) {
+        localStorage.setItem('backend_candidate_id', response.data.candidate_id.toString())
+      }
       localStorage.setItem('user_name', response.data.name || '')
       localStorage.setItem('user_email', data.email)
     }

@@ -36,12 +36,7 @@ except ImportError:
 except Exception as e:
     print(f"Configuration error: {e}")
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-try:
-    from routes.auth import router as auth_router
-except ImportError:
-    # Fallback if auth routes not available
-    from fastapi import APIRouter
-    auth_router = APIRouter()
+# Auth routes import removed - using /v1/auth/ endpoints instead
 try:
     import sys
     import os
@@ -88,8 +83,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include auth routes
-app.include_router(auth_router)
+# Auth routes removed - using /v1/auth/ endpoints instead
 
 # Include AI integration routes
 try:

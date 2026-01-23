@@ -333,21 +333,36 @@ export const applyForJob = async (jobId: string, candidateId: string, resumeUrl?
 
 export const getCandidateApplications = async (candidateId: string): Promise<Application[]> => {
   try {
-    // Backend expects integer candidate_id, not UUID
-    // If using UUID format, this will fail - return empty for now
+    console.log('Fetching applications for candidate_id:', candidateId)
     const response = await api.get(`/v1/candidate/applications/${candidateId}`)
-    return response.data.applications || response.data || []
+    console.log('Applications API response:', response.data)
+    const applications = response.data.applications || response.data || []
+    console.log('Parsed applications:', applications)
+    return applications
   } catch (error: any) {
-    // Handle 422 error (invalid candidate_id format - UUID vs integer)
+    console.error('Error fetching applications:', error)
+    // Handle 401 (authentication error)
+    if (error?.response?.status === 401) {
+      console.warn('Authentication failed when fetching applications. Token may be expired.')
+      // Optionally clear invalid token
+      localStorage.removeItem('auth_token')
+      return []
+    }
+    // Handle 403 (forbidden)
+    if (error?.response?.status === 403) {
+      console.warn('Access denied: Cannot view applications')
+      return []
+    }
+    // Handle 422 error (invalid candidate_id format)
     if (error?.response?.status === 422) {
-      console.warn('Applications: Backend expects integer candidate_id, got UUID. Returning empty.')
+      console.warn('Applications: Invalid candidate_id format.')
       return []
     }
     // Handle 404 (no applications found)
     if (error?.response?.status === 404) {
+      console.log('No applications found (404)')
       return []
     }
-    console.error('Error fetching applications:', error)
     return []
   }
 }
@@ -356,14 +371,28 @@ export const getCandidateApplications = async (candidateId: string): Promise<App
 
 export const getCandidateProfile = async (candidateId: string): Promise<CandidateProfile | null> => {
   try {
-    const response = await api.get(`/v1/candidates/${candidateId}`)
-    // Backend returns { candidate: {...} } or { error: "..." }
+    // Use the candidate portal endpoint which accepts JWT tokens
+    const response = await api.get(`/v1/candidate/profile/${candidateId}`)
+    // Backend returns candidate object directly or { error: "..." }
     if (response.data.error) {
       console.warn('Backend returned error:', response.data.error)
       return null
     }
-    return response.data.candidate || response.data
+    // The endpoint returns the candidate object directly (not wrapped in { candidate: {...} })
+    return response.data
   } catch (error: any) {
+    // Handle 401 (authentication error)
+    if (error?.response?.status === 401) {
+      console.warn('Authentication failed. Token may be expired or invalid.')
+      // Optionally clear invalid token
+      localStorage.removeItem('auth_token')
+      return null
+    }
+    // Handle 403 (forbidden - trying to access another candidate's profile)
+    if (error?.response?.status === 403) {
+      console.warn('Access denied: You can only view your own profile')
+      return null
+    }
     // Handle 422 (UUID vs integer mismatch) or 404 (not found)
     if (error?.response?.status === 422 || error?.response?.status === 404) {
       console.warn('Candidate profile not found or invalid ID format')

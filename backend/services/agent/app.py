@@ -59,9 +59,6 @@ else:
 from fastapi.openapi.utils import get_openapi
 
 # Security setup - Use JWT authentication
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
-
 try:
     from jwt_auth import (
         security,

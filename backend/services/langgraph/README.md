@@ -80,8 +80,10 @@ langgraph/
 
 ### Workflow Management
 - `POST /workflows/application/start` — Start candidate application workflow
-- `GET /workflows/{workflow_id}/status` — Get detailed workflow status
 - `POST /workflows/{workflow_id}/resume` — Resume paused workflow
+
+### Workflow Monitoring
+- `GET /workflows/{workflow_id}/status` — Get detailed workflow status
 - `GET /workflows` — List all workflows with filtering options
 - `GET /workflows/stats` — Workflow statistics and analytics
 

@@ -308,6 +308,13 @@ spec:
 - Receives job and candidate data for matching
 - Returns scored candidate lists to gateway service
 
+### With LangGraph Service
+- Provides AI matching scores to LangGraph workflows
+- Receives feedback data for continuous learning
+- Shared MongoDB database for RL data persistence
+- Cross-service coordination for candidate processing workflows
+- **Shared Components:** Both services use the same JWT authentication module and database connection patterns
+
 ### With Frontend Application
 - JWT token validation for authenticated requests
 - Provides real-time matching results to UI
@@ -317,6 +324,33 @@ spec:
 - Direct MongoDB integration for data access
 - Implements connection pooling and error handling
 - Supports ObjectId and string-based document identification
+
+## Relationship with Other Services
+
+### Shared Components with LangGraph Service
+Both services utilize several shared components and patterns:
+
+- **Authentication System:** Shared JWT authentication module with dual secret support
+- **Database Integration:** Both use MongoDB with similar connection patterns
+- **Configuration Management:** Consistent environment variable-based configuration
+- **Error Handling:** Similar fallback and graceful degradation patterns
+- **Logging Framework:** Unified logging structure and format
+
+### Ishan's LangGraph Implementation Origins
+While this agent service focuses specifically on AI-powered candidate matching, it shares architectural patterns and concepts with the LangGraph service that originated from Ishan's implementation:
+
+- **Modular Design:** Decomposition of complex functionality into specialized components
+- **State Management:** Consistent approaches to data state and persistence
+- **External Integration:** Standardized interfaces for communicating with other services
+- **Error Resilience:** Similar fallback mechanisms and graceful degradation strategies
+- **Configuration Patterns:** Shared approaches to environment-based configuration
+
+The agent service has been specifically optimized for:
+- High-performance semantic matching using sentence transformers
+- Company-specific adaptive scoring algorithms
+- Integration with the RL feedback system
+- Real-time candidate analysis capabilities
+- Scalable batch processing for large datasets
 
 ## Error Handling and Monitoring
 

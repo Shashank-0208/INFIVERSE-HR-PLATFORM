@@ -873,7 +873,7 @@ async def bulk_upload_candidates(candidates: CandidateBulk, api_key: str = Depen
 
 # AI Matching Engine (2 endpoints)
 @app.get("/v1/match/{job_id}/top", tags=["AI Matching Engine"])
-async def get_top_matches(job_id: str, limit: int = 10, api_key: str = Depends(get_api_key)):  # Changed from int to str for MongoDB ObjectId
+async def get_top_matches(job_id: str, limit: int = 10, auth = Depends(get_auth)):  # Accept JWT tokens or API keys
     """AI-powered semantic candidate matching via Agent Service"""
     if limit < 1 or limit > 50:
         raise HTTPException(status_code=400, detail="Invalid limit parameter (must be 1-50)")
@@ -1666,8 +1666,9 @@ async def client_login(login_data: ClientLogin):
                 if new_attempts >= 5:
                     locked_until = datetime.now(timezone.utc) + timedelta(minutes=30)
                 
+                # Use the actual client_id from the found client (works for both client_id and email login)
                 await db.clients.update_one(
-                    {"client_id": login_data.client_id},
+                    {"client_id": client.get("client_id")},
                     {"$set": {
                         "failed_login_attempts": new_attempts,
                         "locked_until": locked_until
@@ -1694,11 +1695,13 @@ async def client_login(login_data: ClientLogin):
         access_token = jwt.encode(token_payload, jwt_secret, algorithm="HS256")
         
         # Reset failed attempts and update last login
+        # Use the actual client_id from the found client (works for both client_id and email login)
         await db.clients.update_one(
-            {"client_id": login_data.client_id},
+            {"client_id": client.get("client_id")},
             {"$set": {
                 "failed_login_attempts": 0,
-                "locked_until": None
+                "locked_until": None,
+                "last_login": datetime.now(timezone.utc)
             }}
         )
         

@@ -195,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (result.success && result.user) {
-        // Store user data and role
+        // Store user data and role temporarily
         const role = userData.role || result.user.role || 'candidate';
         
         localStorage.setItem('user_role', role);
@@ -211,14 +211,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Set user in state
         setUser(result.user);
         
-        // Don't auto-login - just return success so AuthPage can redirect
-        return { error: null, user: result.user };
+        // IMPORTANT: Auto-login after successful registration to get auth token
+        // Registration doesn't return a token, so we need to log in to get one
+        console.log('🔐 Auto-logging in after successful registration...');
+        const loginResult = await authService.login(email, password, role);
+        
+        if (loginResult.success && loginResult.token && loginResult.user) {
+          const token = loginResult.token;
+          
+          // Validate token is not empty
+          if (!token || token.trim() === '') {
+            console.error('❌ AuthContext: Empty token received after auto-login!');
+            return { error: 'Registration successful but auto-login failed. Please log in manually.' };
+          }
+          
+          // Extract role from JWT token
+          let extractedRole = role;
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            extractedRole = payload.role || role;
+            console.log('🔐 AuthContext: Extracted role from auto-login token:', extractedRole);
+          } catch (tokenError) {
+            console.error('❌ AuthContext: Error parsing auto-login token:', tokenError);
+          }
+          
+          // Store the JWT token
+          console.log('🔐 AuthContext: Storing auth token from auto-login');
+          localStorage.setItem('auth_token', token);
+          
+          // Verify token was stored
+          const storedToken = localStorage.getItem('auth_token');
+          if (!storedToken) {
+            console.error('❌ AuthContext: CRITICAL - Failed to store token after auto-login!');
+            return { error: 'Registration successful but failed to store authentication token.' };
+          } else if (storedToken !== token) {
+            console.error('❌ AuthContext: Token stored but value mismatch after auto-login!');
+          } else {
+            console.log('✅ AuthContext: Token stored successfully after auto-login');
+          }
+          
+          // Update stored user data with token info
+          localStorage.setItem('user_data', JSON.stringify(loginResult.user));
+          localStorage.setItem('user_role', extractedRole);
+          localStorage.setItem('isAuthenticated', 'true');
+          
+          // Store role-specific IDs
+          if (extractedRole === 'client' && loginResult.user.id) {
+            localStorage.setItem('client_id', loginResult.user.id);
+          } else if ((extractedRole === 'candidate' || extractedRole === 'recruiter') && loginResult.user.id) {
+            localStorage.setItem('candidate_id', loginResult.user.id);
+            localStorage.setItem('backend_candidate_id', loginResult.user.id);
+          }
+          
+          // Update user object with role
+          const userWithRole = { ...loginResult.user, role: extractedRole };
+          setUser(userWithRole);
+          
+          // Set the auth token in axios defaults
+          const axios = (await import('axios')).default;
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          
+          console.log('✅ AuthContext: Registration and auto-login successful for role:', extractedRole);
+          return { error: null, user: userWithRole };
+        } else {
+          console.error('❌ AuthContext: Auto-login failed after registration:', loginResult.error);
+          return { error: loginResult.error || 'Registration successful but auto-login failed. Please log in manually.' };
+        }
       } else {
         return { error: result.error || 'Registration failed' };
       }
     } catch (error) {
-      console.error('Registration error:', error);
-      return { error: 'Registration failed' };
+      console.error('❌ AuthContext: Registration error:', error);
+      return { error: error instanceof Error ? error.message : 'Registration failed' };
     }
   };
 

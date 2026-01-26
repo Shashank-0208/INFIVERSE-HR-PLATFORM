@@ -175,17 +175,22 @@ def get_auth(credentials: HTTPAuthorizationCredentials = Security(security)):
         }
     
     # Try candidate JWT token first (CANDIDATE_JWT_SECRET_KEY)
+    # This includes both candidates and recruiters (recruiters use candidate login endpoint)
     if CANDIDATE_JWT_SECRET_KEY:
         logger.info(f"Attempting candidate JWT validation with secret (exists: {bool(CANDIDATE_JWT_SECRET_KEY)}, length: {len(CANDIDATE_JWT_SECRET_KEY) if CANDIDATE_JWT_SECRET_KEY else 0})")
         payload = verify_jwt_token(token, secret=CANDIDATE_JWT_SECRET_KEY)
         if payload:
             user_info = get_user_from_token(payload)
-            logger.info(f"[OK] Authentication successful: Candidate JWT token for user {user_info.get('user_id')}")
+            # Get role from token payload (supports both "candidate" and "recruiter")
+            token_role = payload.get("role", "candidate")
+            if token_role not in ["candidate", "recruiter"]:
+                token_role = "candidate"  # Default to candidate if invalid role
+            logger.info(f"[OK] Authentication successful: Candidate JWT token for user {user_info.get('user_id')} with role {token_role}")
             return {
                 "type": "jwt_token",
                 "user_id": user_info["user_id"],
                 "email": user_info["email"],
-                "role": "candidate",  # Candidate tokens always have candidate role
+                "role": token_role,  # Use role from token payload (supports recruiter)
                 "name": user_info["name"],
             }
         else:

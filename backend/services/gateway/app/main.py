@@ -1246,22 +1246,33 @@ async def get_all_feedback(candidate_id: Optional[str] = None, auth = Depends(ge
         
         feedback_records = []
         for doc in feedback_list:
+            values_scores = {
+                "integrity": doc.get("integrity", 0),
+                "honesty": doc.get("honesty", 0),
+                "discipline": doc.get("discipline", 0),
+                "hard_work": doc.get("hard_work", 0),
+                "gratitude": doc.get("gratitude", 0)
+            }
             feedback_records.append({
                 "id": doc.get("id"),
                 "candidate_id": doc.get("candidate_id"),
                 "job_id": doc.get("job_id"),
-                "values_scores": {
-                    "integrity": doc.get("integrity"),
-                    "honesty": doc.get("honesty"),
-                    "discipline": doc.get("discipline"),
-                    "hard_work": doc.get("hard_work"),
-                    "gratitude": doc.get("gratitude")
+                "values_scores": values_scores,  # Keep for backward compatibility
+                "values_assessment": {  # Frontend expects this field name
+                    "integrity": values_scores["integrity"],
+                    "honesty": values_scores["honesty"],
+                    "discipline": values_scores["discipline"],
+                    "hardWork": values_scores["hard_work"],  # Frontend uses camelCase
+                    "gratitude": values_scores["gratitude"]
                 },
                 "average_score": float(doc.get("average_score", 0)) if doc.get("average_score") else 0,
-                "comments": doc.get("comments"),
+                "comments": doc.get("comments"),  # Keep for backward compatibility
+                "feedback_text": doc.get("comments", ""),  # Frontend expects this field name
+                "rating": int(doc.get("average_score", 0)) if doc.get("average_score") else 0,  # Frontend expects rating
                 "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
                 "candidate_name": doc.get("candidate_name"),
-                "job_title": doc.get("job_title")
+                "job_title": doc.get("job_title"),
+                "interviewer_name": None  # Frontend expects this (optional)
             })
         
         return {"feedback": feedback_records, "count": len(feedback_records)}
@@ -1318,15 +1329,23 @@ async def get_interviews(candidate_id: Optional[str] = None, auth = Depends(get_
         
         interviews = []
         for doc in interviews_list:
+            interview_date = doc.get("interview_date")
+            interview_date_str = interview_date.isoformat() if interview_date else None
             interviews.append({
                 "id": doc.get("id"),
                 "candidate_id": doc.get("candidate_id"),
                 "job_id": doc.get("job_id"),
-                "interview_date": doc.get("interview_date").isoformat() if doc.get("interview_date") else None,
+                "interview_date": interview_date_str,  # Keep for backward compatibility
+                "scheduled_date": interview_date_str,  # Frontend expects this field name
+                "scheduled_time": None,  # Frontend expects this (can be extracted from date if needed)
+                "interview_type": "technical",  # Default value for frontend
                 "interviewer": doc.get("interviewer"),
-                "status": doc.get("status"),
+                "status": doc.get("status") or "scheduled",
                 "candidate_name": doc.get("candidate_name"),
-                "job_title": doc.get("job_title")
+                "job_title": doc.get("job_title"),
+                "company": None,  # Frontend expects this (can be added from job lookup if needed)
+                "meeting_link": None,  # Frontend expects this
+                "notes": None  # Frontend expects this
             })
         
         return {"interviews": interviews, "count": len(interviews)}
@@ -1449,17 +1468,22 @@ async def get_all_offers(candidate_id: Optional[str] = None, auth = Depends(get_
         
         offers = []
         for doc in offers_list:
+            start_date = doc.get("start_date")
+            start_date_str = start_date.isoformat() if start_date else None
             offers.append({
                 "id": doc.get("id"),
                 "candidate_id": doc.get("candidate_id"),
                 "job_id": doc.get("job_id"),
-                "salary": float(doc.get("salary", 0)) if doc.get("salary") else 0,
-                "start_date": doc.get("start_date").isoformat() if doc.get("start_date") else None,
+                "salary": float(doc.get("salary", 0)) if doc.get("salary") else 0,  # Keep for backward compatibility
+                "salary_offered": float(doc.get("salary", 0)) if doc.get("salary") else 0,  # Frontend expects this field name
+                "start_date": start_date_str,  # Keep for backward compatibility
+                "joining_date": start_date_str,  # Frontend expects this field name
                 "terms": doc.get("terms"),
-                "status": doc.get("status"),
+                "status": doc.get("status") or "pending",
                 "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
                 "candidate_name": doc.get("candidate_name"),
-                "job_title": doc.get("job_title")
+                "job_title": doc.get("job_title"),
+                "company": None  # Frontend expects this (can be added from job lookup if needed)
             })
         
         return {"offers": offers, "count": len(offers)}

@@ -37,44 +37,41 @@ class AuthService {
   // Login user and store JWT token - supports candidate, recruiter, and client
   async login(email: string, password: string, role?: string): Promise<AuthResponse> {
     try {
-      // Determine role from parameter or localStorage
-      let userRole = role || localStorage.getItem('user_role') || 'candidate';
+      // Get role from parameter, or from localStorage (stored during registration)
+      // This ensures we use the role the user registered with
+      const storedRole = localStorage.getItem('user_role');
+      const userRole = role || storedRole;
       
       let response;
       
-      // If role is not explicitly set, try to detect by attempting both logins
-      // This handles cases where localStorage was cleared but user knows their role
-      if (!role && !localStorage.getItem('user_role')) {
+      if (!userRole) {
+        // If no role is stored and none provided, try to detect by attempting both logins
+        // This handles edge cases where localStorage was cleared
+        console.log('🔐 No role found, attempting auto-detection...');
+        
         // Try client login first
         try {
-          response = await axios.post(`${this.API_BASE_URL}/v1/client/login`, {
+          const clientResponse = await axios.post(`${this.API_BASE_URL}/v1/client/login`, {
             email: email,
             password: password
           });
           
-          if (response.data.success && response.data.access_token) {
-            // Client login succeeded - handle it
-            const token = response.data.access_token;
-            
-            if (!token || token.trim() === '') {
-              console.error('❌ Client login response has empty token!');
-              return { success: false, error: 'Invalid token received from server' };
-            }
-            
+          if (clientResponse.data.success && clientResponse.data.access_token) {
+            const token = clientResponse.data.access_token;
             const userData = {
-              id: response.data.client_id,
+              id: clientResponse.data.client_id,
               email: email,
-              name: response.data.company_name || '',
+              name: clientResponse.data.company_name || '',
               role: 'client',
-              company: response.data.company_name
+              company: clientResponse.data.company_name
             };
             
-            console.log('🔐 Storing client auth token after auto-detected login');
+            console.log('🔐 Auto-detected: Client');
             this.setAuthToken(token);
             localStorage.setItem(this.TOKEN_KEY, token);
             localStorage.setItem('auth_token', token);
             localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
-            localStorage.setItem('client_id', response.data.client_id);
+            localStorage.setItem('client_id', clientResponse.data.client_id);
             localStorage.setItem('user_role', 'client');
             
             return {
@@ -89,7 +86,8 @@ class AuthService {
         }
       }
       
-      // Handle explicit client login or continue with candidate/recruiter login
+      // Use stored role to determine which endpoint to call
+      // Client uses /v1/client/login, candidate/recruiter use /v1/candidate/login
       if (userRole === 'client') {
         // Try client login with email (backend now supports email-based login)
         try {
@@ -273,6 +271,9 @@ class AuthService {
         }
         
         localStorage.setItem(this.USER_KEY, JSON.stringify(userWithRole));
+        
+        // Store role to ensure it persists for future logins
+        localStorage.setItem('user_role', actualRole);
         
         // Store candidate_id if available (for API calls)
         if (response.data.candidate_id) {

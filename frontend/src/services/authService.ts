@@ -95,6 +95,15 @@ class AuthService {
         this.setAuthToken(response.data.token);
         localStorage.setItem(this.USER_KEY, JSON.stringify(userWithRole));
         
+        // Store candidate_id if available (for API calls)
+        if (response.data.candidate_id) {
+          localStorage.setItem('backend_candidate_id', response.data.candidate_id.toString());
+          localStorage.setItem('candidate_id', response.data.candidate_id.toString());
+        } else if (userData.id) {
+          localStorage.setItem('backend_candidate_id', userData.id.toString());
+          localStorage.setItem('candidate_id', userData.id.toString());
+        }
+        
         return {
           success: true,
           token: response.data.token,

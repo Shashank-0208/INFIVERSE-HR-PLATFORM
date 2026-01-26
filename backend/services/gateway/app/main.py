@@ -2253,6 +2253,7 @@ async def candidate_login(login_data: CandidateLogin):
             "success": True,
             "message": "Login successful",
             "token": token,
+            "candidate_id": candidate_id_str,  # Add candidate_id at top level for frontend compatibility
             "candidate": {
                 "id": str(candidate["_id"]),
                 "name": candidate.get("name"),

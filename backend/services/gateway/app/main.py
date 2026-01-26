@@ -44,8 +44,13 @@ try:
     gateway_dir = os.path.dirname(os.path.dirname(__file__))
     sys.path.insert(0, gateway_dir)
     from monitoring import monitor, log_resume_processing, log_matching_performance, log_user_activity, log_error
-    # Import proper JWT authentication functions
-    from jwt_auth import get_auth as jwt_get_auth, get_api_key as jwt_get_api_key, validate_api_key as jwt_validate_api_key
+    # Import proper JWT authentication functions and security scheme
+    from jwt_auth import (
+        get_auth as jwt_get_auth, 
+        get_api_key as jwt_get_api_key, 
+        validate_api_key as jwt_validate_api_key,
+        security as jwt_security
+    )
 except ImportError:
     # Fallback if monitoring module is not available
     class MockMonitor:
@@ -67,13 +72,24 @@ except ImportError:
         import os
         gateway_dir = os.path.dirname(os.path.dirname(__file__))
         sys.path.insert(0, gateway_dir)
-        from jwt_auth import get_auth as jwt_get_auth, get_api_key as jwt_get_api_key, validate_api_key as jwt_validate_api_key
+        from jwt_auth import (
+            get_auth as jwt_get_auth, 
+            get_api_key as jwt_get_api_key, 
+            validate_api_key as jwt_validate_api_key,
+            security as jwt_security
+        )
     except ImportError:
         jwt_get_auth = None
         jwt_get_api_key = None
         jwt_validate_api_key = None
+        jwt_security = None
 
-security = HTTPBearer()
+# Use security scheme from jwt_auth.py (with auto_error=False) if available
+# Otherwise create a fallback with auto_error=False to allow credentials to be None
+if jwt_security is not None:
+    security = jwt_security
+else:
+    security = HTTPBearer(auto_error=False)
 
 app = FastAPI(
     title="BHIV HR Platform API Gateway",
@@ -387,7 +403,7 @@ else:
             raise HTTPException(status_code=401, detail="Invalid API key")
         return credentials.credentials
 
-    def get_auth(credentials: HTTPAuthorizationCredentials = Security(security)):
+    def get_auth(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)):
         """Dual authentication: API key or client JWT token"""
         if not credentials:
             raise HTTPException(status_code=401, detail="Authentication required")

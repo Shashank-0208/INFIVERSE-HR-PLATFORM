@@ -1253,12 +1253,23 @@ async def get_all_feedback(api_key: str = Depends(get_api_key)):
 
 
 @app.get("/v1/interviews", tags=["Assessment & Workflow"])
-async def get_interviews(api_key: str = Depends(get_api_key)):
-    """Get All Interviews"""
+async def get_interviews(candidate_id: Optional[str] = None, auth = Depends(get_auth)):
+    """Get All Interviews (supports filtering by candidate_id)"""
     try:
         db = await get_mongo_db()
         
+        # Build match filter - support candidate_id filtering
+        match_filter = {}
+        if candidate_id:
+            # If JWT auth, verify candidate_id matches authenticated user
+            if auth.get("type") == "jwt_token" and auth.get("role") == "candidate":
+                token_candidate_id = str(auth.get("user_id", ""))
+                if token_candidate_id and token_candidate_id != str(candidate_id):
+                    raise HTTPException(status_code=403, detail="You can only view your own interviews")
+            match_filter["candidate_id"] = candidate_id
+        
         pipeline = [
+            {"$match": match_filter} if match_filter else {"$match": {}},
             {"$lookup": {
                 "from": "candidates",
                 "localField": "candidate_id",
@@ -1371,12 +1382,23 @@ async def create_job_offer(offer: JobOffer, api_key: str = Depends(get_api_key))
         }
 
 @app.get("/v1/offers", tags=["Assessment & Workflow"])
-async def get_all_offers(api_key: str = Depends(get_api_key)):
-    """Get All Job Offers"""
+async def get_all_offers(candidate_id: Optional[str] = None, auth = Depends(get_auth)):
+    """Get All Job Offers (supports filtering by candidate_id)"""
     try:
         db = await get_mongo_db()
         
+        # Build match filter - support candidate_id filtering
+        match_filter = {}
+        if candidate_id:
+            # If JWT auth, verify candidate_id matches authenticated user
+            if auth.get("type") == "jwt_token" and auth.get("role") == "candidate":
+                token_candidate_id = str(auth.get("user_id", ""))
+                if token_candidate_id and token_candidate_id != str(candidate_id):
+                    raise HTTPException(status_code=403, detail="You can only view your own offers")
+            match_filter["candidate_id"] = candidate_id
+        
         pipeline = [
+            {"$match": match_filter} if match_filter else {"$match": {}},
             {"$lookup": {
                 "from": "candidates",
                 "localField": "candidate_id",
@@ -2438,6 +2460,58 @@ async def apply_for_job(application: JobApplication, auth = Depends(get_auth)):
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.get("/v1/candidate/stats/{candidate_id}", tags=["Candidate Portal"])
+async def get_candidate_stats(candidate_id: str, auth = Depends(get_auth)):
+    """Get Candidate Dashboard Statistics"""
+    try:
+        db = await get_mongo_db()
+        
+        # Verify the candidate_id matches the authenticated user (if using JWT token)
+        auth_info = auth
+        if auth_info.get("type") == "jwt_token" and auth_info.get("role") == "candidate":
+            token_candidate_id = str(auth_info.get("user_id", ""))
+            if token_candidate_id and token_candidate_id != str(candidate_id):
+                raise HTTPException(status_code=403, detail="You can only view your own stats")
+        
+        # Get applications count
+        applications_count = await db.job_applications.count_documents({"candidate_id": candidate_id})
+        
+        # Get shortlisted count
+        shortlisted_count = await db.job_applications.count_documents({
+            "candidate_id": candidate_id,
+            "status": "shortlisted"
+        })
+        
+        # Get interviews scheduled count
+        interviews_scheduled = await db.interviews.count_documents({
+            "candidate_id": candidate_id,
+            "status": "scheduled"
+        })
+        
+        # Get offers received count
+        offers_received = await db.offers.count_documents({
+            "candidate_id": candidate_id
+        })
+        
+        return {
+            "total_applications": applications_count,
+            "shortlisted": shortlisted_count,
+            "interviews_scheduled": interviews_scheduled,
+            "offers_received": offers_received,
+            "profile_views": 0  # Placeholder - can be implemented later
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "total_applications": 0,
+            "shortlisted": 0,
+            "interviews_scheduled": 0,
+            "offers_received": 0,
+            "profile_views": 0,
+            "error": str(e)
+        }
 
 @app.get("/v1/candidate/applications/{candidate_id}", tags=["Candidate Portal"])
 async def get_candidate_applications(candidate_id: str, auth = Depends(get_auth)):

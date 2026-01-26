@@ -1,18 +1,18 @@
 # 🧪 BHIV HR Platform - API Testing Guide
 
-**Comprehensive Testing Guide for 111 Endpoints**  
+**Comprehensive Testing Guide for 108 Endpoints**  
 **Version**: v4.3.0 with RL Integration  
-**Updated**: December 9, 2025  
-**Status**: ✅ All 111 endpoints operational  
-**Coverage**: 6 services (Gateway, Agent, LangGraph, 3 Portals)
+**Updated**: January 22, 2026  
+**Status**: ✅ All 108 endpoints operational  
+**Coverage**: 3 core services (Gateway, Agent, LangGraph)
 
 ---
 
 ## 📊 API Testing Overview
 
 ### **Testing Scope**
-- **Total Endpoints**: 111 (80 Gateway + 6 Agent + 25 LangGraph)
-- **Services**: 6 microservices with comprehensive API coverage
+- **Total Endpoints**: 108 (77 Gateway + 6 Agent + 25 LangGraph)
+- **Services**: 3 microservices with comprehensive API coverage
 - **Authentication**: Triple authentication system (API Key + JWT + 2FA)
 - **Testing Types**: Functional, security, performance, integration
 - **Response Time**: <100ms target for all endpoints
@@ -22,12 +22,12 @@
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   API Gateway   │────│   AI Agent      │────│   LangGraph     │
-│   80 endpoints  │    │   6 endpoints   │    │  25 endpoints   │
+│   77 endpoints  │    │   6 endpoints   │    │  25 endpoints   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          │              ┌─────────────────┐              │
-         └──────────────│   Portal APIs   │──────────────┘
-                        │   6 endpoints   │
+         └──────────────│   MongoDB Atlas │──────────────┘
+                        │ 17+ collections │
                         └─────────────────┘
 ```
 
@@ -37,17 +37,13 @@
 GATEWAY_SERVICE_URL="https://bhiv-hr-gateway-ltg0.onrender.com"
 AGENT_URL="https://bhiv-hr-agent-nhgg.onrender.com"
 LANGGRAPH_URL="https://bhiv-hr-langgraph.onrender.com"
-HR_PORTAL_URL="https://bhiv-hr-portal-u670.onrender.com"
-CLIENT_PORTAL_SERVICE_URL="https://bhiv-hr-client-portal-3iod.onrender.com"
-CANDIDATE_PORTAL_SERVICE_URL="https://bhiv-hr-candidate-portal-abe6.onrender.com"
+DATABASE_URL="mongodb+srv://<username>:<password>@<cluster>.mongodb.net/bhiv_hr"
 
 # Local Development URLs
 LOCAL_GATEWAY="http://localhost:8000"
-LOCAL_AGENT="http://localhost:8001"
-LOCAL_LANGGRAPH="http://localhost:8002"
-LOCAL_HR_PORTAL="http://localhost:8501"
-LOCAL_CLIENT_PORTAL="http://localhost:8502"
-LOCAL_CANDIDATE_PORTAL="http://localhost:8503"
+LOCAL_AGENT="http://localhost:9000"
+LOCAL_LANGGRAPH="http://localhost:9001"
+LOCAL_DATABASE="mongodb://localhost:27017/bhiv_hr"
 
 # Authentication
 API_KEY="demo_key"  # For testing

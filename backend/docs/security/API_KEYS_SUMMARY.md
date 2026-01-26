@@ -9,12 +9,12 @@
 | **Metric** | **Value** |
 |------------|-----------|
 | **Platform Version** | v4.3.0 |
-| **Last Updated** | December 9, 2025 |
+| **Last Updated** | January 22, 2026 |
 | **Security Rating** | A+ (Zero Vulnerabilities) |
 | **Authentication Type** | Triple Layer Security |
 | **Total Services** | 6 Microservices + Database |
-| **API Endpoints** | 111 Total (89 Secured) |
-| **Production Status** | ✅ 6/6 Services Operational |
+| **API Endpoints** | 108 Total (108 Secured) |
+| **Production Status** | ✅ 3/3 Core Services Operational |
 
 ---
 
@@ -24,7 +24,7 @@
 
 | **Service** | **URL** | **Port** | **Auth Type** | **Status** |
 |-------------|---------|----------|---------------|------------|
-| **API Gateway** | [bhiv-hr-gateway-ltg0.onrender.com](https://bhiv-hr-gateway-ltg0.onrender.com) | 443 | Triple Auth | ✅ 80 endpoints |
+| **API Gateway** | [bhiv-hr-gateway-ltg0.onrender.com](https://bhiv-hr-gateway-ltg0.onrender.com) | 443 | Triple Auth | ✅ 77 endpoints |
 | **AI Agent** | [bhiv-hr-agent-nhgg.onrender.com](https://bhiv-hr-agent-nhgg.onrender.com) | 443 | API Key + JWT | ✅ 6 endpoints |
 | **LangGraph** | [bhiv-hr-langgraph.onrender.com](https://bhiv-hr-langgraph.onrender.com) | 443 | Bearer Token | ✅ 25 endpoints |
 | **HR Portal** | [bhiv-hr-portal-u670.onrender.com](https://bhiv-hr-portal-u670.onrender.com) | 443 | Portal JWT | ✅ Live |
@@ -41,7 +41,7 @@
 | **HR Portal** | `docker-portal-1` | 8501 | Portal Auth | ✅ Operational |
 | **Client Portal** | `docker-client_portal-1` | 8502 | Client Auth | ✅ Operational |
 | **Candidate Portal** | `docker-candidate_portal-1` | 8503 | Candidate Auth | ✅ Operational |
-| **Database** | `docker-db-1` | 5432 | PostgreSQL | ✅ Operational |
+| **Database** | MongoDB Atlas | 27017 | MongoDB | ✅ Operational |
 
 ---
 

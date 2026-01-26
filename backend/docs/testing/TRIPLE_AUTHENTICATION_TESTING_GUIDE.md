@@ -1,10 +1,10 @@
 # 🔐 BHIV HR Platform - Triple Authentication Testing Guide
 
 **Enterprise Security Testing Framework**  
-**Updated**: December 9, 2025  
+**Updated**: January 22, 2026  
 **Status**: ✅ Production Ready  
 **Authentication Methods**: 3 (API Key, Client JWT, Candidate JWT)  
-**Services**: 6 microservices with 111 total endpoints
+**Services**: 3 microservices with 108 total endpoints
 
 ---
 
@@ -27,7 +27,7 @@
 - **Failed Attempts**: Auto-lockout after 5 failed attempts
 
 ### **Service Integration**
-- **Gateway Service**: 80 endpoints with triple auth support
+- **Gateway Service**: 77 endpoints with triple auth support
 - **AI Agent Service**: 6 endpoints with API key and JWT validation
 - **LangGraph Service**: 25 workflow endpoints with secure automation
 - **Portal Services**: 3 portals with integrated authentication systems

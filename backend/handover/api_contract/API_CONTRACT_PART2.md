@@ -4,7 +4,7 @@
 
 **Version:** 4.0.0  
 **Last Updated:** January 22, 2026  
-**Total Endpoints:** 114 (83 Gateway + 6 Agent + 25 LangGraph)  
+**Total Endpoints:** 111 (80 Gateway + 6 Agent + 25 LangGraph)  
 **Database:** MongoDB Atlas
 
 ---
@@ -1005,13 +1005,11 @@ Authorization: Bearer YOUR_API_KEY
 | /v1/candidates/job/{job_id} | GET | Candidate Mgmt | Get candidates by job | Yes |
 | /v1/candidates/{candidate_id} | GET | Candidate Mgmt | Get candidate details | Yes |
 | /v1/candidates/bulk | POST | Candidate Mgmt | Bulk upload | Yes |
-| /v1/candidate/profile/{candidate_id} | GET | Candidate Mgmt | Get candidate profile | Yes |
-| /v1/candidate/stats/{candidate_id} | GET | Analytics | Get candidate stats | Yes |
-| /v1/recruiter/stats | GET | Analytics | Get recruiter stats | Yes |
+
 | /v1/database/schema | GET | Analytics | Get schema info | Yes |
 | /v1/reports/job/{job_id}/export.csv | GET | Analytics | Export report | Yes |
 
-**Total Endpoints in Part 2:** 21 (Cumulative: 38 of 111)
+**Total Endpoints in Part 2:** 18 (Cumulative: 35 of 111)
 
 ---
 

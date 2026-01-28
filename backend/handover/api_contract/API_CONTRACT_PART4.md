@@ -4,7 +4,7 @@
 
 **Version:** 4.0.0  
 **Last Updated:** January 22, 2026  
-**Total Endpoints:** 114 (83 Gateway + 6 Agent + 25 LangGraph)  
+**Total Endpoints:** 111 (80 Gateway + 6 Agent + 25 LangGraph)  
 **Database:** MongoDB Atlas
 
 ---
@@ -484,7 +484,7 @@ Authorization: Bearer CANDIDATE_JWT_TOKEN
 | /v1/candidate/apply | POST | Candidate | Apply for job | Yes |
 | /v1/candidate/applications/{id} | GET | Candidate | Get applications | Yes |
 
-**Total Endpoints in Part 4:** 35 (Cumulative: 83 of 111)
+**Total Endpoints in Part 4:** 35 (Cumulative: 80 of 111)
 
 ---
 

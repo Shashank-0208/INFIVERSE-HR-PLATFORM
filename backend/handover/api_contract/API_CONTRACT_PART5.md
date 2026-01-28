@@ -4,7 +4,7 @@
 
 **Version:** 4.0.0  
 **Last Updated:** January 22, 2026  
-**Total Endpoints:** 114 (83 Gateway + 6 Agent + 25 LangGraph)  
+**Total Endpoints:** 111 (80 Gateway + 6 Agent + 25 LangGraph)  
 **Database:** MongoDB Atlas
 
 ---
@@ -748,22 +748,22 @@ Authorization: Bearer YOUR_API_KEY
 | RL + Feedback Agent | 8 (predict, feedback, analytics) - 100% operational | Yes |
 | System Diagnostics | 1 (test-integration) | Yes |
 
-**Total Endpoints in Part 5:** 31 (Cumulative: 114 of 114)
+**Total Endpoints in Part 5:** 31 (Cumulative: 111 of 111)
 
 ---
 
 ## 🎉 Complete API Documentation
 
-**Total Endpoints Documented:** 114 of 114 (100%)
+**Total Endpoints Documented:** 111 of 111 (100%)
 
 ### Service Breakdown
-- **Gateway API:** 83 endpoints
+- **Gateway API:** 80 endpoints
 - **AI Agent API:** 6 endpoints
 - **LangGraph API:** 25 endpoints (17 workflow + 8 RL)
 
 ### Documentation Parts
 - ✅ Part 1: Core Services (17 endpoints)
-- ✅ Part 2: Gateway Core Features (21 endpoints)
+- ✅ Part 2: Gateway Core Features (18 endpoints)
 - ✅ Part 3: Gateway Advanced Features (10 endpoints)
 - ✅ Part 4: Gateway Security & Portals (35 endpoints)
 - ✅ Part 5: AI Agent & LangGraph Services (31 endpoints)

@@ -10,16 +10,19 @@
 
 ## Table of Contents
 
-### Part 1: Core Services (1-17 of 111)
+### Part 1: Core Services (1-18 of 111)
 1. [Authentication & Standards](#authentication--standards)
 2. [Gateway API - Monitoring (3 endpoints)](#gateway-monitoring)
 3. [Gateway API - Core API (5 endpoints)](#gateway-core-api) 
 4. [Gateway API - AI Integration (2 endpoints)](#gateway-ai-integration)
 
-### Part 2: Gateway Core Features (18-35 of 111)
+### Part 2: Gateway Core Features (19-35 of 111)
 - Job Management (2 endpoints)
 - Candidate Management (6 endpoints)
 - Analytics & Statistics (2 endpoints)
+- Candidate Portal (2 endpoints)
+- RL + Feedback Agent (4 endpoints)
+- Recruiter Portal (1 endpoint)
 
 ### Part 3: Gateway Advanced Features (36-45 of 111)
 - AI Matching Engine (2 endpoints)
@@ -931,6 +934,55 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
+### 18. POST /api/v1/webhooks/interview-scheduled
+
+**Purpose:** Webhook for when interview is scheduled
+
+**Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/app/main.py` → `interview_scheduled_webhook()`
+
+**Timeout:** 30s
+
+**Request:**
+```http
+POST /api/v1/webhooks/interview-scheduled
+Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
+
+{
+  "candidate_id": 123,
+  "job_id": 45,
+  "interview_id": 789,
+  "scheduled_time": "2026-01-25T14:00:00Z",
+  "interview_type": "technical",
+  "interviewer": "tech_lead_001",
+  "meeting_link": "https://meet.google.com/abc-defg-hij"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "status": "success",
+  "webhook_processed": true,
+  "notifications_sent": ["email", "whatsapp"],
+  "calendar_event_created": true,
+  "reminders_set": true,
+  "processed_at": "2026-01-22T13:37:00Z"
+}
+```
+
+**Error Responses:**
+- 400 Bad Request: Invalid payload
+- 404 Not Found: Candidate, job, or interview not found
+
+**When Called:** Interview coordinator schedules interview
+
+**Database Impact:** Create calendar events and send notifications
+
+---
+
 ## Summary Table - Part 1
 
 | Endpoint | Method | Category | Purpose | Auth Required | Timeout |
@@ -952,8 +1004,9 @@ Authorization: Bearer YOUR_API_KEY
 | /api/v1/workflow/health | GET | LangGraph | Check service health | Yes | 10s |
 | /api/v1/webhooks/candidate-applied | POST | LangGraph | Application webhook | Yes | 30s |
 | /api/v1/webhooks/candidate-shortlisted | POST | LangGraph | Shortlist webhook | Yes | 30s |
+| /api/v1/webhooks/interview-scheduled | POST | LangGraph | Interview scheduled webhook | Yes | 30s |
 
-**Total Endpoints in Part 1:** 17 (1-17 of 111)
+**Total Endpoints in Part 1:** 18 (1-18 of 111)
 
 ---
 

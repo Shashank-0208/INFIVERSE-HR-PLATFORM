@@ -1,4 +1,4 @@
-# API Contract — Part 3: Gateway Advanced Features (36-45 of 111)
+# API Contract — Part 3: Gateway Advanced Features (41-50 of 111)
 
 **Continued from:** [API_CONTRACT_PART2.md](./API_CONTRACT_PART2.md)
 

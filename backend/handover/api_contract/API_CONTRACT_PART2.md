@@ -1,4 +1,4 @@
-# API Contract — Part 2: Gateway Core Features (18-35 of 111)
+# API Contract — Part 2: Gateway Core Features (19-35 of 111)
 
 **Continued from:** [API_CONTRACT_PART1.md](./API_CONTRACT_PART1.md)
 
@@ -12,7 +12,7 @@
 
 ## Gateway Job Management
 
-### 18. GET /v1/jobs
+### 19. GET /v1/jobs
 
 **Purpose:** List all active job postings
 
@@ -66,7 +66,7 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
-### 19. POST /v1/jobs
+### 20. POST /v1/jobs
 
 **Purpose:** Create new job posting
 
@@ -120,7 +120,7 @@ Authorization: Bearer YOUR_API_KEY
 
 ## Gateway Candidate Management
 
-### 20. GET /v1/candidates
+### 21. GET /v1/candidates
 
 **Purpose:** Get all candidates with pagination
 
@@ -169,7 +169,7 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
-### 21. POST /v1/candidates/bulk
+### 22. POST /v1/candidates/bulk
 
 **Purpose:** Bulk upload multiple candidates
 
@@ -243,7 +243,7 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
-### 22. GET /v1/candidates/{candidate_id}
+### 23. GET /v1/candidates/{candidate_id}
 
 **Purpose:** Get specific candidate by ID with full details
 
@@ -289,7 +289,7 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
-### 23. GET /v1/candidates/search
+### 24. GET /v1/candidates/search
 
 **Purpose:** Search and filter candidates by criteria
 
@@ -346,7 +346,7 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
-### 24. GET /v1/candidates/job/{job_id}
+### 25. GET /v1/candidates/job/{job_id}
 
 **Purpose:** Get candidates for specific job (dynamic matching)
 
@@ -389,7 +389,7 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
-### 25. GET /v1/candidates/stats
+### 26. GET /v1/candidates/stats
 
 **Purpose:** Get dynamic candidate statistics for dashboard
 
@@ -431,7 +431,7 @@ Authorization: Bearer YOUR_API_KEY
 
 ## Gateway Analytics & Statistics
 
-### 26. GET /v1/database/schema
+### 27. GET /v1/database/schema
 
 **Purpose:** Get database schema information and version
 
@@ -502,7 +502,7 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
-### 27. GET /v1/reports/job/{job_id}/export.csv
+### 28. GET /v1/reports/job/{job_id}/export.csv
 
 **Purpose:** Export job report as CSV
 
@@ -539,6 +539,328 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
+### 29. GET /v1/candidate/profile/{candidate_id}
+
+**Purpose:** Get candidate profile information
+
+**Authentication:** JWT token required
+
+**Implementation:** `services/gateway/app/main.py` → `get_candidate_profile()`
+
+**Timeout:** 10s
+
+**Request:**
+```http
+GET /v1/candidate/profile/123
+Authorization: Bearer CANDIDATE_JWT_TOKEN
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": 123,
+  "name": "John Doe",
+  "email": "john.doe@example.com",
+  "phone": "+1234567890",
+  "location": "San Francisco, CA",
+  "experience_years": 5,
+  "technical_skills": ["Python", "FastAPI", "MongoDB"],
+  "education_level": "Bachelor",
+  "seniority_level": "Senior",
+  "status": "active",
+  "created_at": "2026-01-22T13:37:00Z",
+  "updated_at": "2026-01-22T13:37:00Z"
+}
+```
+
+**Error Responses:**
+- 404 Not Found: Candidate not found
+- 401 Unauthorized: Invalid JWT token
+
+**When Called:** Candidate accesses their profile in portal
+
+**Database Impact:** Query candidates collection
+
+---
+
+### 30. GET /v1/candidate/stats/{candidate_id}
+
+**Purpose:** Get candidate-specific statistics
+
+**Authentication:** JWT token required
+
+**Implementation:** `services/gateway/app/main.py` → `get_candidate_stats()`
+
+**Timeout:** 15s
+
+**Request:**
+```http
+GET /v1/candidate/stats/123
+Authorization: Bearer CANDIDATE_JWT_TOKEN
+```
+
+**Response (200 OK):**
+```json
+{
+  "candidate_id": 123,
+  "applications_submitted": 5,
+  "interviews_scheduled": 2,
+  "offers_received": 1,
+  "applications_by_status": {
+    "applied": 2,
+    "screening": 1,
+    "interview": 1,
+    "offered": 1,
+    "rejected": 0
+  },
+  "engagement_score": 85,
+  "last_activity": "2026-01-22T13:37:00Z",
+  "recommended_jobs": [45, 67, 89]
+}
+```
+
+**Error Responses:**
+- 404 Not Found: Candidate not found
+- 401 Unauthorized: Invalid JWT token
+
+**When Called:** Candidate views their application statistics
+
+**Database Impact:** Query candidates and job_applications collections with aggregations
+
+---
+
+### 31. POST /api/v1/rl/predict
+
+**Purpose:** Make Reinforcement Learning-based prediction for candidate-job matching
+
+**Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/routes/rl_routes.py` → `rl_predict_match()`
+
+**Timeout:** 60s
+
+**Request:**
+```http
+POST /api/v1/rl/predict
+Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
+
+{
+  "candidate_id": 123,
+  "job_id": 45,
+  "candidate_features": {
+    "experience_years": 5,
+    "technical_skills": ["Python", "FastAPI", "MongoDB"],
+    "education_level": "Bachelor"
+  },
+  "job_features": {
+    "required_experience": 3,
+    "required_skills": ["Python", "FastAPI"]
+  }
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "prediction_id": "pred_12345",
+  "candidate_id": 123,
+  "job_id": 45,
+  "rl_score": 0.87,
+  "confidence": 0.92,
+  "decision": "recommend",
+  "feature_importance": {
+    "technical_skills": 0.65,
+    "experience_match": 0.25,
+    "education_match": 0.10
+  },
+  "generated_at": "2026-01-22T13:37:00Z"
+}
+```
+
+**Error Responses:**
+- 400 Bad Request: Invalid input data
+- 404 Not Found: Candidate or job not found
+- 401 Unauthorized: Invalid API key
+
+**When Called:** AI matching engine requests RL-enhanced predictions
+
+**Database Impact:** Query RL model and store prediction results
+
+---
+
+### 32. POST /api/v1/rl/feedback
+
+**Purpose:** Submit feedback for Reinforcement Learning model improvement
+
+**Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/routes/rl_routes.py` → `submit_rl_feedback()`
+
+**Timeout:** 30s
+
+**Request:**
+```http
+POST /api/v1/rl/feedback
+Content-Type: application/json
+Authorization: Bearer YOUR_API_KEY
+
+{
+  "prediction_id": "pred_12345",
+  "actual_outcome": "hired",
+  "feedback_score": 0.9,
+  "feedback_notes": "Excellent candidate fit, performed well in role"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "feedback_id": "fb_67890",
+  "prediction_id": "pred_12345",
+  "status": "recorded",
+  "reward_signal": 0.85,
+  "processed_at": "2026-01-22T13:37:00Z"
+}
+```
+
+**Error Responses:**
+- 400 Bad Request: Invalid feedback data
+- 404 Not Found: Prediction not found
+- 401 Unauthorized: Invalid API key
+
+**When Called:** HR provides outcome feedback for RL model training
+
+**Database Impact:** Store feedback data for model retraining
+
+---
+
+### 33. GET /api/v1/rl/analytics
+
+**Purpose:** Get Reinforcement Learning system analytics and performance metrics
+
+**Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/routes/rl_routes.py` → `get_rl_analytics()`
+
+**Timeout:** 20s
+
+**Request:**
+```http
+GET /api/v1/rl/analytics
+Authorization: Bearer YOUR_API_KEY
+```
+
+**Response (200 OK):**
+```json
+{
+  "total_predictions": 1250,
+  "total_feedback": 890,
+  "average_accuracy": 0.87,
+  "model_performance": {
+    "precision": 0.85,
+    "recall": 0.82,
+    "f1_score": 0.83
+  },
+  "feedback_rate": 0.71,
+  "active_models": ["v1.0.0"],
+  "last_training": "2026-01-20T10:00:00Z",
+  "generated_at": "2026-01-22T13:37:00Z"
+}
+```
+
+**Error Responses:**
+- 401 Unauthorized: Invalid API key
+
+**When Called:** Dashboard analytics and system monitoring
+
+**Database Impact:** Aggregate RL system metrics
+
+---
+
+### 34. GET /api/v1/rl/performance
+
+**Purpose:** Get Reinforcement Learning system performance details
+
+**Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/routes/rl_routes.py` → `get_rl_performance()`
+
+**Timeout:** 20s
+
+**Request:**
+```http
+GET /api/v1/rl/performance
+Authorization: Bearer YOUR_API_KEY
+```
+
+**Response (200 OK):**
+```json
+{
+  "current_metrics": {
+    "total_predictions": 1250,
+    "accuracy": 0.87,
+    "model_version": "v1.0.0",
+    "feedback_rate": 0.71,
+    "active_learning_cycles": 5,
+    "improvement_since_deploy": 0.12
+  },
+  "monitoring_status": "active",
+  "last_updated": "2026-01-22T13:37:00Z"
+}
+```
+
+**Error Responses:**
+- 401 Unauthorized: Invalid API key
+
+**When Called:** Performance monitoring and model evaluation
+
+**Database Impact:** Query RL performance metrics
+
+---
+
+### 35. GET /v1/recruiter/stats
+
+**Purpose:** Get recruiter-specific statistics and analytics
+
+**Authentication:** JWT token required
+
+**Implementation:** `services/gateway/app/main.py` → `get_recruiter_stats()`
+
+**Timeout:** 20s
+
+**Request:**
+```http
+GET /v1/recruiter/stats
+Authorization: Bearer RECRUITER_JWT_TOKEN
+```
+
+**Response (200 OK):**
+```json
+{
+  "recruiter_id": 123,
+  "active_candidates": 45,
+  "active_jobs": 12,
+  "applications_reviewed": 128,
+  "interviews_scheduled": 23,
+  "offers_made": 8,
+  "hires_completed": 5,
+  "conversion_rate": 0.18,
+  "avg_time_to_hire": 28,
+  "recruiter_performance_score": 92,
+  "last_activity": "2026-01-22T13:37:00Z"
+}
+```
+
+**Error Responses:**
+- 401 Unauthorized: Invalid JWT token
+
+**When Called:** Recruiter accesses their dashboard statistics
+
+**Database Impact:** Query recruiters, candidates, job_applications, interviews, and offers collections with aggregations
+
+---
+
 ## Summary Table - Part 2
 
 | Endpoint | Method | Category | Purpose | Auth Required | Timeout |
@@ -553,8 +875,15 @@ Authorization: Bearer YOUR_API_KEY
 | /v1/candidates/stats | GET | Analytics | Get statistics | Yes | 20s |
 | /v1/database/schema | GET | Analytics | Get schema info | Yes | 15s |
 | /v1/reports/job/{job_id}/export.csv | GET | Analytics | Export report | Yes | 30s |
+| /v1/candidate/profile/{candidate_id} | GET | Candidate Portal | Get candidate profile | Yes | 10s |
+| /v1/candidate/stats/{candidate_id} | GET | Candidate Portal | Get candidate stats | Yes | 15s |
+| /api/v1/rl/predict | POST | RL + Feedback Agent | RL predict match | Yes | 60s |
+| /api/v1/rl/feedback | POST | RL + Feedback Agent | Submit RL feedback | Yes | 30s |
+| /api/v1/rl/analytics | GET | RL + Feedback Agent | Get RL analytics | Yes | 20s |
+| /api/v1/rl/performance | GET | RL + Feedback Agent | Get RL performance | Yes | 20s |
+| /v1/recruiter/stats | GET | Recruiter Portal | Get recruiter stats | Yes | 20s |
 
-**Total Endpoints in Part 2:** 18 (18-35 of 111)
+**Total Endpoints in Part 2:** 17 (19-35 of 111)
 
 ---
 

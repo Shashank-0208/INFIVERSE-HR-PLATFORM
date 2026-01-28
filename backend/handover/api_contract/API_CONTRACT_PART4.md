@@ -1,4 +1,4 @@
-# API Contract — Part 4: Gateway Security & Portals (46-80 of 111)
+# API Contract — Part 4: Gateway Security & Portals (51-85 of 111)
 
 **Continued from:** [API_CONTRACT_PART3.md](./API_CONTRACT_PART3.md)
 

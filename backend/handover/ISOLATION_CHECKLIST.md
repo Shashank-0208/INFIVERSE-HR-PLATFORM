@@ -15,7 +15,7 @@ This document outlines the comprehensive checklist for verifying tenant isolatio
 ### 2. Cross-Tenant Access Prevention
 - [ ] Cross-tenant access validation prevents unauthorized data access
 - [ ] Tenant isolation checks are performed at the database level
-- [ ] SQL query filters are automatically generated based on tenant ID
+- [ ] MongoDB query filters are automatically generated based on tenant ID
 - [ ] Shared resources are properly identified and accessed according to tenant permissions
 - [ ] Tenant-aware tables are isolated per tenant (jobs, applications, interviews, offers)
 - [ ] Shared data (candidates) is accessed with proper tenant context

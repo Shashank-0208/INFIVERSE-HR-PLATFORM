@@ -520,7 +520,8 @@ backend/
 │   ├── HOW_TO_TEST.md            # Testing guide
 │   ├── ISOLATION_CHECKLIST.md    # Isolation checklist
 │   ├── KNOWN_GAPS.md             # Known gaps
-│   ├── POSTMAN_README.md         # Postman documentation
+│   └── postman/                 # Postman collection and documentation
+│       ├── POSTMAN_README.md    # Postman documentation
 │   ├── QA_CHECKLIST.md           # QA checklist
 │   ├── READ_THIS_FIRST.md        # Initial handover instructions
 │   ├── ROLE_MATRIX.md            # Role matrix

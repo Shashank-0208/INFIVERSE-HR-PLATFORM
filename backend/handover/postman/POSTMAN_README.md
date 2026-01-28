@@ -1,7 +1,7 @@
 # BHIV HR Platform - Postman Testing Suite
 
 ## Overview
-Complete Postman collection with all **119 endpoints** organized by service with enhanced testing capabilities.
+Complete Postman collection with all **111 endpoints** organized by service with enhanced testing capabilities.
 
 **Files**:
 - `postman/postman_collection.json` - Complete endpoint collection
@@ -61,7 +61,7 @@ Complete Postman collection with all **119 endpoints** organized by service with
 3. **Select "Upload Files"** tab
 4. **Choose file** → Navigate to `handover/postman/postman_collection.json`
 5. **Click Import** → Collection appears in left sidebar
-6. **Verify**: You should see "BHIV HR Platform - Complete API Collection (119 Endpoints)" in Collections
+6. **Verify**: You should see "BHIV HR Platform - Complete API Collection (111 Endpoints)" in Collections
 
 ### Step 3A: Environment Setup - Manual Variables (Recommended)
 1. **Click Environments** (left sidebar, gear icon)
@@ -213,7 +213,7 @@ curl http://localhost:9001/health  # LangGraph
 3. Select `postman/postman_collection.json`
 4. Import `postman/bhiv-local-env.json` as environment
 5. Collection will appear in sidebar with organized folders
-6. All 119 endpoints will be ready to use with authentication
+6. All 111 endpoints will be ready to use with authentication
 
 ## Environment Variables
 
@@ -508,7 +508,7 @@ Gateway: 17 folders
 Agent: 2 folders
 LangGraph: 5 folders
 
-# Count endpoints (should be 119)
+# Count endpoints (should be 111)
 Gateway: 88 endpoints
 Agent: 6 endpoints
 LangGraph: 25 endpoints
@@ -520,7 +520,7 @@ LangGraph: 25 endpoints
 - **Issues**: Create GitHub issue with `[API]` tag
 
 ## Version History
-- **v4.3.1** (2024-12-22): Enhanced testing suite, 119 endpoints, complete environment setup
+- **v4.3.1** (2024-12-22): Enhanced testing suite, 111 endpoints, complete environment setup
 - **v4.0.0** (2024-12-18): RL integration complete, advanced test scripts
 - **v3.0.0** (2024-12-15): LangGraph workflows, multi-channel notifications
 - **v2.0.0** (2024-11-15): LangGraph workflows added

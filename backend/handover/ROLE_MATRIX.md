@@ -1,7 +1,9 @@
 # ROLE_MATRIX.md
 **BHIV HR Platform - Role-Based Access Control Matrix**  
 **Version**: 4.3.1  
-**Generated**: December 22, 2025  
+**Updated**: January 22, 2026  
+**Database**: MongoDB Atlas (migrated from PostgreSQL)  
+**Architecture**: Microservices with 111 endpoints (80 Gateway + 6 Agent + 25 LangGraph)  
 **Status**: Production Ready - Zero Dependency Handover  
 
 ---
@@ -511,25 +513,35 @@ def validate_query_results(auth, results, resource_type):
 
 ---
 
-## 🎯 **ROLE HANDOVER REQUIREMENTS**
+## 🎯 **TEAM ROLES & RESPONSIBILITIES**
 
-### **For Ishan Shirode (Backend)**
-- **MUST** implement internal user authentication system
-- **MUST** add cross-tenant validation to all endpoints
-- **MUST** implement role-based permission checking
-- **MUST** add resource ownership validation
+### **Ishan Shirode (Lead Backend Engineer)**
+- **Architecture & Infrastructure**: Lead system architecture, database migration, microservice deployment
+- **API Gateway**: Manage Gateway service (80 endpoints) - core APIs, job management, candidate workflows
+- **Security Implementation**: Cross-tenant validation, RBAC, authentication system improvements
+- **AI Integration**: Maintain Agent service (6 endpoints) and LangGraph integration (25 endpoints)
+- **Database Operations**: MongoDB Atlas administration, performance optimization, data migration
+- **Key Files**: `services/gateway/app/main.py`, `services/agent/app.py`, `services/langgraph/app/main.py`
 
-### **For Nikhil (Frontend)**
-- **MUST** implement role-based UI rendering
-- **MUST** handle different authentication types
-- **MUST** respect role permissions in navigation
-- **MUST** implement proper token management
+### **Nikhil (Frontend Engineer)**
+- **UI/UX Implementation**: Client Portal (Streamlit), Candidate Portal, responsive interfaces
+- **Authentication Integration**: JWT token handling, role-based UI rendering, session management
+- **API Integration**: Frontend-backend communication, error handling, loading states
+- **User Experience**: Portal workflows, form validation, accessibility compliance
+- **Key Files**: Frontend components, portal services, authentication modules
 
-### **For Vinayak (Testing)**
-- **MUST** test all role combinations
-- **MUST** verify cross-tenant access prevention
-- **MUST** test privilege escalation scenarios
-- **MUST** validate authentication edge cases
+### **Vinayak (QA & Testing Lead)**
+- **Test Automation**: Comprehensive test suite for all 111 endpoints, integration testing
+- **Security Testing**: Authentication validation, cross-tenant access prevention, penetration testing
+- **Performance Testing**: Load testing, response time validation, stress testing
+- **Documentation**: Test cases, bug reports, validation procedures
+- **Key Files**: `test_all_endpoints.py`, `handover/postman/`, test automation scripts
+
+### **Cross-Team Collaboration**
+- **Weekly Sync**: Monday 10:00 AM - Architecture review and progress updates
+- **Code Reviews**: All pull requests require approval from at least one other team member
+- **Incident Response**: Shared responsibility for system stability and issue resolution
+- **Documentation**: Maintain synchronized documentation in `handover/` directory
 
 ---
 

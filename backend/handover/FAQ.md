@@ -583,7 +583,7 @@ taskkill /IM uvicorn.exe /F
 netstat -ano | findstr :8000
 taskkill /PID <PID> /F
 
-# Port 5432 (PostgreSQL)
+# Port 27017 (MongoDB Atlas)
 netstat -ano | findstr :5432
 taskkill /PID <PID> /F
 
@@ -615,7 +615,7 @@ AGENT_PORT=9090    # Instead of 9000
 
 ---
 
-### Q47: PostgreSQL connection string issues?
+### Q47: MongoDB Atlas connection string issues?
 
 **Answer**: Troubleshooting DATABASE_URL format:
 
@@ -1153,7 +1153,7 @@ curl http://localhost:8000/metrics/dashboard
 
 ### Q9: How do I connect to the database?
 
-**Answer**: Multiple methods to connect to PostgreSQL database:
+**Answer**: Multiple methods to connect to MongoDB Atlas:
 
 #### **Method 1: Docker Exec (Recommended for Local)**
 ```bash
@@ -1161,7 +1161,7 @@ curl http://localhost:8000/metrics/dashboard
 docker-compose -f docker-compose.production.yml exec db \
   psql -U bhiv_user -d bhiv_hr
 
-# You'll see PostgreSQL prompt:
+# You'll see MongoDB shell prompt:
 # bhiv_hr=#
 
 # Run queries
@@ -1426,7 +1426,7 @@ docker-compose -f docker-compose.production.yml exec db \
 # Extract specific table from backup
 pg_restore -U bhiv_user -d bhiv_hr -t candidates backup.dump
 
-# Or using SQL backup
+# Or using MongoDB backup
 grep -A 1000 "CREATE TABLE candidates" backup.sql | \
   docker-compose -f docker-compose.production.yml exec -T db \
   psql -U bhiv_user bhiv_hr
@@ -1831,7 +1831,7 @@ docker-compose -f docker-compose.production.yml exec db \
     'Engineering',
     'San Francisco',
     'mid',
-    'Python, FastAPI, PostgreSQL',
+    'Python, FastAPI, MongoDB',
     'Build amazing products',
     'TECH001'
   )
@@ -2516,7 +2516,7 @@ Technology Stack:
   - Sentence Transformers: all-MiniLM-L6-v2 model
   - scikit-learn: ML predictions
   - NumPy/Pandas: Data processing
-  - PostgreSQL: Data storage and caching
+  - MongoDB Atlas: Data storage and caching
 ```
 
 #### **Matching Algorithm**:
@@ -2585,7 +2585,7 @@ Primary: Phase 3 Semantic Engine
 
 Fallback: Database Matching
   - Activated if Agent service unavailable
-  - Uses PostgreSQL full-text search
+  - Uses MongoDB Atlas text search
   - Simpler keyword matching
   - Still provides ai_rank
 
@@ -2856,7 +2856,7 @@ python tools/security/security_audit_checker.py
 # - Rate limiting verification
 # - HTTPS enforcement
 # - CSP headers check
-# - SQL injection vulnerabilities
+# - MongoDB injection vulnerabilities
 # - XSS protection status
 
 # Generates report with:
@@ -2951,7 +2951,7 @@ docker-compose -f docker-compose.production.yml exec db \
 curl http://localhost:8000/v1/security/penetration-test-endpoints
 
 # Tests:
-# - SQL injection attempts
+# - MongoDB injection attempts
 # - XSS attacks
 # - CSRF protection
 # - Authentication bypass

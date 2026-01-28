@@ -1,7 +1,9 @@
 # TENANT_ASSUMPTIONS.md
 **BHIV HR Platform - Tenant Architecture & Assumptions**  
 **Version**: 4.3.1  
-**Generated**: December 22, 2025  
+**Updated**: January 22, 2026  
+**Database**: MongoDB Atlas (migrated from PostgreSQL)  
+**Architecture**: Microservices with 111 endpoints  
 **Status**: Multi-Tenant Ready - Zero Dependency Handover  
 
 ---
@@ -254,11 +256,19 @@ CANDIDATE_JWT_SECRET_KEY=<candidate_jwt_secret>
 ```
 
 ### **Database Configuration**
-```sql
--- No tenant-specific database settings
--- All tenants use same connection pool
--- No per-tenant resource limits
+```yaml
+# MongoDB Atlas configuration
+# Tenant context included in all documents
+# Shared connection pool with automatic scaling
+# Per-tenant read/write optimization via Atlas
+# Collection-level security policies
 ```
+
+### **MongoDB Atlas Integration**
+- **Shared Cluster**: All tenants use same Atlas cluster
+- **Tenant Context**: `client_id` field in relevant documents
+- **Query Optimization**: Tenant-aware indexing and aggregation
+- **Performance**: Atlas handles connection pooling and optimization
 
 ### **Service Configuration**
 ```yaml
@@ -272,16 +282,19 @@ CANDIDATE_JWT_SECRET_KEY=<candidate_jwt_secret>
 ## 📊 **TENANT DATA PATTERNS**
 
 ### **Current Tenant Usage**
-```sql
--- Tenant job distribution
-SELECT client_id, COUNT(*) as job_count 
-FROM jobs 
-GROUP BY client_id;
+```javascript
+// Tenant job distribution in MongoDB
+db.jobs.aggregate([
+  { $group: { _id: "$client_id", job_count: { $sum: 1 } } }
+])
 
--- Expected results:
--- TECH001: 2-3 jobs
--- STARTUP01: 1-2 jobs  
--- ENTERPRISE01: 1-2 jobs
+// Expected results:
+// TECH001: 2-3 jobs
+// STARTUP01: 1-2 jobs  
+// ENTERPRISE01: 1-2 jobs
+
+// MongoDB Atlas metrics via dashboard
+// Real-time monitoring of tenant resource usage
 ```
 
 ### **Tenant Relationship Mapping**

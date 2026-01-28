@@ -137,7 +137,7 @@ handover/
 2. Import: handover/postman_collection.json
 3. Set environment variable: api_key_secret = YOUR_API_KEY
 4. Test any of 111 endpoints
-5. See POSTMAN_README.md for detailed guide
+5. See postman/POSTMAN_README.md for detailed guide
 ```
 
 ### 2. Create Candidate via API

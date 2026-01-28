@@ -1,4 +1,4 @@
-# API Contract — Part 5: AI Agent & LangGraph Services
+# API Contract — Part 5: AI Agent & LangGraph Services (81-111 of 111)
 
 **Continued from:** [API_CONTRACT_PART4.md](./API_CONTRACT_PART4.md)
 
@@ -73,7 +73,7 @@ GET /health
   "status": "healthy",
   "service": "BHIV AI Agent",
   "version": "3.0.0",
-  "timestamp": "2024-12-09T13:37:00Z"
+  "timestamp": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -88,6 +88,10 @@ GET /health
 **Purpose:** Test database connectivity
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/agent/app.py` → `test_database()`
+
+**Timeout:** 10s
 
 **Request:**
 ```http
@@ -113,7 +117,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** System diagnostics
 
-**Implemented In:** `services/agent/app.py` → `test_database()`
+**Database Impact:** COUNT from candidates collection
 
 ---
 
@@ -122,6 +126,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** AI-powered candidate matching using Phase 3 semantic engine
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/agent/app.py` → `match_candidates()`
+
+**Timeout:** 60s
 
 **Request:**
 ```http
@@ -171,9 +179,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Gateway requests AI matching
 
-**Implemented In:** `services/agent/app.py` → `match_candidates()`
-
-**Database Impact:** SELECT from jobs, candidates tables
+**Database Impact:** SELECT from jobs, candidates collections
 
 ---
 
@@ -182,6 +188,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Batch AI matching for multiple jobs
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/agent/app.py` → `batch_match_jobs()`
+
+**Timeout:** 120s
 
 **Request:**
 ```http
@@ -231,9 +241,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Gateway requests batch matching
 
-**Implemented In:** `services/agent/app.py` → `batch_match_jobs()`
-
-**Database Impact:** SELECT from jobs, candidates tables
+**Database Impact:** SELECT from jobs, candidates collections
 
 ---
 
@@ -242,6 +250,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Detailed candidate analysis with skill categorization
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/agent/app.py` → `analyze_candidate()`
+
+**Timeout:** 60s
 
 **Request:**
 ```http
@@ -277,9 +289,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** HR requests detailed candidate analysis
 
-**Implemented In:** `services/agent/app.py` → `analyze_candidate()`
-
-**Database Impact:** SELECT from candidates table
+**Database Impact:** SELECT from candidates collection
 
 ---
 
@@ -294,6 +304,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** LangGraph service information
 
 **Authentication:** None (public endpoint)
+
+**Implementation:** `services/langgraph/app/main.py` → `read_root()`
+
+**Timeout:** 2s
 
 **Request:**
 ```http
@@ -315,7 +329,7 @@ GET /
 
 **When Called:** Service discovery
 
-**Implemented In:** `services/langgraph/app/main.py` → `read_root()`
+**Database Impact:** None (static response)
 
 ---
 
@@ -324,6 +338,10 @@ GET /
 **Purpose:** Health check for LangGraph service
 
 **Authentication:** None (public health endpoint)
+
+**Implementation:** `services/langgraph/app/main.py` → `health_check()`
+
+**Timeout:** 5s
 
 **Request:**
 ```http
@@ -342,7 +360,7 @@ GET /health
 
 **When Called:** Load balancer health checks
 
-**Implemented In:** `services/langgraph/app/main.py` → `health_check()`
+**Database Impact:** None (static response)
 
 ---
 
@@ -351,6 +369,10 @@ GET /health
 **Purpose:** Start AI workflow for candidate processing
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/langgraph/app/main.py` → `start_application_workflow()`
+
+**Timeout:** 10s
 
 **Request:**
 ```http
@@ -376,7 +398,7 @@ Authorization: Bearer YOUR_API_KEY
   "workflow_id": "wf_abc123def456",
   "status": "started",
   "message": "Application workflow started for John Doe",
-  "timestamp": "2024-12-09T13:37:00Z"
+  "timestamp": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -392,9 +414,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Candidate submits application
 
-**Implemented In:** `services/langgraph/app/main.py` → `start_application_workflow()`
-
-**Database Impact:** INSERT into workflows table
+**Database Impact:** INSERT into workflows collection
 
 ---
 
@@ -403,6 +423,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Get detailed workflow execution status
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/langgraph/app/main.py` → `get_workflow_status()`
+
+**Timeout:** 15s
 
 **Request:**
 ```http
@@ -427,7 +451,7 @@ Authorization: Bearer YOUR_API_KEY
   },
   "output_data": {},
   "error_message": null,
-  "started_at": "2024-12-09T13:37:00Z",
+  "started_at": "2026-01-22T13:37:00Z",
   "completed_at": null,
   "updated_at": "2026-01-22T13:40:00Z",
   "completed": false,
@@ -441,9 +465,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Dashboard polls for workflow updates
 
-**Implemented In:** `services/langgraph/app/main.py` → `get_workflow_status()`
-
-**Database Impact:** SELECT from workflows table
+**Database Impact:** SELECT from workflows collection
 
 ---
 
@@ -452,6 +474,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Resume paused workflow
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/langgraph/app/main.py` → `resume_workflow()`
+
+**Timeout:** 10s
 
 **Request:**
 ```http
@@ -470,7 +496,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Admin resumes paused workflow
 
-**Implemented In:** `services/langgraph/app/main.py` → `resume_workflow()`
+**Database Impact:** UPDATE workflows collection
 
 ---
 
@@ -479,6 +505,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** List all workflows with filtering
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/langgraph/app/main.py` → `list_workflows()`
+
+**Timeout:** 20s
 
 **Request:**
 ```http
@@ -497,7 +527,7 @@ Authorization: Bearer YOUR_API_KEY
       "progress_percentage": 65,
       "candidate_id": 123,
       "job_id": 45,
-      "started_at": "2024-12-09T13:37:00Z",
+      "started_at": "2026-01-22T13:37:00Z",
       "completed": false,
       "estimated_time_remaining": "2-4 minutes"
     }
@@ -512,9 +542,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Dashboard loads workflow list
 
-**Implemented In:** `services/langgraph/app/main.py` → `list_workflows()`
-
-**Database Impact:** SELECT from workflows table
+**Database Impact:** SELECT from workflows collection
 
 ---
 
@@ -523,6 +551,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Workflow statistics and analytics
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/langgraph/app/main.py` → `get_workflow_stats()`
+
+**Timeout:** 20s
 
 **Request:**
 ```http
@@ -546,9 +578,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Admin dashboard loads workflow metrics
 
-**Implemented In:** `services/langgraph/app/main.py` → `get_workflow_stats()`
-
-**Database Impact:** Multiple COUNT queries on workflows table
+**Database Impact:** Multiple COUNT queries on workflows collection
 
 ---
 
@@ -557,6 +587,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Multi-channel notification system with interactive features
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/langgraph/app/main.py` → `send_notification()`
+
+**Timeout:** 30s
 
 **Request:**
 ```http
@@ -594,7 +628,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Workflow triggers notification
 
-**Implemented In:** `services/langgraph/app/main.py` → `send_notification()`
+**Database Impact:** INSERT into notification logs
 
 ---
 
@@ -631,7 +665,9 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Testing communication channels, automation triggers
 
-**Implemented In:** `services/langgraph/app/main.py` → Communication functions
+**Implementation:** `services/langgraph/app/main.py` → Communication functions
+
+**Database Impact:** None (external service calls only)
 
 ---
 
@@ -645,7 +681,7 @@ Authorization: Bearer YOUR_API_KEY
 - GET /rl/history/{candidate_id} - Candidate decision history (3 decisions tracked)
 - POST /rl/retrain - Trigger model retraining (v1.0.1, 80% accuracy)
 - GET /health - Service health check
-- GET /test-integration - RL system integration test
+- POST /rl/start-monitoring - Start RL monitoring
 
 **Example - RL Predict:**
 ```http
@@ -681,13 +717,13 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** AI matching requests RL enhancement
 
-**Implemented In:** `services/langgraph/app/rl_integration/rl_endpoints.py` → Complete RL system
+**Implementation:** `services/langgraph/app/rl_integration/rl_endpoints.py` → Complete RL system
 
-**Database Integration:** PostgreSQL with rl_predictions, rl_feedback, rl_model_performance tables
+**Database Impact:** MongoDB with rl_predictions, rl_feedback, rl_model_performance collections
 
 **Test Results:** 8/8 tests passing (100% success rate)
 - ✅ Service Health: langgraph-orchestrator v4.3.1 operational
-- ✅ Integration Test: RL Engine integrated with PostgreSQL
+- ✅ Integration Test: RL Engine integrated with MongoDB
 - ✅ RL Prediction: Score 77.65, Decision: recommend, Confidence: 75.0%
 - ✅ RL Feedback: Feedback ID: 20, Reward: 1.225
 - ✅ RL Analytics: 5 Predictions, 17 Feedback, 340% rate
@@ -702,6 +738,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Integration testing and system validation
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/langgraph/app/main.py` → `test_integration()`
+
+**Timeout:** 30s
 
 **Request:**
 ```http
@@ -729,7 +769,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** System diagnostics, deployment verification
 
-**Implemented In:** `services/langgraph/app/main.py` → `test_integration()`
+**Database Impact:** Health checks across all integrated services
 
 ---
 
@@ -737,25 +777,25 @@ Authorization: Bearer YOUR_API_KEY
 
 ### AI Agent Service (6 endpoints)
 
-| Endpoint | Method | Purpose | Auth Required |
-|----------|--------|---------|---------------|
-| / | GET | Service info | No |
-| /health | GET | Health check | No |
-| /test-db | GET | Test database | Yes |
-| /match | POST | AI matching | Yes |
-| /batch-match | POST | Batch matching | Yes |
-| /analyze/{candidate_id} | GET | Candidate analysis | Yes |
+| Endpoint | Method | Purpose | Auth Required | Timeout |
+|----------|--------|---------|---------------|---------|
+| / | GET | Service info | No | 2s |
+| /health | GET | Health check | No | 5s |
+| /test-db | GET | Test database | Yes | 10s |
+| /match | POST | AI matching | Yes | 60s |
+| /batch-match | POST | Batch matching | Yes | 120s |
+| /analyze/{candidate_id} | GET | Candidate analysis | Yes | 60s |
 
 ### LangGraph Service (25 endpoints)
 
-| Category | Endpoints | Auth Required |
-|----------|-----------|---------------|
-| Core API | 2 (/, /health) | No |
-| Workflow Management | 2 (start, resume) | Yes |
-| Workflow Monitoring | 3 (status, list, stats) | Yes |
-| Communication Tools | 10 (notifications, webhooks) | Yes |
-| RL + Feedback Agent | 8 (predict, feedback, analytics) - 100% operational | Yes |
-| System Diagnostics | 1 (test-integration) | Yes |
+| Category | Endpoints | Auth Required | Timeout |
+|----------|-----------|---------------|---------|
+| Core API | 2 (/, /health) | No | 2-5s |
+| Workflow Management | 2 (start, resume) | Yes | 10s |
+| Workflow Monitoring | 3 (status, list, stats) | Yes | 15-20s |
+| Communication Tools | 8 (notifications, webhooks) | Yes | 10-30s |
+| RL + Feedback Agent | 8 (predict, feedback, analytics) - 100% operational | Yes | 10-30s |
+| System Diagnostics | 1 (test-integration) | Yes | 30s |
 
 **Total Endpoints in Part 5:** 31 (81-111 of 111)
 

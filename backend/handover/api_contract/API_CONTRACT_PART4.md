@@ -1,4 +1,4 @@
-# API Contract — Part 4: Gateway Security & Portals
+# API Contract — Part 4: Gateway Security & Portals (46-80 of 111)
 
 **Continued from:** [API_CONTRACT_PART3.md](./API_CONTRACT_PART3.md)
 
@@ -25,7 +25,7 @@
 **Request:**
 ```http
 GET /v1/security/rate-limit-status
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 ```
 
 **Response (200 OK):**
@@ -42,7 +42,7 @@ Authorization: Bearer <API_KEY_SECRET>
 
 **When Called:** Admin monitors rate limiting
 
-**Database Impact:** SELECT from rate_limits collection
+**Database Impact:** Query rate limit cache/memory
 
 ---
 
@@ -54,12 +54,12 @@ Authorization: Bearer <API_KEY_SECRET>
 
 **Implementation:** `services/gateway/app/main.py` → `view_blocked_ips()`
 
-**Timeout:** 10s
+**Timeout:** 5s
 
 **Request:**
 ```http
 GET /v1/security/blocked-ips
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 ```
 
 **Response (200 OK):**
@@ -79,7 +79,7 @@ Authorization: Bearer <API_KEY_SECRET>
 
 **When Called:** Admin reviews security blocks
 
-**Database Impact:** SELECT from blocked_ips collection
+**Database Impact:** Query blocked IPs cache/database
 
 ---
 
@@ -100,7 +100,7 @@ Authorization: Bearer <API_KEY_SECRET>
 **Common Pattern:**
 ```http
 POST /v1/security/test-input-validation
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 {"input_data": "<script>alert('xss')</script>"}
 ```
 
@@ -110,15 +110,15 @@ Authorization: Bearer <API_KEY_SECRET>
   "input": "<script>alert('xss')</script>",
   "validation_result": "BLOCKED",
   "threats_detected": ["XSS attempt detected"],
-  "timestamp": "2024-12-09T13:37:00Z"
+  "timestamp": "2026-01-22T13:37:00Z"
 }
 ```
 
 **When Called:** Security testing, penetration testing
 
-**Timeout:** 10s each
+**Implementation:** `services/gateway/app/main.py` → Various security test functions
 
-**Database Impact:** INSERT into security_test_logs collection
+**Database Impact:** None (security validation only)
 
 ---
 
@@ -132,13 +132,13 @@ Authorization: Bearer <API_KEY_SECRET>
 
 **Implementation:** `services/gateway/app/main.py` → `csp_violation_reporting()`
 
-**Timeout:** 10s
+**Timeout:** 5s
 
 **Request:**
 ```http
 POST /v1/security/csp-report
 Content-Type: application/json
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 
 {
   "violated_directive": "script-src",
@@ -157,7 +157,7 @@ Authorization: Bearer <API_KEY_SECRET>
     "document_uri": "https://bhiv-platform.com/dashboard",
     "timestamp": "2026-01-22T13:37:00Z"
   },
-  "report_id": "507f1f77bcf86cd799439019"
+  "report_id": "csp_report_1702134000"
 }
 ```
 
@@ -173,9 +173,9 @@ Authorization: Bearer <API_KEY_SECRET>
 - GET /v1/security/csp-policies
 - POST /v1/security/test-csp-policy
 
-**Timeout:** 10s each
+**Implementation:** `services/gateway/app/main.py` → CSP management functions
 
-**Database Impact:** SELECT/INSERT into csp_violations collection
+**Database Impact:** SELECT/INSERT from csp_violations collection
 
 ---
 
@@ -196,24 +196,24 @@ Authorization: Bearer <API_KEY_SECRET>
 **Example - Setup:**
 ```http
 POST /v1/auth/2fa/setup
-Authorization: Bearer <API_KEY_SECRET>
-{"user_id": "507f1f77bcf86cd799439020"}
+Authorization: Bearer YOUR_API_KEY
+{"user_id": "user_123"}
 ```
 
 **Response:**
 ```json
 {
   "message": "2FA setup initiated",
-  "user_id": "507f1f77bcf86cd799439020",
+  "user_id": "user_123",
   "secret": "JBSWY3DPEHPK3PXP",
   "qr_code": "data:image/png;base64,...",
   "manual_entry_key": "JBSWY3DPEHPK3PXP"
 }
 ```
 
-**Timeout:** 15s each
+**Implementation:** `services/gateway/app/main.py` → 2FA functions
 
-**Database Impact:** INSERT/UPDATE in users collection
+**Database Impact:** UPDATE user records with 2FA settings
 
 ---
 
@@ -232,7 +232,7 @@ Authorization: Bearer <API_KEY_SECRET>
 **Example - Validate:**
 ```http
 POST /v1/auth/password/validate
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 {"password": "SecurePass123!"}
 ```
 
@@ -247,9 +247,9 @@ Authorization: Bearer <API_KEY_SECRET>
 }
 ```
 
-**Timeout:** 5s each
+**Implementation:** `services/gateway/app/main.py` → Password management functions
 
-**Database Impact:** SELECT from password_policies collection
+**Database Impact:** None (password validation only)
 
 ---
 
@@ -288,7 +288,7 @@ Content-Type: application/json
 {
   "success": true,
   "message": "Registration successful",
-  "candidate_id": "507f1f77bcf86cd799439021"
+  "candidate_id": 456
 }
 ```
 
@@ -298,15 +298,8 @@ Content-Type: application/json
 3. Insert into candidates collection with status='applied'
 4. Return candidate_id
 
-**Validation:**
-- Email format validation and uniqueness
-- Password strength requirements (min 8 chars, uppercase, lowercase, number, special char)
-- Phone format validation (E.164)
-- Experience years: Non-negative integer
-
 **Error Responses:**
 - 409 Conflict: Email already registered
-- 400 Bad Request: Invalid input format or password requirements not met
 
 **When Called:** Candidate signs up
 
@@ -319,6 +312,10 @@ Content-Type: application/json
 **Purpose:** Candidate authentication with JWT token
 
 **Authentication:** None (public login)
+
+**Implementation:** `services/gateway/app/main.py` → `candidate_login()`
+
+**Timeout:** 10s
 
 **Request:**
 ```http
@@ -357,9 +354,7 @@ Content-Type: application/json
 
 **When Called:** Candidate logs in
 
-**Implemented In:** `services/gateway/app/main.py` → `candidate_login()`
-
-**Database Impact:** SELECT from candidates table
+**Database Impact:** SELECT from candidates collection
 
 ---
 
@@ -368,6 +363,10 @@ Content-Type: application/json
 **Purpose:** Update candidate profile
 
 **Authentication:** Candidate JWT token required
+
+**Implementation:** `services/gateway/app/main.py` → `update_candidate_profile()`
+
+**Timeout:** 15s
 
 **Request:**
 ```http
@@ -401,9 +400,7 @@ Authorization: Bearer CANDIDATE_JWT_TOKEN
 
 **When Called:** Candidate updates profile
 
-**Implemented In:** `services/gateway/app/main.py` → `update_candidate_profile()`
-
-**Database Impact:** UPDATE candidates table
+**Database Impact:** UPDATE candidates collection
 
 ---
 
@@ -412,6 +409,10 @@ Authorization: Bearer CANDIDATE_JWT_TOKEN
 **Purpose:** Apply for job
 
 **Authentication:** Candidate JWT token required
+
+**Implementation:** `services/gateway/app/main.py` → `apply_for_job()`
+
+**Timeout:** 20s
 
 **Request:**
 ```http
@@ -437,7 +438,7 @@ Authorization: Bearer CANDIDATE_JWT_TOKEN
 
 **Sequence:**
 1. Check if already applied
-2. Create job_applications table if not exists
+2. Create job_applications collection if not exists
 3. Insert application with status='applied'
 4. Trigger application webhook
 
@@ -447,9 +448,7 @@ Authorization: Bearer CANDIDATE_JWT_TOKEN
 
 **When Called:** Candidate applies for job
 
-**Implemented In:** `services/gateway/app/main.py` → `apply_for_job()`
-
-**Database Impact:** INSERT into job_applications table
+**Database Impact:** INSERT into job_applications collection
 
 ---
 
@@ -458,6 +457,10 @@ Authorization: Bearer CANDIDATE_JWT_TOKEN
 **Purpose:** Get candidate's job applications
 
 **Authentication:** Candidate JWT token required
+
+**Implementation:** `services/gateway/app/main.py` → `get_candidate_applications()`
+
+**Timeout:** 15s
 
 **Request:**
 ```http
@@ -489,28 +492,26 @@ Authorization: Bearer CANDIDATE_JWT_TOKEN
 
 **When Called:** Candidate views application history
 
-**Implemented In:** `services/gateway/app/main.py` → `get_candidate_applications()`
+**Database Impact:** SELECT from job_applications, jobs, clients collections with JOIN
 
-**Database Impact:** SELECT from job_applications, jobs, clients tables with JOIN
-
-
+---
 
 ## Summary Table - Part 4
 
-| Endpoint | Method | Category | Purpose | Auth Required |
-|----------|--------|----------|---------|---------------|
-| /v1/security/rate-limit-status | GET | Security | Check rate limits | Yes |
-| /v1/security/blocked-ips | GET | Security | View blocked IPs | Yes |
-| /v1/security/test-* (10) | POST/GET | Security | Security testing | Yes |
-| /v1/security/csp-report | POST | CSP | Report violation | Yes |
-| /v1/security/csp-* (3) | GET/POST | CSP | CSP management | Yes |
-| /v1/auth/2fa/* (8) | POST/GET | 2FA | Two-factor auth | Yes |
-| /v1/auth/password/* (6) | POST/GET | Password | Password mgmt | Yes |
-| /v1/candidate/register | POST | Candidate | Register | No |
-| /v1/candidate/login | POST | Candidate | Login | No |
-| /v1/candidate/profile/{id} | PUT | Candidate | Update profile | Yes |
-| /v1/candidate/apply | POST | Candidate | Apply for job | Yes |
-| /v1/candidate/applications/{id} | GET | Candidate | Get applications | Yes |
+| Endpoint | Method | Category | Purpose | Auth Required | Timeout |
+|----------|--------|----------|---------|---------------|---------|
+| /v1/security/rate-limit-status | GET | Security | Check rate limits | Yes | 5s |
+| /v1/security/blocked-ips | GET | Security | View blocked IPs | Yes | 5s |
+| /v1/security/test-* (10) | POST/GET | Security | Security testing | Yes | 5s |
+| /v1/security/csp-report | POST | CSP | Report violation | Yes | 5s |
+| /v1/security/csp-* (3) | GET/POST | CSP | CSP management | Yes | 5s |
+| /v1/auth/2fa/* (8) | POST/GET | 2FA | Two-factor auth | Yes | 5s |
+| /v1/auth/password/* (6) | POST/GET | Password | Password mgmt | Yes | 5s |
+| /v1/candidate/register | POST | Candidate | Register | No | 15s |
+| /v1/candidate/login | POST | Candidate | Login | No | 10s |
+| /v1/candidate/profile/{id} | PUT | Candidate | Update profile | Yes | 15s |
+| /v1/candidate/apply | POST | Candidate | Apply for job | Yes | 20s |
+| /v1/candidate/applications/{id} | GET | Candidate | Get applications | Yes | 15s |
 
 **Total Endpoints in Part 4:** 35 (46-80 of 111)
 

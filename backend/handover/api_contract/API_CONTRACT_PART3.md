@@ -1,4 +1,4 @@
-# API Contract — Part 3: Gateway Advanced Features
+# API Contract — Part 3: Gateway Advanced Features (36-45 of 111)
 
 **Continued from:** [API_CONTRACT_PART2.md](./API_CONTRACT_PART2.md)
 
@@ -20,12 +20,12 @@
 
 **Implementation:** `services/gateway/app/main.py` → `get_top_matches()`
 
-**Timeout:** 60s (Agent Service communication)
+**Timeout:** 60s
 
 **Request:**
 ```http
-GET /v1/match/507f1f77bcf86cd799439013/top?limit=10
-Authorization: Bearer <API_KEY_SECRET>
+GET /v1/match/123/top?limit=10
+Authorization: Bearer YOUR_API_KEY
 ```
 
 **Response (200 OK):**
@@ -33,7 +33,7 @@ Authorization: Bearer <API_KEY_SECRET>
 {
   "matches": [
     {
-      "candidate_id": "507f1f77bcf86cd799439011",
+      "candidate_id": 45,
       "name": "John Doe",
       "email": "john.doe@example.com",
       "score": 92.5,
@@ -45,7 +45,7 @@ Authorization: Bearer <API_KEY_SECRET>
     }
   ],
   "top_candidates": [],
-  "job_id": "507f1f77bcf86cd799439013",
+  "job_id": 123,
   "limit": 10,
   "total_candidates": 50,
   "algorithm_version": "3.0.0-phase3-production",
@@ -61,11 +61,8 @@ Authorization: Bearer <API_KEY_SECRET>
 3. Results transformed to Gateway format
 4. Fallback to database matching if Agent unavailable
 
-**Query Parameters:**
-- limit: Maximum matches to return (default: 10, max: 50)
-
 **Error Responses:**
-- 400 Bad Request: Invalid ObjectId format or limit
+- 400 Bad Request: Invalid job_id or limit
 - 404 Not Found: Job not found
 - 503 Service Unavailable: Agent service down (fallback activated)
 
@@ -83,16 +80,16 @@ Authorization: Bearer <API_KEY_SECRET>
 
 **Implementation:** `services/gateway/app/main.py` → `batch_match_jobs()`
 
-**Timeout:** 120s (batch processing)
+**Timeout:** 120s
 
 **Request:**
 ```http
 POST /v1/match/batch
 Content-Type: application/json
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 
 {
-  "job_ids": ["507f1f77bcf86cd799439013", "507f1f77bcf86cd799439014", "507f1f77bcf86cd799439015"]
+  "job_ids": [123, 124, 125]
 }
 ```
 
@@ -100,11 +97,11 @@ Authorization: Bearer <API_KEY_SECRET>
 ```json
 {
   "batch_results": {
-    "507f1f77bcf86cd799439013": {
-      "job_id": "507f1f77bcf86cd799439013",
+    "123": {
+      "job_id": 123,
       "matches": [
         {
-          "candidate_id": "507f1f77bcf86cd799439011",
+          "candidate_id": 45,
           "name": "John Doe",
           "email": "john.doe@example.com",
           "score": 92.5,
@@ -130,13 +127,9 @@ Authorization: Bearer <API_KEY_SECRET>
 }
 ```
 
-**Validation:**
-- job_ids: Required array, max 10 jobs per batch
-- All job_ids must be valid ObjectId format
-
 **Error Responses:**
-- 400 Bad Request: Empty job_ids, > 10 jobs, or invalid ObjectId format
-- 404 Not Found: One or more jobs not found
+- 400 Bad Request: Empty job_ids or > 10 jobs
+- 404 Not Found: Jobs not found
 - 503 Service Unavailable: Agent service down (fallback activated)
 
 **When Called:** HR compares candidates across multiple jobs
@@ -161,11 +154,11 @@ Authorization: Bearer <API_KEY_SECRET>
 ```http
 POST /v1/feedback
 Content-Type: application/json
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 
 {
-  "candidate_id": "507f1f77bcf86cd799439011",
-  "job_id": "507f1f77bcf86cd799439013",
+  "candidate_id": 123,
+  "job_id": 45,
   "integrity": 5,
   "honesty": 5,
   "discipline": 4,
@@ -179,9 +172,9 @@ Authorization: Bearer <API_KEY_SECRET>
 ```json
 {
   "message": "Feedback submitted successfully",
-  "feedback_id": "507f1f77bcf86cd799439016",
-  "candidate_id": "507f1f77bcf86cd799439011",
-  "job_id": "507f1f77bcf86cd799439013",
+  "feedback_id": 789,
+  "candidate_id": 123,
+  "job_id": 45,
   "values_scores": {
     "integrity": 5,
     "honesty": 5,
@@ -194,13 +187,8 @@ Authorization: Bearer <API_KEY_SECRET>
 }
 ```
 
-**Validation:**
-- All score values must be integers 1-5
-- candidate_id and job_id must be valid ObjectId format
-- comments optional but recommended
-
 **Error Responses:**
-- 400 Bad Request: Invalid score values (must be 1-5) or ObjectId format
+- 400 Bad Request: Invalid score values (must be 1-5)
 - 404 Not Found: Candidate or job not found
 
 **When Called:** HR submits post-interview feedback
@@ -222,7 +210,7 @@ Authorization: Bearer <API_KEY_SECRET>
 **Request:**
 ```http
 GET /v1/feedback
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 ```
 
 **Response (200 OK):**
@@ -230,9 +218,9 @@ Authorization: Bearer <API_KEY_SECRET>
 {
   "feedback": [
     {
-      "id": "507f1f77bcf86cd799439016",
-      "candidate_id": "507f1f77bcf86cd799439011",
-      "job_id": "507f1f77bcf86cd799439013",
+      "id": 789,
+      "candidate_id": 123,
+      "job_id": 45,
       "values_scores": {
         "integrity": 5,
         "honesty": 5,
@@ -242,7 +230,7 @@ Authorization: Bearer <API_KEY_SECRET>
       },
       "average_score": 4.6,
       "comments": "Excellent candidate with strong values alignment",
-      "created_at": "2024-12-09T13:37:00Z",
+      "created_at": "2026-01-22T13:37:00Z",
       "candidate_name": "John Doe",
       "job_title": "Senior Software Engineer"
     }
@@ -253,7 +241,7 @@ Authorization: Bearer <API_KEY_SECRET>
 
 **When Called:** HR reviews feedback history
 
-**Database Impact:** SELECT from feedback collection with JOIN to candidates and jobs collections
+**Database Impact:** SELECT from feedback, candidates, jobs collections with JOIN
 
 ---
 
@@ -270,7 +258,7 @@ Authorization: Bearer <API_KEY_SECRET>
 **Request:**
 ```http
 GET /v1/interviews
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 ```
 
 **Response (200 OK):**
@@ -278,9 +266,9 @@ Authorization: Bearer <API_KEY_SECRET>
 {
   "interviews": [
     {
-      "id": "507f1f77bcf86cd799439017",
-      "candidate_id": "507f1f77bcf86cd799439011",
-      "job_id": "507f1f77bcf86cd799439013",
+      "id": 456,
+      "candidate_id": 123,
+      "job_id": 45,
       "interview_date": "2026-01-29T14:00:00Z",
       "interviewer": "Sarah Johnson",
       "status": "scheduled",
@@ -294,7 +282,7 @@ Authorization: Bearer <API_KEY_SECRET>
 
 **When Called:** HR views interview schedule
 
-**Database Impact:** SELECT from interviews collection with JOIN to candidates and jobs collections
+**Database Impact:** SELECT from interviews, candidates, jobs collections with JOIN
 
 ---
 
@@ -306,18 +294,18 @@ Authorization: Bearer <API_KEY_SECRET>
 
 **Implementation:** `services/gateway/app/main.py` → `schedule_interview()`
 
-**Timeout:** 20s (includes LangGraph webhook trigger)
+**Timeout:** 20s
 
 **Request:**
 ```http
 POST /v1/interviews
 Content-Type: application/json
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 
 {
-  "candidate_id": "507f1f77bcf86cd799439011",
-  "job_id": "507f1f77bcf86cd799439013",
-  "interview_date": "2024-12-15T14:00:00Z",
+  "candidate_id": 123,
+  "job_id": 45,
+  "interview_date": "2026-01-29T14:00:00Z",
   "interviewer": "Sarah Johnson",
   "notes": "Technical interview - focus on system design"
 }
@@ -327,28 +315,22 @@ Authorization: Bearer <API_KEY_SECRET>
 ```json
 {
   "message": "Interview scheduled successfully",
-  "interview_id": "507f1f77bcf86cd799439017",
-  "candidate_id": "507f1f77bcf86cd799439011",
-  "job_id": "507f1f77bcf86cd799439013",
-  "interview_date": "2024-12-15T14:00:00Z",
-  "status": "scheduled",
-  "workflow_triggered": true
+  "interview_id": 456,
+  "candidate_id": 123,
+  "job_id": 45,
+  "interview_date": "2026-01-29T14:00:00Z",
+  "status": "scheduled"
 }
 ```
 
 **Sequence:**
 1. Validate candidate and job exist
 2. Insert into interviews collection with status='scheduled'
-3. Trigger LangGraph webhook: interview_scheduled
+3. Trigger interview.scheduled webhook
 4. Send notification to candidate
 
-**Validation:**
-- candidate_id and job_id must be valid ObjectId format
-- interview_date must be valid ISO 8601 format
-- interviewer is required
-
 **Error Responses:**
-- 400 Bad Request: Invalid date format or ObjectId format
+- 400 Bad Request: Invalid date format
 - 404 Not Found: Candidate or job not found
 - 500 Internal Server Error: Database error
 
@@ -372,13 +354,13 @@ Authorization: Bearer <API_KEY_SECRET>
 ```http
 POST /v1/offers
 Content-Type: application/json
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 
 {
-  "candidate_id": "507f1f77bcf86cd799439011",
-  "job_id": "507f1f77bcf86cd799439013",
+  "candidate_id": 123,
+  "job_id": 45,
   "salary": 150000.00,
-  "start_date": "2025-01-15",
+  "start_date": "2026-02-01",
   "terms": "Full-time, remote, benefits included"
 }
 ```
@@ -387,24 +369,19 @@ Authorization: Bearer <API_KEY_SECRET>
 ```json
 {
   "message": "Job offer created successfully",
-  "offer_id": "507f1f77bcf86cd799439018",
-  "candidate_id": "507f1f77bcf86cd799439011",
-  "job_id": "507f1f77bcf86cd799439013",
+  "offer_id": 999,
+  "candidate_id": 123,
+  "job_id": 45,
   "salary": 150000.00,
-  "start_date": "2025-01-15",
+  "start_date": "2026-02-01",
   "terms": "Full-time, remote, benefits included",
   "status": "pending",
   "created_at": "2026-01-22T13:37:00Z"
 }
 ```
 
-**Validation:**
-- candidate_id and job_id must be valid ObjectId format
-- salary must be positive number
-- start_date must be valid date format (YYYY-MM-DD)
-
 **Error Responses:**
-- 400 Bad Request: Invalid salary, date format, or ObjectId format
+- 400 Bad Request: Invalid salary or date
 - 404 Not Found: Candidate or job not found
 
 **When Called:** HR extends job offer
@@ -426,7 +403,7 @@ Authorization: Bearer <API_KEY_SECRET>
 **Request:**
 ```http
 GET /v1/offers
-Authorization: Bearer <API_KEY_SECRET>
+Authorization: Bearer YOUR_API_KEY
 ```
 
 **Response (200 OK):**
@@ -434,14 +411,14 @@ Authorization: Bearer <API_KEY_SECRET>
 {
   "offers": [
     {
-      "id": "507f1f77bcf86cd799439018",
-      "candidate_id": "507f1f77bcf86cd799439011",
-      "job_id": "507f1f77bcf86cd799439013",
+      "id": 999,
+      "candidate_id": 123,
+      "job_id": 45,
       "salary": 150000.00,
-      "start_date": "2025-01-15",
+      "start_date": "2026-02-01",
       "terms": "Full-time, remote, benefits included",
       "status": "pending",
-      "created_at": "2024-12-09T13:37:00Z",
+      "created_at": "2026-01-22T13:37:00Z",
       "candidate_name": "John Doe",
       "job_title": "Senior Software Engineer"
     }
@@ -452,7 +429,7 @@ Authorization: Bearer <API_KEY_SECRET>
 
 **When Called:** HR reviews offer status
 
-**Database Impact:** SELECT from offers collection with JOIN to candidates and jobs collections
+**Database Impact:** SELECT from offers, candidates, jobs collections with JOIN
 
 ---
 
@@ -498,15 +475,9 @@ Content-Type: application/json
 4. Insert into clients collection with status='active'
 5. Return success confirmation
 
-**Validation:**
-- client_id: Required, alphanumeric, 3-20 characters
-- company_name: Required, 2-100 characters
-- contact_email: Required, valid email format
-- password: Required, min 8 characters, must contain uppercase, lowercase, number, special char
-
 **Error Responses:**
 - 409 Conflict: Client ID or email already exists
-- 400 Bad Request: Invalid input data or password requirements not met
+- 400 Bad Request: Invalid input data
 
 **When Called:** New client signs up
 
@@ -562,12 +533,6 @@ Content-Type: application/json
 5. Reset failed login attempts
 6. Return token and permissions
 
-**JWT Token Details:**
-- Algorithm: HS256
-- Secret: JWT_SECRET_KEY environment variable
-- Expiry: 24 hours
-- Payload: {"sub": client_id, "type": "client", "exp": timestamp}
-
 **Error Responses:**
 - 401 Unauthorized: Invalid credentials
 - 403 Forbidden: Account locked (5 failed attempts)
@@ -582,15 +547,7 @@ Content-Type: application/json
 ## Summary Table - Part 3
 
 | Endpoint | Method | Category | Purpose | Auth Required | Timeout |
-|----------|--------|----------|---------|---------------|----------|
-| /v1/candidates | GET | Candidate Mgmt | List candidates | Yes | 15s |
-| /v1/candidates | POST | Candidate Mgmt | Create candidate | Yes | 15s |
-| /v1/candidates/{id} | GET | Candidate Mgmt | Get candidate | Yes | 10s |
-| /v1/candidates/{id} | PUT | Candidate Mgmt | Update candidate | Yes | 15s |
-| /v1/candidates/{id} | DELETE | Candidate Mgmt | Delete candidate | Yes | 10s |
-| /v1/applications | POST | Application Mgmt | Submit application | Yes | 20s |
-| /v1/applications | GET | Application Mgmt | List applications | Yes | 15s |
-| /v1/analytics/dashboard | GET | Analytics | Dashboard data | Yes | 20s |
+|----------|--------|----------|---------|---------------|---------|
 | /v1/match/{job_id}/top | GET | AI Matching | Get top matches | Yes | 60s |
 | /v1/match/batch | POST | AI Matching | Batch matching | Yes | 120s |
 | /v1/feedback | POST | Assessment | Submit feedback | Yes | 15s |

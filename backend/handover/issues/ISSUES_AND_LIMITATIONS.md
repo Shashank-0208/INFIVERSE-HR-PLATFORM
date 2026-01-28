@@ -1,8 +1,11 @@
 # Known Issues & Limitations — BHIV HR Platform
 
-**Version**: 4.3.0  
-**Last Updated**: December 9, 2025  
+**Version**: 4.3.1  
+**Last Updated**: January 22, 2026  
 **Status**: Production System with Known Issues Documented
+
+**Service Distribution**: 80 Gateway, 6 Agent, 25 LangGraph (Total: 111 endpoints)
+**Database**: MongoDB Atlas (Previously PostgreSQL)
 
 ---
 
@@ -24,7 +27,7 @@
 
 ## Critical Issues
 
-### ISSUE-001: Database Connection Pool Leaks on Long-Running Operations
+### ISSUE-001: MongoDB Connection Pool Management on Long-Running Operations
 
 **Severity**: Critical  
 **Status**: Active (Workaround available)  
@@ -32,17 +35,17 @@
 **Reported Date**: 2025-11-20
 
 **Description**:
-After 8+ hours of continuous operation, database connections aren't properly released in some error paths, eventually blocking new queries. System becomes unresponsive when connection pool exhausted.
+After 8+ hours of continuous operation, MongoDB connections aren't properly managed in some error paths, eventually affecting new queries. System performance degrades when connection pool exhausted.
 
 **Root Cause**:
-In `services/gateway/app/main.py`, SQLAlchemy connections not closed in exception handlers. Connection pool configured with `pool_size=10, max_overflow=5` (max 15 connections).
+In `services/gateway/app/main.py`, MongoDB connections not properly closed in exception handlers. Connection pool configured with `maxPoolSize=10, minPoolSize=2`.
 
 ```python
 # PROBLEMATIC CODE in main.py (multiple locations)
-engine = get_db_engine()
-with engine.connect() as connection:
-    # If exception occurs here, connection may not be properly released
-    result = connection.execute(query)
+client = get_mongo_client()
+db = client['bhiv_hr']
+# If exception occurs here, connection may not be properly released
+result = db.collection.find(query)
 ```
 
 **Affected Components**:
@@ -56,33 +59,37 @@ with engine.connect() as connection:
    0 */6 * * * docker restart bhiv-hr-gateway
    ```
 2. Monitor connection count:
-   ```sql
-   SELECT count(*) FROM pg_stat_activity WHERE application_name = 'bhiv_gateway';
+   ```javascript
+   // MongoDB connection monitoring
+   db.serverStatus().connections
    ```
 
 **Permanent Fix (Recommended)**:
 Update all database operations to use proper context managers:
 ```python
 # CORRECT PATTERN
-def get_db_engine():
-    database_url = os.getenv("DATABASE_URL")
-    return create_engine(
-        database_url,
-        pool_pre_ping=True,
-        pool_recycle=3600,
-        pool_size=10,
-        max_overflow=5,
-        pool_timeout=20
+def get_mongo_client():
+    mongodb_uri = os.getenv("DATABASE_URL")
+    return MongoClient(
+        mongodb_uri,
+        serverSelectionTimeoutMS=5000,
+        maxPoolSize=10,
+        minPoolSize=2,
+        connectTimeoutMS=10000,
+        socketTimeoutMS=20000,
     )
 
-# Always use with statement
+# Always use try-finally to ensure connection closure
 try:
-    engine = get_db_engine()
-    with engine.connect() as connection:
-        result = connection.execute(query)
-        # Connection automatically closed even on exception
+    client = get_mongo_client()
+    db = client['bhiv_hr']
+    result = db.collection.find(query)
+    # Process results
 except Exception as e:
     log_error("database_error", str(e))
+finally:
+    if 'client' in locals():
+        client.close()
 ```
 
 **Next Steps**:
@@ -505,14 +512,14 @@ if not PHASE3_AVAILABLE:
 **Reported Date**: 2025-12-08
 
 **Description**:
-`GET /v1/candidates/stats` endpoint becomes slow (>2s) when database has >10,000 candidates. Query scans entire table without proper indexes.
+`GET /v1/candidates/stats` endpoint becomes slow (>2s) when database has >10,000 candidates. Query scans entire collection without proper indexes.
 
 **Root Cause**:
 In `services/gateway/app/main.py` (lines 550-650), statistics query lacks optimized indexes:
 
-```sql
--- SLOW QUERY
-SELECT COUNT(*) FROM candidates WHERE created_at >= NOW() - INTERVAL '7 days'
+```javascript
+// SLOW QUERY
+db.candidates.countDocuments({ created_at: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } })
 ```
 
 **Affected Components**:
@@ -528,21 +535,28 @@ SELECT COUNT(*) FROM candidates WHERE created_at >= NOW() - INTERVAL '7 days'
 2. Run statistics query asynchronously
 
 **Permanent Fix**:
-```sql
--- Add index for date-based queries
-CREATE INDEX idx_candidates_created_at_partial 
-ON candidates(created_at) 
-WHERE created_at >= NOW() - INTERVAL '30 days';
+```javascript
+// Add index for date-based queries
+db.candidates.createIndex({ "created_at": 1 })
 
--- Use materialized view for statistics
-CREATE MATERIALIZED VIEW candidate_stats AS
-SELECT 
-    COUNT(*) as total,
-    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') as new_this_week
-FROM candidates;
+// Use aggregation pipeline for statistics
+db.candidates.aggregate([
+  {
+    $match: {
+      created_at: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      total: { $sum: 1 },
+      new_this_week: { $sum: 1 }
+    }
+  }
+])
 
--- Refresh every hour
-REFRESH MATERIALIZED VIEW CONCURRENTLY candidate_stats;
+// Create TTL index for automatic cleanup
+db.candidates.createIndex({ "created_at": 1 }, { expireAfterSeconds: 2592000 }) // 30 days
 ```
 
 **Estimated Fix Time**: 2 hours  
@@ -586,12 +600,12 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY candidate_stats;
 **Critical Sections**:
 - Authentication middleware (lines 300-400)
 - Rate limiting middleware (lines 130-180)
-- Database connection management (lines 420-450)
+- MongoDB connection management (lines 420-450)
 
 **If you MUST change**:
 1. Create feature branch
 2. Test on staging for 48 hours minimum
-3. Run full test suite (89 endpoints)
+3. Run full test suite (111 endpoints)
 4. Have rollback plan ready
 5. Deploy during low-traffic window
 
@@ -615,14 +629,14 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY candidate_stats;
 
 ---
 
-### Database Schema: `consolidated_schema.sql` — Production Schema
+### Database Schema: MongoDB Collections — Production Schema
 
 **Why**: Schema changes require careful migration planning  
 **Last Modified**: 2025-12-04  
-**Critical Tables**:
-- `candidates` - 19 indexes, referenced by 7 tables
-- `jobs` - 6 indexes, referenced by 6 tables
-- `feedback` - Generated column (average_score)
+**Critical Collections**:
+- `candidates` - 19 indexes, referenced by 7 collections
+- `jobs` - 6 indexes, referenced by 6 collections
+- `feedback` - Computed field (average_score)
 
 **If you MUST change**:
 1. Create migration script with rollback
@@ -843,7 +857,7 @@ PASSWORD_POLICY = {
 **Reason**: Cost optimization for free tier  
 **Risk**: Single point of failure  
 **Workaround**: Daily backups to S3  
-**Future**: Implement PostgreSQL replication when scaling
+**Future**: Implement MongoDB replica set when scaling
 
 ---
 

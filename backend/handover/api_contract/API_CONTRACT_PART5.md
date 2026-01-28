@@ -283,9 +283,9 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
-## LangGraph Service (33 endpoints)
-
-**Base URL:** https://bhiv-hr-langgraph.onrender.com
+## LangGraph Service (Port 9001)
+**Total Endpoints:** 25  
+**Base URL:** http://localhost:9001 (Local) | https://bhiv-hr-langgraph.onrender.com (Production)
 
 **RL Integration Status:** ✅ 8 RL endpoints operational with 100% test pass rate
 
@@ -746,14 +746,14 @@ Authorization: Bearer YOUR_API_KEY
 | /batch-match | POST | Batch matching | Yes |
 | /analyze/{candidate_id} | GET | Candidate analysis | Yes |
 
-### LangGraph Service (33 endpoints)
+### LangGraph Service (25 endpoints)
 
 | Category | Endpoints | Auth Required |
 |----------|-----------|---------------|
 | Core API | 2 (/, /health) | No |
 | Workflow Management | 2 (start, resume) | Yes |
 | Workflow Monitoring | 3 (status, list, stats) | Yes |
-| Communication Tools | 9 (notifications, webhooks) | Yes |
+| Communication Tools | 10 (notifications, webhooks) | Yes |
 | RL + Feedback Agent | 8 (predict, feedback, analytics) - 100% operational | Yes |
 | System Diagnostics | 1 (test-integration) | Yes |
 

@@ -207,6 +207,26 @@ The runtime-core includes a comprehensive test suite:
 - Docker and Docker Compose
 - MongoDB instance (local or remote)
 
+### Virtual Environment Setup
+
+Using a virtual environment is strongly recommended to isolate dependencies:
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+
+# Upgrade pip (recommended)
+python -m pip install --upgrade pip
+```
+
+Once activated, your virtual environment will be used for installing all dependencies.
+
 ### Installation
 
 1. Clone the repository:
@@ -215,19 +235,69 @@ The runtime-core includes a comprehensive test suite:
    cd backend/runtime-core
    ```
 
-2. Install dependencies:
+2. Create and activate a virtual environment (recommended):
+   ```bash
+   # On Windows:
+   python -m venv venv
+   venv\Scripts\activate
+   
+   # On macOS/Linux:
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Set up environment variables:
+4. Set up environment variables:
    ```bash
    # Set environment variables as needed (see Configuration section)
    ```
 
 ## Configuration
 
-The SAR is highly configurable through environment variables:
+The SAR is highly configurable through environment variables. Create a `.env` file by copying the example:
+
+```bash
+# On Windows:
+copy .env.example .env
+
+# On macOS/Linux:
+cp .env.example .env
+```
+
+Then edit the `.env` file to set your specific values:
+
+```env
+# MongoDB Configuration
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DB_NAME=bhiv_hr
+
+# Authentication Secrets (generate with: python -c "import secrets; print(secrets.token_urlsafe(32))")
+JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production
+API_KEY_SECRET=your-api-key-secret
+CANDIDATE_JWT_SECRET_KEY=your-candidate-jwt-key-change-in-production
+
+# Service Configuration
+AUDIT_LOGGING_ENABLED=true
+AUDIT_STORAGE_BACKEND=mongodb
+TENANT_ISOLATION_ENABLED=true
+WORKFLOW_STORAGE_BACKEND=mongodb
+
+# External Service APIs (if using integration adapters)
+ARTHRA_API_URL=https://artha-api.example.com
+ARTHRA_API_KEY=your-artha-key
+KARYA_API_URL=https://karya-api.example.com
+KARYA_API_KEY=your-karya-key
+INSIGHTFLOW_API_URL=https://insightflow-api.example.com
+INSIGHTFLOW_API_KEY=your-insightflow-key
+BUCKET_API_URL=https://bucket-api.example.com
+BUCKET_CREDENTIALS=your-bucket-credentials
+```
+
+### Key Environment Variables:
 
 - `MONGODB_URI` - MongoDB connection string (default: `mongodb://localhost:27017`)
 - `MONGODB_DB_NAME` - MongoDB database name (default: `bhiv_hr`)
@@ -281,6 +351,13 @@ Once running, access the interactive API documentation:
 
 Most protected endpoints accept both API Key and JWT Token authentication. API Key is recommended for testing as it's simpler to use.
 
+### Deactivating the Virtual Environment
+
+When you're done working, you can deactivate the virtual environment:
+```bash
+deactivate
+```
+
 ## Security
 
 The SAR implements multiple layers of security:
@@ -294,6 +371,15 @@ The SAR implements multiple layers of security:
 - **API Key Protection**: System-level operations protected with API keys
 - **JWT Token Validation**: Secure token validation with proper secret keys
 
+## Important Notes
+
+- **MongoDB Auto-Creation**: The MongoDB database and collections will be automatically created when the application first connects to the database
+- **Local MongoDB Required**: Make sure MongoDB is running locally (or update MONGODB_URI for remote access)
+- **Default API Key**: The default API key for testing is `default_sar_api_key`
+- **Production Security**: For production use, make sure to use strong, unique secret keys and not the default values
+- **Multi-Tenancy**: The application follows a multi-tenant architecture with complete tenant isolation
+- **Dependency Management**: All dependencies are managed through the requirements.txt file
+
 ## Troubleshooting
 
 ### Common Issues
@@ -306,6 +392,15 @@ The SAR implements multiple layers of security:
 ### Logs
 
 Check the application logs for detailed error information. The audit logging service also maintains comprehensive logs of all operations.
+
+### MongoDB Auto-Creation Behavior
+
+When running the application with MongoDB:
+- The database (`bhiv_hr`) will be automatically created if it doesn't exist
+- Collections will be automatically created when data is first written to them
+- Indexes will be automatically created by the service modules when establishing connections
+- No manual database, collection, or index creation is required
+- The system follows MongoDB's "lazy creation" model where database resources are provisioned on demand
 
 ## Deployment
 
@@ -403,9 +498,21 @@ python test/test_all_endpoints.py
 # Run individual service tests
 python -m pytest test_suite/
 
-# Run end-to-end validation
+# Run end-to-end validation tests
 python test/e2e_validation_test.py
+
+# Run specific test modules
+python -m pytest test_suite/
 ```
+
+### Test Coverage
+
+The application includes comprehensive test coverage with:
+- **42 unique endpoints** validated with **49 test scenarios**
+- End-to-end validation tests for all services
+- Unit tests for individual components
+- Integration tests for cross-service functionality
+- API endpoint validation with proper authentication testing
 
 ## License
 

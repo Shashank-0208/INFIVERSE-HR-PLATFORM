@@ -53,22 +53,6 @@ graph TD
     L[Client Portal] --> B
 ```
 
-## 📊 System Overview
-
-| Metric | Value |
-|--------|-------|
-| **Platform Version** | v4.3.0 |
-| **Last Updated** | January 22, 2026 |
-| **Services** | 3 Core Microservices (Gateway, Agent, LangGraph) |
-| **Total Endpoints** | 111 (80 Gateway + 6 Agent + 25 LangGraph) |
-| **Database** | MongoDB Atlas (fully migrated from PostgreSQL) |
-| **Security Rating** | A+ |
-| **Status** | ✅ Production Ready |
-| **Architecture** | Multi-tenant SaaS with AI/ML integration |
-| **Deployment** | Docker + Render Cloud + Vercel Frontend |
-
----
-
 ## 🌐 Service Architecture & Communication
 
 ### Core Service Mapping
@@ -119,7 +103,7 @@ Frontend → API Gateway → [AI Agent, LangGraph] → MongoDB Atlas
 
 ## 📁 Complete Backend Directory Structure
 
-### Root Directory Components
+### Root Directory Components (c:\Infiverse-HR\backend\)
 
 ```
 backend/
@@ -153,7 +137,7 @@ backend/
 └── venv/                         # Virtual environment (if exists)
 ```
 
-### Services Directory Structure
+### Services Directory Structure (c:\Infiverse-HR\backend\services)
 
 ```
 services/
@@ -206,7 +190,7 @@ services/
 └── [Additional services...]      # Portal and supporting services
 ```
 
-### Documentation Directory Structure
+### Documentation Directory Structure (c:\Infiverse-HR\backend\docs)
 
 ```
 docs/
@@ -250,7 +234,7 @@ docs/
     └── TESTING_APPROACH.md
 ```
 
-### Testing Directory Structure
+### Testing Directory Structure (c:\Infiverse-HR\backend\tests)
 
 ```
 tests/
@@ -274,7 +258,7 @@ tests/
 └── requirements.txt             # Test dependencies
 ```
 
-### Tools Directory Structure
+### Tools Directory Structure (c:\Infiverse-HR\backend\tools)
 
 ```
 tools/
@@ -957,11 +941,11 @@ python services/gateway/migrate_mongodb_schema.py
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `test_authentication_changes.py` | Test authentication flows (candidate, recruiter, client) | `python test_authentication_changes.py` |
-| `test_mongodb_scripts.py` | Test MongoDB schema management scripts | `python test_mongodb_scripts.py` |
-| `services/gateway/verify_mongodb_schema.py` | Verify MongoDB schema and collections | `python services/gateway/verify_mongodb_schema.py` |
-| `services/gateway/create_mongodb_indexes.py` | Create recommended MongoDB indexes | `python services/gateway/create_mongodb_indexes.py` |
-| `services/gateway/migrate_mongodb_schema.py` | Migrate existing MongoDB data (add role fields) | `python services/gateway/migrate_mongodb_schema.py` |
+| `c:\Infiverse-HR\backend\test_authentication_changes.py` | Test authentication flows (candidate, recruiter, client) | `python test_authentication_changes.py` |
+| `c:\Infiverse-HR\backend\test_mongodb_scripts.py` | Test MongoDB schema management scripts | `python test_mongodb_scripts.py` |
+| `c:\Infiverse-HR\backend\services\gateway\verify_mongodb_schema.py` | Verify MongoDB schema and collections | `python services/gateway/verify_mongodb_schema.py` |
+| `c:\Infiverse-HR\backend\services\gateway\create_mongodb_indexes.py` | Create recommended MongoDB indexes | `python services/gateway/create_mongodb_indexes.py` |
+| `c:\Infiverse-HR\backend\services\gateway\migrate_mongodb_schema.py` | Migrate existing MongoDB data (add role fields) | `python services/gateway/migrate_mongodb_schema.py` |
 
 **Quick Test Commands:**
 ```bash
@@ -981,12 +965,38 @@ python services/gateway/create_mongodb_indexes.py
 python services/gateway/migrate_mongodb_schema.py
 ```
 
+**Comprehensive Test Suite:**
+```bash
+# Run all tests
+python tests/comprehensive_endpoint_tests.py
+
+# Run specific service tests
+python -m pytest tests/gateway/
+python -m pytest tests/agent/
+python -m pytest tests/langgraph/
+
+# Run security tests
+python -m pytest tests/security/
+
+# Run integration tests
+python -m pytest tests/integration/
+```
+
+**Test Coverage:**
+- **Gateway Service**: 77+ endpoints tested
+- **Agent Service**: 6 endpoints tested  
+- **LangGraph Service**: 25 endpoints tested
+- **Integration Tests**: Cross-service communication validation
+- **Security Tests**: Authentication and authorization validation
+- **Performance Tests**: Load and stress testing
+- **Regression Tests**: Ensuring no functionality loss
+
 ---
 
 ## 📁 Complete Project Structure
 
 ```
-backend/
+c:\Infiverse-HR\backend\
 ├── .env.example                    # Example environment variables file
 ├── .gitignore                     # Git ignore rules
 ├── README.md                      # This file (Main Documentation)
@@ -1298,59 +1308,93 @@ backend/
 │       └── verify_auth_and_params.py # Auth and parameters verification
 └── venv/                         # Virtual environment (if exists)
     └── ...                       # Python virtual environment files
-```
+---
 
 ## 🏗️ Backend Architecture Overview
 
 The BHIV HR Platform backend follows a modern microservices architecture with a focus on AI-powered recruitment processes and multi-tenant SaaS design. Here's a comprehensive breakdown of each component:
 
-### Root Level Components
+### Root Level Components (c:\Infiverse-HR\backend\)
 
-- **`.env.example`**: Template containing all required environment variables with placeholder values for database connections, API keys, and service configurations.
-- **`.gitignore`**: Specifies files and Git should ignore, including environment files, cache directories, and local configuration files.
-- **`README.md`**: Main documentation file providing setup instructions, architecture overview, and usage guidelines.
-- **`check_services.bat`**: Windows batch script that verifies the health status of all running backend services.
-- **`comprehensive_test_results.json`**: JSON file containing results from comprehensive integration tests, useful for CI/CD pipelines.
-- **`docker-compose.production.yml`**: Production-ready Docker Compose configuration for deploying all services in a containerized environment.
-- **`requirements.txt`**: Lists all Python dependencies required for the backend services to run properly.
-- **`run_services.py`**: Main orchestration script that starts all backend services with proper configurations and inter-service communication.
-- **`run_test_simple.py`**: Lightweight test runner for basic functionality verification.
-- **`run_with_venv.bat`**: Windows batch script that activates the virtual environment and starts all services.
-- **`seed_mongodb.py`**: Script to populate MongoDB with initial sample data for demonstration and testing purposes.
-- **`setup_venv.bat`**: Windows batch script to create and configure a Python virtual environment with all required dependencies.
-- **`test_mongodb_atlas.py`**: Test script to verify connectivity and basic operations with MongoDB Atlas.
-- **`test_mongodb_setup.py`**: Comprehensive test suite for MongoDB connection and schema validation.
-- **`MONGODB_VERIFICATION_REPORT.md`**: Detailed report of MongoDB connection tests and performance metrics.
-- **`__pycache__`**: Automatically generated directory containing Python bytecode cache files.
+- **`c:\Infiverse-HR\backend\.env.example`**: Template containing all required environment variables with placeholder values for database connections, API keys, and service configurations.
+- **`c:\Infiverse-HR\backend\.gitignore`**: Specifies files and Git should ignore, including environment files, cache directories, and local configuration files.
+- **`c:\Infiverse-HR\backend\README.md`**: Main documentation file providing setup instructions, architecture overview, and usage guidelines.
+- **`c:\Infiverse-HR\backend\check_services.bat`**: Windows batch script that verifies the health status of all running backend services.
+- **`c:\Infiverse-HR\backend\comprehensive_test_results.json`**: JSON file containing results from comprehensive integration tests, useful for CI/CD pipelines.
+- **`c:\Infiverse-HR\backend\docker-compose.production.yml`**: Production-ready Docker Compose configuration for deploying all services in a containerized environment.
+- **`c:\Infiverse-HR\backend\requirements.txt`**: Lists all Python dependencies required for the backend services to run properly.
+- **`c:\Infiverse-HR\backend\run_services.py`**: Main orchestration script that starts all backend services with proper configurations and inter-service communication.
+- **`c:\Infiverse-HR\backend\run_test_simple.py`**: Lightweight test runner for basic functionality verification.
+- **`c:\Infiverse-HR\backend\run_with_venv.bat`**: Windows batch script that activates the virtual environment and starts all services.
+- **`c:\Infiverse-HR\backend\seed_mongodb.py`**: Script to populate MongoDB with initial sample data for demonstration and testing purposes.
+- **`c:\Infiverse-HR\backend\setup_venv.bat`**: Windows batch script to create and configure a Python virtual environment with all required dependencies.
+- **`c:\Infiverse-HR\backend\test_mongodb_atlas.py`**: Test script to verify connectivity and basic operations with MongoDB Atlas.
+- **`c:\Infiverse-HR\backend\test_mongodb_setup.py`**: Comprehensive test suite for MongoDB connection and schema validation.
+- **`c:\Infiverse-HR\backend\MONGODB_VERIFICATION_REPORT.md`**: Detailed report of MongoDB connection tests and performance metrics.
+- **`c:\Infiverse-HR\backend\__pycache__`**: Automatically generated directory containing Python bytecode cache files.
+
+### Development Workflow & Best Practices
+
+**Code Standards:**
+- **Language**: Python 3.12+ with type hints for improved maintainability
+- **Framework**: FastAPI for all services with Pydantic for data validation
+- **Database**: MongoDB Atlas with asynchronous operations using Motor
+- **Authentication**: Dual authentication (API Key + JWT tokens) with role-based access control
+- **Testing**: Comprehensive unit, integration, and end-to-end testing with pytest
+- **Documentation**: Auto-generated API documentation with Swagger/OpenAPI
+- **Error Handling**: Centralized exception handling with proper error codes and messages
+- **Logging**: Structured logging with context-aware logging for debugging and monitoring
+
+**Branch Strategy:**
+- **`main`**: Production-ready code with all tests passing
+- **`develop`**: Integration branch for feature development
+- **`feature/*`**: Feature-specific branches for new functionality
+- **`hotfix/*`**: Urgent fixes for production issues
+- **`release/*`**: Release preparation branches
+
+**Pull Request Process:**
+1. Create feature branch from `develop`
+2. Implement changes with comprehensive tests
+3. Submit PR with detailed description and related issue reference
+4. Code review by at least one senior developer
+5. Automated testing passes (unit, integration, security)
+6. Merge to `develop` after approval
+
+**Quality Assurance:**
+- **Static Analysis**: Automated code quality checks with flake8, mypy, and bandit
+- **Security Scanning**: Regular vulnerability assessments
+- **Performance Testing**: Load testing for critical endpoints
+- **Code Coverage**: Minimum 85% test coverage required
+- **Peer Review**: Mandatory code reviews for all changes
 
 ### Legacy Components (Reference Only)
 
-#### Ishan's AI HR System Components
+#### Ishan's AI HR System Components (c:\Infiverse-HR\backend\Ishan's_AI_HR_System-main\)
 
 **Status**: Legacy/Reference - Not actively used in production
 
 These components represent the original AI HR system developed by Ishan, maintained for historical reference and potential future integration:
 
-- **`Ishan's_AI_HR_System-main/`**: Contains the original AI HR system with agents, routers, and utility functions that may still be referenced for AI logic.
-- **`app/agents/`**: AI agent implementations responsible for candidate matching and analysis.
-- **`app/routers/`**: API route definitions from the original AI system.
-- **`hr_intelligence_brain.py`**: Core AI logic for HR intelligence and decision-making.
-- **`start_system.py`**: Original startup script for the AI system.
+- **`c:\Infiverse-HR\backend\Ishan's_AI_HR_System-main\`**: Contains the original AI HR system with agents, routers, and utility functions that may still be referenced for AI logic.
+- **`c:\Infiverse-HR\backend\Ishan's_AI_HR_System-main\app\agents\`**: AI agent implementations responsible for candidate matching and analysis.
+- **`c:\Infiverse-HR\backend\Ishan's_AI_HR_System-main\app\routers\`**: API route definitions from the original AI system.
+- **`c:\Infiverse-HR\backend\Ishan's_AI_HR_System-main\hr_intelligence_brain.py`**: Core AI logic for HR intelligence and decision-making.
+- **`c:\Infiverse-HR\backend\Ishan's_AI_HR_System-main\start_system.py`**: Original startup script for the AI system.
 
 **Note**: Current AI functionality is integrated directly into the main services (gateway, agent, langgraph) for better maintainability and performance.
 
-#### Runtime Core Framework
+#### Runtime Core Framework (c:\Infiverse-HR\backend\runtime-core\)
 
 **Status**: Legacy/Reference - Not actively used in production
 
 The Sovereign Application Runtime (SAR) framework was developed as part of Task 7 and Task 8 requirements but is not currently integrated into the main BHIV HR Platform services. The core functionality has been integrated directly into the main services for better maintainability and performance.
 
-- **`runtime-core/auth/`**: Authentication services with JWT and API key management.
-- **`runtime-core/tenancy/`**: Multi-tenancy management with tenant isolation capabilities.
-- **`runtime-core/role_enforcement/`**: Role-based access control and permission management.
-- **`runtime-core/audit_logging/`**: Comprehensive audit trail system for compliance and monitoring.
-- **`runtime-core/workflow/`**: Workflow automation engine for business process orchestration.
-- **`runtime-core/framework/`**: Core framework utilities and common components.
+- **`c:\Infiverse-HR\backend\runtime-core\auth\`**: Authentication services with JWT and API key management.
+- **`c:\Infiverse-HR\backend\runtime-core\tenancy\`**: Multi-tenancy management with tenant isolation capabilities.
+- **`c:\Infiverse-HR\backend\runtime-core\role_enforcement\`**: Role-based access control and permission management.
+- **`c:\Infiverse-HR\backend\runtime-core\audit_logging\`**: Comprehensive audit trail system for compliance and monitoring.
+- **`c:\Infiverse-HR\backend\runtime-core\workflow\`**: Workflow automation engine for business process orchestration.
+- **`c:\Infiverse-HR\backend\runtime-core\framework\`**: Core framework utilities and common components.
 
 **Current Status**: The runtime-core framework serves as a reference implementation and educational resource. The actual production system has these components integrated directly into the main services.
 
@@ -1782,6 +1826,47 @@ Ctrl+C
 docker-compose -f docker-compose.production.yml down
 ```
 
+### Production Deployment
+
+**Render.com Deployment:**
+1. Create a new Web Service on Render
+2. Connect your GitHub repository
+3. Set the root directory to `backend/`
+4. Use the following environment variables:
+   - `DATABASE_URL`: Your MongoDB Atlas connection string
+   - `API_KEY_SECRET`: Your API key secret
+   - `JWT_SECRET_KEY`: Your JWT secret key
+   - `CANDIDATE_JWT_SECRET_KEY`: Your candidate JWT secret key
+   - All other required environment variables
+
+**Build Command:** `pip install -r requirements.txt`
+**Start Command:** `python run_services.py`
+
+**Vercel Deployment (Frontend):**
+1. Deploy frontend separately to Vercel
+2. Configure environment variables for API base URL
+3. Ensure CORS settings allow communication with backend services
+
+**Heroku Deployment:**
+1. Create Heroku app
+2. Add environment variables in Settings > Config Vars
+3. Deploy using Git integration or Heroku CLI
+
+**Environment-Specific Configuration:**
+- **Development:** Use local MongoDB or MongoDB Atlas sandbox tier
+- **Staging:** Use dedicated MongoDB Atlas cluster with staging data
+- **Production:** Use production-grade MongoDB Atlas cluster with backup enabled
+
+**Deployment Checklist:**
+- [ ] Environment variables properly configured
+- [ ] Database connection verified
+- [ ] SSL certificates installed (if using custom domains)
+- [ ] DNS records updated to point to deployed services
+- [ ] Health checks passing
+- [ ] Security scans completed
+- [ ] Performance testing completed
+- [ ] Backup and recovery procedures verified
+
 ---
 
 ## 📊 Monitoring
@@ -1853,6 +1938,39 @@ For new features and enhancements:
 - Leverage existing MongoDB Atlas infrastructure
 - Follow established security and authentication patterns
 - Maintain backward compatibility with existing APIs
+
+### Contribution Guidelines
+
+**Getting Started:**
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes following the coding standards
+4. Add tests for new functionality
+5. Update documentation as needed
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+**Coding Standards:**
+- Follow PEP 8 style guide for Python code
+- Use descriptive variable and function names
+- Write docstrings for all public methods and classes
+- Include type hints for function parameters and return values
+- Keep functions small and focused on a single responsibility
+- Write comprehensive comments for complex logic
+
+**Testing Requirements:**
+- All new features must include unit tests
+- Bug fixes must include regression tests
+- Achieve minimum 85% code coverage
+- Ensure all tests pass before submitting PR
+- Test against all supported Python versions
+
+**Documentation Updates:**
+- Update API documentation for new endpoints
+- Add usage examples for new features
+- Update README files as needed
+- Document breaking changes in release notes
 
 ---
 

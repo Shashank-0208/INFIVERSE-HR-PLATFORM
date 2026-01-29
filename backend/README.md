@@ -157,14 +157,18 @@ services/
 │   │   ├── __init__.py
 │   │   ├── database.py          # MongoDB async connection
 │   │   ├── db_helpers.py        # MongoDB utility functions
-│   │   └── main.py              # Main application (77+ endpoints)
+│   │   └── main.py              # Main application
 │   ├── config.py                # Configuration management
-│   ├── docker-compose.yml       # Service-specific compose
+│   ├── create_mongodb_indexes.py # MongoDB index creation
+│   ├── dependencies.py          # Authentication dependencies
 │   ├── jwt_auth.py              # JWT authentication
 │   ├── langgraph_integration.py # LangGraph service integration
+│   ├── migrate_mongodb_schema.py # MongoDB schema migration
 │   ├── monitoring.py            # Advanced monitoring 
 │   ├── requirements.txt         # Service-specific dependencies
-│   └── routes/                  # Modular route definitions
+│   ├── run.bat                # Windows run script
+│   ├── routes/                  # Modular route definitions
+│   └── verify_mongodb_schema.py # MongoDB schema verification
 ├── langgraph/                    # LangGraph Service (Port 9001)
 │   ├── Dockerfile               # Container configuration
 │   ├── README.md                # Service documentation
@@ -173,7 +177,6 @@ services/
 │   │   ├── main.py              # Main application 
 │   │   ├── agents.py            # Agent implementations
 │   │   ├── communication.py     # Multi-channel communication
-│   │   ├── config.py            # Configuration
 │   │   ├── database.py          # MongoDB connection
 │   │   ├── graphs.py            # Graph definitions
 │   │   ├── mongodb_checkpointer.py # Workflow checkpointing
@@ -185,9 +188,8 @@ services/
 │   │   ├── state.py             # State management
 │   │   ├── tools.py             # Tool implementations
 │   │   └── rl_integration/      # RL integration components
-│   ├── config.py                # Pydantic configuration
+│   ├── config.py                # Configuration
 │   ├── dependencies.py          # Authentication dependencies
-│   ├── docker-compose.yml       # Service-specific compose
 │   ├── jwt_auth.py              # JWT authentication
 │   ├── requirements.txt         # Service-specific dependencies
 │   └── tests/                   # Integration tests
@@ -1220,8 +1222,9 @@ c:\Infiverse-HR\backend\
 │   │   ├── Dockerfile
 │   │   ├── README.md
 │   │   ├── consolidated_schema.sql # Database schema (PostgreSQL)
-│   │   ├── docker-compose.yml   # Docker Compose
-│   │   └── requirements.txt     # Dependencies
+│   │   ├── deploy_schema_production.sql # Production deployment schema
+│   │   ├── fix_clients_table.sql # Clients table fix
+│   │   └── database/            # Database components
 │   ├── gateway/                  # API Gateway Service (Port 8000)
 │   │   ├── Dockerfile
 │   │   ├── README.md
@@ -1232,33 +1235,49 @@ c:\Infiverse-HR\backend\
 │   │   │   ├── main.py          # Main application
 │   │   │   └── monitoring.py    # Monitoring utilities
 │   │   ├── config.py            # Configuration
-│   │   ├── docker-compose.yml   # Docker Compose
+│   │   ├── create_mongodb_indexes.py # MongoDB index creation
+│   │   ├── dependencies.py      # Authentication dependencies
 │   │   ├── jwt_auth.py          # JWT authentication
 │   │   ├── langgraph_integration.py # LangGraph integration
+│   │   ├── migrate_mongodb_schema.py # MongoDB schema migration
 │   │   ├── monitoring.py        # Monitoring utilities
 │   │   ├── requirements.txt     # Dependencies
-│   │   └── routes/              # Route definitions
+│   │   ├── run.bat              # Windows run script
+│   │   ├── routes/              # Route definitions
+│   │   └── verify_mongodb_schema.py # MongoDB schema verification
 │   ├── langgraph/                # LangGraph Service (Port 9001)
 │   │   ├── Dockerfile
 │   │   ├── README.md
 │   │   ├── app/
 │   │   │   ├── __init__.py
-│   │   │   ├── app.py           # Main application
-│   │   │   ├── communication/   # Communication components
-│   │   │   ├── config.py        # Configuration
-│   │   │   ├── database.py      # Database connection
+│   │   │   ├── agents.py        # Agent implementations
+│   │   │   ├── communication.py # Multi-channel communication (single file)
+│   │   │   ├── database.py      # MongoDB connection
+│   │   │   ├── graphs.py        # Graph definitions
+│   │   │   ├── main.py          # Main application
+│   │   │   ├── mongodb_checkpointer.py # Workflow checkpointing
 │   │   │   ├── mongodb_tracker.py # MongoDB tracker
+│   │   │   ├── monitoring.py    # Monitoring utilities
 │   │   │   ├── rl_database.py   # RL database
-│   │   │   ├── rl_integration/  # RL integration components
-│   │   │   ├── semantic_matcher.py # Semantic matcher
-│   │   │   └── workflows/       # Workflow definitions
-│   │   ├── docker-compose.yml   # Docker Compose
+│   │   │   ├── rl_engine.py     # RL engine implementation
+│   │   │   ├── rl_performance_monitor.py # RL performance monitoring
+│   │   │   ├── state.py         # State management
+│   │   │   ├── tools.py         # Tool implementations
+│   │   │   └── rl_integration/  # RL integration components
+│   │   ├── config.py            # Configuration
+│   │   ├── dependencies.py      # Authentication dependencies
+│   │   ├── jwt_auth.py          # JWT authentication
 │   │   └── requirements.txt     # Dependencies
 │   └── portal/                   # Portal Service
 │       ├── Dockerfile
 │       ├── README.md
 │       ├── app.py               # Main application
-│       ├── docker-compose.yml   # Docker Compose
+│       ├── auth_manager.py      # Authentication manager
+│       ├── batch_upload.py      # Batch upload functionality
+│       ├── components/          # UI components
+│       ├── config.py            # Configuration
+│       ├── email_automation.py  # Email automation
+│       ├── file_security.py     # File security
 │       └── requirements.txt     # Dependencies
 ├── tests/                        # Comprehensive test suites
 │   ├── README.md                 # Tests README

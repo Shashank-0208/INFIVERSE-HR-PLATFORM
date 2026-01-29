@@ -1,5 +1,5 @@
 """
-Test suite for Workflow Engine in BHIV Application Framework
+Test suite for Workflow Engine in Sovereign Application Runtime (SAR)
 """
 import pytest
 import requests

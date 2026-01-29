@@ -1,5 +1,5 @@
 """
-Comprehensive Test Runner for BHIV Application Framework
+Comprehensive Test Runner for Sovereign Application Runtime (SAR)
 Executes all test suites and provides consolidated results
 """
 import subprocess

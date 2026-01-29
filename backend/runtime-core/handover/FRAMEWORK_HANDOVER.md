@@ -16,16 +16,17 @@
 
 ## Executive Summary
 
-The BHIV Application Framework is a production-ready, multi-tenant application platform evolved from the Sovereign Application Runtime (SAR). It provides essential infrastructure services for building secure, scalable SaaS applications with complete tenant isolation, robust security measures, and integrated AI/RL capabilities.
+The Sovereign Application Runtime (SAR) is a production-ready, multi-tenant application platform that provides essential infrastructure services for building secure, scalable SaaS applications with complete tenant isolation, robust security measures, and integrated MongoDB Atlas database backend.
 
 ### Key Features
 - **Authentication Service**: JWT/API key auth with 2FA and password management
 - **Tenancy Service**: Robust tenant isolation with cross-tenant access prevention
 - **Role Enforcement**: Comprehensive RBAC with 5 predefined roles
-- **Audit Logging**: Complete audit trails with provenance tracking
-- **Workflow Engine**: Business process automation with instance management
+- **Audit Logging**: Complete audit trails with provenance tracking and MongoDB storage
+- **Workflow Engine**: Business process automation with instance management and MongoDB persistence
 - **AI/RL Integration**: Intelligent automation and reinforcement learning hooks
-- **Integration Adapters**: Pluggable adapters for external systems
+- **Integration Adapters**: Pluggable adapters for external systems with secure API communication
+- **Database**: MongoDB Atlas integration as primary database backend with elastic scaling
 
 ### Business Value
 - **Reusable Infrastructure**: <10% glue code needed for new product integration
@@ -234,14 +235,24 @@ The framework relies on environment variables for configuration. The `.env.examp
 - `CANDIDATE_JWT_SECRET_KEY`: Secret for candidate tokens
 
 #### Database
-- `DATABASE_URL`: Connection string for database (currently for future migration)
+- `MONGODB_URI`: Connection string for MongoDB Atlas cluster
+- `MONGODB_DB_NAME`: Database name in MongoDB Atlas (default: bhiv_hr)
 
 #### Services
 - `GATEWAY_SERVICE_URL`: URL for gateway service
 - `AGENT_SERVICE_URL`: URL for agent service
 - `LANGGRAPH_SERVICE_URL`: URL for LangGraph service
 
-#### Security
+#### Integration Adapters
+- `ARTHA_API_URL`: Artha payroll system API endpoint
+- `ARTHA_API_KEY`: API key for Artha system
+- `KARYA_API_URL`: Karya task system API endpoint
+- `KARYA_API_KEY`: API key for Karya system
+- `INSIGHTFLOW_API_URL`: InsightFlow analytics API endpoint
+- `INSIGHTFLOW_API_KEY`: API key for InsightFlow system
+- `BUCKET_API_URL`: Bucket storage API endpoint
+- `BUCKET_CREDENTIALS`: Credentials for Bucket storage system
+#### Security Settings
 - `MAX_LOGIN_ATTEMPTS`: Maximum failed login attempts before lockout
 - `JWT_EXPIRATION_HOURS`: JWT token expiration time
 - `REQUIRE_PASSWORD_COMPLEXITY`: Whether to enforce password complexity
@@ -347,23 +358,23 @@ docker-compose -f docker-compose.yml up -d
 
 #### 1. Authentication Issues
 - **Problem**: Unable to authenticate
-- **Solution**: Verify API_KEY_SECRET and JWT_SECRET_KEY in environment variables
+- **Solution**: Verify API_KEY_SECRET, JWT_SECRET_KEY, and CANDIDATE_JWT_SECRET_KEY in environment variables. Check MongoDB Atlas connection for user data storage.
 
 #### 2. Tenant Isolation Not Working
 - **Problem**: Cross-tenant data access
-- **Solution**: Verify all database queries include tenant_id filters
+- **Solution**: Verify all database queries include tenant_id filters. Check MongoDB Atlas collection indexes for tenant_id fields.
 
 #### 3. Adapter Not Loading
 - **Problem**: Integration adapters not initializing
-- **Solution**: Check adapter configuration in environment variables
+- **Solution**: Check adapter configuration in environment variables. Verify MongoDB Atlas connection for adapter event logging.
 
 #### 4. AI/RL Service Integration Failing
 - **Problem**: AI/RL services not responding
-- **Solution**: Verify AI_SERVICE_ENDPOINT and RL_SERVICE_API_KEY, check service connectivity
+- **Solution**: Verify AI_SERVICE_ENDPOINT and RL_SERVICE_API_KEY, check service connectivity. Ensure MongoDB Atlas is available for RL data persistence.
 
 #### 5. Performance Issues
 - **Problem**: Slow response times
-- **Solution**: Check database performance, optimize queries, monitor resource usage
+- **Solution**: Check MongoDB Atlas connection pool settings, optimize database indexes, monitor resource usage. Consider enabling MongoDB Atlas performance advisor.
 
 ### Diagnostic Commands
 
@@ -371,11 +382,17 @@ docker-compose -f docker-compose.yml up -d
 # Check service health
 curl http://localhost:8000/health
 
+# Check MongoDB Atlas connection
+python -c "from runtime_core.tenancy.tenant_service import sar_tenant_resolver; print('MongoDB connection:', 'OK' if sar_tenant_resolver._db else 'FAILED')"
+
 # Check all endpoints
 python test/test_all_endpoints.py --verbose
 
 # View logs
 tail -f logs/application.log
+
+# Check adapter status
+curl http://localhost:8000/integration/
 ```
 
 ### Monitoring
@@ -424,6 +441,6 @@ tail -f logs/application.log
 
 ---
 
-**Handover Date**: January 17, 2026  
-**Framework Version**: BHIV Application Framework v1.0  
-**Document Version**: 1.0
+**Handover Date**: January 23, 2026  
+**Framework Version**: Sovereign Application Runtime (SAR) v2.0  
+**Document Version**: 2.0

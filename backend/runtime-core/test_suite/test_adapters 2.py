@@ -1,5 +1,5 @@
 """
-Test script to validate the adapter system for the BHIV Application Framework.
+Test script to validate the adapter system for the Sovereign Application Runtime (SAR).
 """
 
 from integration.adapter_manager import AdapterManager

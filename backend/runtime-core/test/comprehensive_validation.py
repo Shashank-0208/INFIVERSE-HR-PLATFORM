@@ -1,5 +1,5 @@
 """
-Comprehensive Validation Script for BHIV Application Framework
+Comprehensive Validation Script for Sovereign Application Runtime (SAR)
 
 This script performs comprehensive validation of the entire framework
 by testing actual API endpoints and verifying functionality.
@@ -17,7 +17,7 @@ import uuid
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class FrameworkValidator:
-    """Validates the BHIV Application Framework components"""
+    """Validates the Sovereign Application Runtime (SAR) components"""
     
     def __init__(self, base_url: str = "http://localhost:8000"):
         self.base_url = base_url

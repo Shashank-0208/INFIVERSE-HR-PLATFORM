@@ -1,5 +1,5 @@
 """
-Test suite for Integration Adapters in BHIV Application Framework
+Test suite for Integration Adapters in Sovereign Application Runtime (SAR)
 """
 import pytest
 import os

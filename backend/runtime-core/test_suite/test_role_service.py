@@ -1,5 +1,5 @@
 """
-Test suite for Role Enforcement Service in BHIV Application Framework
+Test suite for Role Enforcement Service in Sovereign Application Runtime (SAR)
 """
 import pytest
 import requests

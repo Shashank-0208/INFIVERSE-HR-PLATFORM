@@ -1,5 +1,5 @@
 """
-End-to-End Validation Test Suite for BHIV Application Framework
+End-to-End Validation Test Suite for Sovereign Application Runtime (SAR)
 
 This script performs comprehensive validation of all framework components
 to ensure proper functionality across the entire stack.
@@ -24,7 +24,7 @@ from workflow.workflow_engine import sar_workflow_engine
 
 
 class E2EValidationTests(unittest.TestCase):
-    """End-to-End validation tests for the BHIV Application Framework"""
+    """End-to-End validation tests for the Sovereign Application Runtime (SAR)"""
     
     def setUp(self):
         """Set up test environment"""

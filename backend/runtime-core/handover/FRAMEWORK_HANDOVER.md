@@ -15,16 +15,16 @@
 
 ## Executive Summary
 
-The Sovereign Application Runtime (SAR) is a production-ready, multi-tenant application platform that provides essential infrastructure services for building secure, scalable SaaS applications with complete tenant isolation, robust security measures, and integrated MongoDB database backend.
+The Sovereign Application Runtime (SAR) is a production-ready, multi-tenant application platform that provides essential infrastructure services for building secure, scalable SaaS applications with complete tenant isolation, robust security measures, and integrated MongoDB Atlas database backend. **Note**: The production BHIV HR Platform has 111 operational endpoints across 6 services with MongoDB Atlas integration and operates in single-tenant mode with multi-tenant framework ready. **Current System Status**: MongoDB Atlas migration complete, 111 endpoints operational, production-ready single-tenant system.
 
 ### Key Features
-- **Authentication Service**: JWT/API key auth with 2FA and password management
+- **Authentication Service**: Triple authentication system with API Key, Client JWT, and Candidate JWT tokens, plus 2FA and password management
 - **Tenancy Service**: Robust tenant isolation with cross-tenant access prevention
 - **Role Enforcement**: Comprehensive RBAC with 5 predefined roles
 - **Audit Logging**: Complete audit trails with provenance tracking and MongoDB storage
 - **Workflow Engine**: Business process automation with instance management and MongoDB persistence
 - **Integration Adapters**: Pluggable adapters for external systems with secure API communication
-- **Database**: MongoDB integration as primary database backend with elastic scaling
+- **Database**: MongoDB Atlas integration as primary database backend with elastic scaling, auto-backup, and monitoring
 
 ### Business Value
 - **Reusable Infrastructure**: <10% glue code needed for new product integration
@@ -38,7 +38,7 @@ The Sovereign Application Runtime (SAR) is a production-ready, multi-tenant appl
 - Python 3.12+
 - pip package manager
 - Docker (optional, for containerized deployment)
-- MongoDB instance (local or Atlas)
+- MongoDB Atlas instance (production) or local MongoDB (development)
 
 ### Installation
 ```bash

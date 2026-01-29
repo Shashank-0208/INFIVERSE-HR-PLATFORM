@@ -1,7 +1,7 @@
 # Tenant Isolation Checklist
 
 ## Overview
-This document outlines the comprehensive checklist for verifying tenant isolation mechanisms in the BHIV Application Framework. Tenant isolation is a critical security feature that ensures data separation between different tenants in the multi-tenant SaaS architecture.
+This document outlines the comprehensive checklist for verifying tenant isolation mechanisms in the BHIV HR Platform. Tenant isolation is a critical security feature that ensures data separation between different tenants in the multi-tenant SaaS architecture. **Current System Status**: MongoDB Atlas migration complete, 111 endpoints operational, production-ready single-tenant system with multi-tenant framework ready.
 
 ## Core Isolation Mechanisms
 
@@ -15,16 +15,16 @@ This document outlines the comprehensive checklist for verifying tenant isolatio
 ### 2. Cross-Tenant Access Prevention
 - [ ] Cross-tenant access validation prevents unauthorized data access
 - [ ] Tenant isolation checks are performed at the database level
-- [ ] MongoDB query filters are automatically generated based on tenant ID
+- [ ] MongoDB Atlas query filters are automatically generated based on tenant ID
 - [ ] Shared resources are properly identified and accessed according to tenant permissions
 - [ ] Tenant-aware tables are isolated per tenant (jobs, applications, interviews, offers)
 - [ ] Shared data (candidates) is accessed with proper tenant context
 
 ### 3. Database-Level Isolation
-- [ ] All tenant-specific data includes tenant_id field
-- [ ] Database queries automatically filter by tenant_id
+- [ ] All tenant-specific data includes client_id field (current implementation uses client_id instead of tenant_id for single-tenant operation)
+- [ ] Database queries automatically filter by client_id (current implementation uses client_id instead of tenant_id for single-tenant operation)
 - [ ] No direct access to cross-tenant data is possible
-- [ ] Indexes are created on tenant_id fields for performance
+- [ ] Indexes are created on client_id fields for performance (current implementation uses client_id instead of tenant_id for single-tenant operation)
 - [ ] Foreign key constraints respect tenant boundaries
 
 ### 4. API-Level Isolation
@@ -36,12 +36,14 @@ This document outlines the comprehensive checklist for verifying tenant isolatio
 
 ## Authentication & Authorization Integration
 
-### 5. Dual Authentication Support
-- [ ] Both API key and JWT token authentication work with tenant isolation
+### 5. Triple Authentication Support
+- [ ] API key, Client JWT, and Candidate JWT authentication work with tenant isolation
 - [ ] API key users have appropriate tenant context
-- [ ] JWT token users have tenant context extracted from claims
+- [ ] Client JWT token users have tenant context extracted from claims
+- [ ] Candidate JWT token users have proper scope limitations
 - [ ] Authentication middleware integrates with tenant resolution
 - [ ] Token validation respects tenant boundaries
+- [ ] Client_id properly used for tenant context in single-tenant operation
 
 ### 6. Role-Based Access Control (RBAC)
 - [ ] Role enforcement respects tenant boundaries

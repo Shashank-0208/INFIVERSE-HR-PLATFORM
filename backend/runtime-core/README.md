@@ -24,7 +24,7 @@ The Sovereign Application Runtime (SAR) is a modular, multi-tenant framework des
 
 ### Features
 - **Multi-tenant SaaS Architecture**: Complete tenant isolation with no cross-tenant data access
-- **Dual Authentication System**: Support for both API keys and JWT tokens with 2FA capabilities
+- **Triple Authentication System**: Support for API keys, Client JWT tokens, and Candidate JWT tokens with 2FA capabilities
 - **Role-Based Access Control (RBAC)**: Comprehensive permission system with flexible role assignments
 - **Comprehensive Audit Logging**: Complete audit trails with provenance tracking for all operations
 - **Workflow Engine**: Business process automation with dependency management
@@ -407,6 +407,7 @@ When running the application with MongoDB:
 The SAR can be deployed in various configurations:
 
 - **Sovereign Cloud**: Deployable in KSA/UAE infrastructure
+- **MongoDB Atlas**: Production-ready cloud database with auto-scaling
 - **Self-Hosted**: On-premises deployment with no external dependencies
 - **Containerized**: Docker-based deployment for easy scaling
 - **Cloud-Native**: Kubernetes-ready for cloud deployments
@@ -513,6 +514,8 @@ The application includes comprehensive test coverage with:
 - Unit tests for individual components
 - Integration tests for cross-service functionality
 - API endpoint validation with proper authentication testing
+
+**Note**: This framework serves as a reference implementation. The production BHIV HR Platform has 111 operational endpoints across 6 services with MongoDB Atlas integration.
 
 ## License
 

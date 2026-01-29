@@ -1054,7 +1054,10 @@ c:\Infiverse-HR\backend\
 ├── Task/                         # Task documentation files
 │   ├── BHIV HR Demo Ready Task 9.md # Task 9 documentation
 │   ├── TAsk 8.md                # Task 8 documentation
-│   └── Task 7.md                # Task 7 documentation
+│   ├── Task 7.md                # Task 7 documentation
+│   ├── task 9.md                # Task 9 requirements (Sovereign-Ready, Demo-Stable Alignment)
+│   ├── task10.md                # Task 10 requirements (Reusable Hiring Loop Extraction)
+│   └── task11.md                # Task 11 requirements (Internal Test Readiness & Truth Lock)
 ├── assets/                       # Asset files
 │   └── data/
 │       └── candidates.csv        # Sample candidate data
@@ -1076,9 +1079,13 @@ c:\Infiverse-HR\backend\
 │   │   ├── MONGODB_COLLECTIONS.md # MongoDB collections
 │   │   └── POSTGRES_MIGRATION_PLAN.md # PostgreSQL migration plan
 │   ├── demo/                     # Demo documentation
-│   │   └── DEMO_SCOPE.md         # Demo scope definition
+│   │   └── DEMO_SCOPE.md         # Demo scope definition 
 │   ├── framework/                # Framework documentation
-│   │   └── BOUNDARY_DEFINITION.md # Boundary definition
+│   │   ├── BOUNDARY_DEFINITION.md # Boundary definition 
+│   │   ├── GENERIC_REFACTORING_PLAN.md # Generic refactoring plan
+│   │   ├── HIRING_LOOP_OVERVIEW.md # Hiring loop overview 
+│   │   ├── REUSABILITY_GUIDE.md   # Reusability guide 
+│   │   └── FRAMEWORK_HANDOVER.md  # Framework handover
 │   ├── guides/                   # Guides
 │   │   ├── AUTHENTICATION_FLOW.md # Authentication flow
 │   │   ├── BACKEND_INTEGRATION_GUIDE.md # Backend integration guide
@@ -1098,11 +1105,15 @@ c:\Infiverse-HR\backend\
 │   │   └── PERFORMANCE_REPORT.md # Performance report
 │   ├── security/                 # Security documentation
 │   │   ├── API_SECURITY.md       # API security
+│   │   ├── ARTIFACT_SECURITY.md  # Artifact security
+│   │   ├── AUDIT_AND_TRACEABILITY.md # Audit and traceability
 │   │   ├── AUTHENTICATION_SECURITY.md # Authentication security
 │   │   ├── SECURITY_AUDIT.md     # Security audit
-│   │   └── SECURITY_IMPLEMENTATION.md # Security implementation
+│   │   ├── SECURITY_IMPLEMENTATION.md # Security implementation
+│   │   └── TENANT_ISOLATION_STATUS.md # Tenant isolation status
 │   ├── system/                   # System documentation
-│   │   └── CURRENT_REALITY.md    # Current reality assessment
+│   │   ├── CURRENT_REALITY.md    # Current reality assessment 
+│   │   └── UPDATE_SUMMARY.md     # Update summary
 │   └── testing/                  # Testing documentation
 │       ├── COMPREHENSIVE_TESTING_STRATEGY.md # Comprehensive testing strategy
 │       ├── ENDPOINT_TESTING.md   # Endpoint testing
@@ -1123,19 +1134,22 @@ c:\Infiverse-HR\backend\
 │   │   └── ISSUES_AND_LIMITATIONS.md         # Issues and limitations log
 │   ├── postman/                  # Postman collections
 │   │   └── postman_collection.json # Main Postman collection
-│   ├── FAQ.md                    # Frequently asked questions
+│   ├── DEMO_RUNBOOK.md           # Demo runbook 
+│   ├── FAQ.md                    # Frequently asked questions 
+│   ├── FRONTEND_BACKEND_SYNC.md  # Frontend-backend sync 
 │   ├── HOW_TO_TEST.md            # Testing guide
+│   ├── INTERNAL_TEST_CHECKLIST.md # Internal test checklist 
 │   ├── ISOLATION_CHECKLIST.md    # Isolation checklist
-│   ├── KNOWN_GAPS.md             # Known gaps
-│   └── postman/                 # Postman collection and documentation
-│       ├── POSTMAN_README.md    # Postman documentation
+│   ├── KNOWN_GAPS.md             # Known gaps 
 │   ├── QA_CHECKLIST.md           # QA checklist
+│   ├── REAL_HIRING_LOOP.md       # Real hiring loop validation 
 │   ├── READ_THIS_FIRST.md        # Initial handover instructions
 │   ├── ROLE_MATRIX.md            # Role matrix
 │   ├── RUNBOOK.md                # Operations runbook
 │   ├── START_HERE.md             # Starting point documentation
 │   ├── SYSTEM_BEHAVIOR.md        # System behavior
 │   ├── TENANT_ASSUMPTIONS.md     # Tenant assumptions
+│   ├── TRUTH_MATRIX.md           # Truth matrix 
 │   └── generate_totp.py          # TOTP generation utility
 
 ├── runtime-core/                 # Legacy: Sovereign Application Runtime framework (Reference Only)
@@ -1158,10 +1172,12 @@ c:\Infiverse-HR\backend\
 │   ├── docs/                     # Runtime documentation
 │   │   ├── README.md
 │   │   ├── IMPLEMENTATION_GUIDE.md # Implementation guide
-│   │   └── OVERVIEW.md          # Overview documentation
+│   │   ├── OVERVIEW.md          # Overview documentation
+│   │   └── FRAMEWORK_HANDOVER.md # Framework handover 
 
 │   ├── handover/                 # Runtime handover
-│   │   └── README.md
+│   │   ├── README.md
+│   │   └── FRAMEWORK_HANDOVER.md # Framework handover 
 │   ├── integration/              # Integration components
 │   │   ├── README.md
 │   │   └── integration_service.py # Integration service
@@ -1172,6 +1188,8 @@ c:\Infiverse-HR\backend\
 │   │   ├── role_checker.py      # Role checker
 │   │   └── validators.py        # Validators
 │   ├── sovereign/                # Sovereign components
+│   │   ├── DEPLOYMENT_READINESS.md # Deployment readiness 
+│   │   ├── UPDATE_SUMMARY.md      # Update summary
 │   │   └── README.md
 │   ├── tenancy/                  # Tenancy management
 │   │   ├── README.md
@@ -1421,6 +1439,7 @@ Comprehensive documentation system covering all aspects of the platform:
 - **`docs/framework/`**: Boundary definitions for HR-specific vs reusable platform logic.
 - **`docs/guides/`**: Step-by-step guides for development, deployment, and troubleshooting.
 - **`docs/security/`**: Security implementation details, authentication flows, and audit requirements.
+- **`docs/sovereign/`**: Sovereign deployment documentation.
 - **`docs/system/`**: Current reality assessments and system status documentation.
 - **`docs/testing/`**: Comprehensive testing strategies and approach documentation.
 
@@ -1430,9 +1449,18 @@ Critical operational documentation for system maintenance and transfer:
 
 - **`handover/api_contract/`**: Detailed API contracts for each microservice.
 - **`handover/postman/`**: Complete Postman collections for API testing and validation.
+- **`handover/DEMO_RUNBOOK.md`**: Demo runbook for safe demonstration procedures.
+- **`handover/FAQ.md`**: Frequently asked questions with honest answers.
+- **`handover/INTERNAL_TEST_CHECKLIST.md`**: Comprehensive internal testing checklist.
+- **`handover/KNOWN_GAPS.md`**: Documented known gaps and limitations .
+- **`handover/QA_CHECKLIST.md`**: QA checklist for testing validation .
+- **`handover/REAL_HIRING_LOOP.md`**: End-to-end hiring loop validation .
 - **`handover/RUNBOOK.md`**: Operational runbook with procedures for system maintenance.
 - **`handover/START_HERE.md`**: Starting point documentation for new team members.
 - **`handover/SYSTEM_BEHAVIOR.md`**: Detailed documentation of system behaviors and expected responses.
+- **`handover/TENANT_ASSUMPTIONS.md`**: Assumptions about tenant isolation and multi-tenancy.
+- **`handover/TRUTH_MATRIX.md`**: Reality audit and truth lock documentation .
+- **`handover/FRONTEND_BACKEND_SYNC.md`**: Frontend-backend synchronization validation.
 
 ### Runtime Core Framework
 
@@ -2004,3 +2032,10 @@ For issues or questions:
 - [Security Documentation](docs/security/SECURITY_AUDIT.md)
 - [Deployment Guide](docs/guides/CLOUD_DEPLOYMENT_GUIDE.md)
 - [Handover Documentation](handover/README.md)
+- [Demo-Stable Alignment](docs/demo/DEMO_SCOPE.md)
+- [Reusable Hiring Loop Extraction](docs/framework/HIRING_LOOP_OVERVIEW.md)
+- [Internal Test Readiness & Truth Lock](docs/TRUTH_MATRIX.md)
+- [Current System Reality](docs/system/CURRENT_REALITY.md)
+- [Deployment Readiness](docs/sovereign/DEPLOYMENT_READINESS.md)
+- [Tenant Isolation Status](docs/security/TENANT_ISOLATION_STATUS.md)
+- [Framework Reusability Guide](docs/framework/REUSABILITY_GUIDE.md)

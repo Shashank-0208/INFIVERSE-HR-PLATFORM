@@ -210,8 +210,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem('candidate_id', String(result.user.id));
         }
         
-        // Set user in state
-        setUser(result.user);
+        // Do NOT setUser(result.user) here. Any component observing user could redirect or set
+        // authReady before token is stored and verified. setUser is called only after token
+        // verification (below) so Dashboard and others never see user without a valid token.
         
         // IMPORTANT: Auto-login after successful registration to get auth token
         // Registration doesn't return a token, so we need to log in to get one

@@ -46,6 +46,7 @@ def setup_logging():
         logging.getLogger("uvicorn").setLevel(logging.WARNING)
         logging.getLogger("transformers").setLevel(logging.WARNING)
         logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+        logging.getLogger("httpx").setLevel(logging.WARNING)  # Suppress HTTP request logs
 
 # Configuration validation
 def validate_config():

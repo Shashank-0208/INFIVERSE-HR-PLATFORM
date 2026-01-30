@@ -87,6 +87,13 @@ COMMON_ENV = {
     "LOG_LEVEL": "INFO",
     "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY", "AIzaSyC8vbb0qAgcFlHw6fA14Ta6Nr7zsG5ELIs"),
     "GEMINI_MODEL": os.getenv("GEMINI_MODEL", "gemini-pro"),
+    # Hugging Face Configuration - Use environment variables only
+    "HF_TOKEN": os.getenv("HF_TOKEN"),  # No default value to prevent hardcoding
+    "HF_HUB_DISABLE_SYMLINKS_WARNING": "1",
+    "HF_HUB_DISABLE_TELEMETRY": "1",
+    "HF_HUB_DISABLE_PROGRESS_BARS": "1",
+    "TRANSFORMERS_VERBOSITY": "error",
+    "TOKENIZERS_PARALLELISM": "false",
 }
 
 # Track running processes

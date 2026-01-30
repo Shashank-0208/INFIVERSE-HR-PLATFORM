@@ -25,6 +25,17 @@ except Exception as e:
     print(f"Configuration error: {e}")
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
+# Ensure Hugging Face token is loaded before importing semantic engine
+hf_token = os.getenv("HF_TOKEN")
+if hf_token:
+    os.environ["HF_TOKEN"] = hf_token
+    # Also set other optimization variables
+    os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 # Import Phase 3 engine from shared semantic_engine module
 try:
     from semantic_engine.phase3_engine import (

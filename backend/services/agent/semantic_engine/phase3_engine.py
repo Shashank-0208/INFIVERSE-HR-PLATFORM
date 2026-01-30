@@ -45,6 +45,21 @@ class Phase3SemanticEngine:
         """Initialize semantic model and learning components"""
         try:
             logger.info("Initializing Phase 3 Semantic Engine...")
+            
+            # Set Hugging Face token if available
+            hf_token = os.getenv("HF_TOKEN")
+            if hf_token:
+                logger.info("Using authenticated Hugging Face access with token")
+                # Set the token for the current process
+                os.environ["HF_TOKEN"] = hf_token
+            
+            # Initialize model with v4-compatible token usage
+            # Set token in environment (v4 approach)
+            if hf_token:
+                os.environ["HF_TOKEN"] = hf_token
+                logger.info("HF_TOKEN set in environment for v4 compatibility")
+            
+            # Load model without deprecated use_auth_token parameter
             self.model = SentenceTransformer('all-MiniLM-L6-v2')
             self._load_company_preferences()
             logger.info("Phase 3 Semantic Engine initialized successfully")

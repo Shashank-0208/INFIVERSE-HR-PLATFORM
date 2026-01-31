@@ -62,7 +62,7 @@ gateway/
 Recruiter portal (Values Assessment, Export Reports, Search) uses JWT; these endpoints accept both JWT and API Key (`get_auth`).
 
 ### AI Matching Engine (2 endpoints)
-- `GET /v1/match/{job_id}/top` - AI-powered semantic candidate matching; on Agent timeout/failure, returns DB fallback matches. Timeout configurable via `AGENT_MATCH_TIMEOUT` (default 20s).
+- `GET /v1/match/{job_id}/top` - AI-powered semantic candidate matching; on Agent timeout/failure, returns DB fallback matches. Timeout configurable via `AGENT_MATCH_TIMEOUT` (default 60s).
 - `POST /v1/match/batch` - Batch AI matching via Agent Service
 
 ### Assessment & Workflow (6 endpoints)
@@ -210,7 +210,7 @@ LANGGRAPH_SERVICE_URL=http://localhost:9001
 
 # AI matching (optional)
 # Seconds to wait for Agent before falling back to DB matching. Default 20; set 60 for full AI when agent is fast.
-AGENT_MATCH_TIMEOUT=20
+AGENT_MATCH_TIMEOUT=60
 
 # Optional: AI Services
 GEMINI_API_KEY=<your-gemini-key>

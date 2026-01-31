@@ -28,7 +28,7 @@
 - **POST /v1/jobs/{job_id}/shortlist** – Mark a candidate as shortlisted for a job (JWT/API Key). Upserts `job_applications` with `job_id`, `candidate_id`, `status: "shortlisted"`.
 - **Job IDs:** All job identifiers are MongoDB ObjectId strings (24-char hex). Frontend and API use this format everywhere (no numeric job IDs).
 - **Candidate endpoints auth:** `GET /v1/candidates`, `GET /v1/candidates/stats`, `GET /v1/candidates/search`, `GET /v1/candidates/job/{job_id}`, `GET /v1/candidates/{candidate_id}` now accept **JWT or API Key** (`get_auth`) so recruiter portal (Values Assessment, Export Reports, Search) works with logged-in user tokens (fixes 401).
-- **AI match:** `GET /v1/match/{job_id}/top` uses configurable **AGENT_MATCH_TIMEOUT** (default 20s). On Agent timeout or failure, gateway returns DB fallback matches. Set `AGENT_MATCH_TIMEOUT=60` in `.env` for full AI wait when agent is fast.
+- **AI match:** `GET /v1/match/{job_id}/top` uses configurable **AGENT_MATCH_TIMEOUT** (default 60s). On Agent timeout or failure, gateway returns DB fallback matches. Set `AGENT_MATCH_TIMEOUT=20` in `.env` for quicker fallback when agent is slow.
 
 ### **Database**
 - **job_applications** collection documented and used by shortlist endpoint (`job_id`, `candidate_id` as strings; `status`, `created_at`, `updated_at`).

@@ -941,9 +941,8 @@ async def get_top_matches(job_id: str, limit: int = 10, auth = Depends(get_auth)
     try:
         import httpx
         agent_url = os.getenv("AGENT_SERVICE_URL")
-        # Use a shorter default (20s) so we fall back to DB quickly when agent is slow
-        # or degraded after extended run; set AGENT_MATCH_TIMEOUT=60 for full AI/ML time.
-        agent_timeout = float(os.getenv("AGENT_MATCH_TIMEOUT", "20"))
+        # 60s default for AI shortlist: allows full AI/ML time; fallback to DB on timeout/failure.
+        agent_timeout = float(os.getenv("AGENT_MATCH_TIMEOUT", "60"))
         async with httpx.AsyncClient(timeout=agent_timeout) as client:
             response = await client.post(
                 f"{agent_url}/match",

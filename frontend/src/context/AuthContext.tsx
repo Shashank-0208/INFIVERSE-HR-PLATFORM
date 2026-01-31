@@ -24,29 +24,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Initialize auth from stored JWT token
+    // Initialize auth from stored JWT token; derive role from token so role is correct on reload
     const token = localStorage.getItem('auth_token');
     const userData = localStorage.getItem('user_data');
     
     if (token && userData) {
       try {
-        // Check if token is expired
         const payload = JSON.parse(atob(token.split('.')[1]));
         const currentTime = Math.floor(Date.now() / 1000);
         
         if (payload.exp > currentTime) {
-          // Token is valid, set user data
-          setUser(JSON.parse(userData));
+          const parsed = JSON.parse(userData) as User;
+          // Use role from JWT payload so recruiter/client stay on correct portal after reload
+          const roleFromToken = payload.role;
+          const role = typeof roleFromToken === 'string' && ['candidate', 'recruiter', 'client'].includes(roleFromToken)
+            ? roleFromToken
+            : (parsed.role || localStorage.getItem('user_role') || 'candidate');
+          const userWithRole = { ...parsed, role };
+          setUser(userWithRole);
+          localStorage.setItem('user_role', role);
         } else {
-          // Token is expired, clear stored data
           localStorage.removeItem('auth_token');
           localStorage.removeItem('user_data');
+          localStorage.removeItem('user_role');
         }
       } catch (error) {
         console.error('Error parsing token or user data:', error);
-        // Clear invalid data
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user_data');
+        localStorage.removeItem('user_role');
       }
     }
     

@@ -160,7 +160,7 @@ All 111 endpoints organized by functional category across the three microservice
 | Agent | POST | /match | API Key | AI-powered candidate matching with RL integration |
 | Agent | POST | /batch-match | API Key | Batch AI matching for multiple jobs |
 
-**Match behaviour:** `GET /v1/match/{job_id}/top` calls the Agent service with a configurable timeout (`AGENT_MATCH_TIMEOUT`, default 20 seconds). If the Agent does not respond in time or errors, the gateway returns matches from the database (keyword/location fallback). Use `AGENT_MATCH_TIMEOUT=60` in `.env` for full AI wait when the agent is fast.
+**Match behaviour:** `GET /v1/match/{job_id}/top` calls the Agent service with a configurable timeout (`AGENT_MATCH_TIMEOUT`, default 60 seconds). If the Agent does not respond in time or errors, the gateway returns matches from the database (keyword/location fallback). Set `AGENT_MATCH_TIMEOUT=20` in `.env` for quicker fallback when the agent is slow.
 
 ### **Authentication & User Management Endpoints (14)**
 

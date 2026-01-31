@@ -51,11 +51,12 @@ export default function ApplicantsMatching() {
     }
   }, [jobId])
 
+  // Load candidates when a job is selected (from URL, query, or dropdown/first job)
   useEffect(() => {
-    if (jobId && effectiveJobId && jobId === effectiveJobId) {
+    if (jobId) {
       loadData()
     }
-  }, [jobId, effectiveJobId])
+  }, [jobId])
 
   // Auto-refresh candidates every 30 seconds when candidates are loaded
   useEffect(() => {

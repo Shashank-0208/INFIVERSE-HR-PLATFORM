@@ -12,35 +12,6 @@ export default function AppliedJobs() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
 
-  // Get backend candidate ID (integer) for API calls, fallback to user ID
-  const backendCandidateId = localStorage.getItem('backend_candidate_id')
-  const candidateId = backendCandidateId || user?.id || localStorage.getItem('candidate_id') || ''
-
-  useEffect(() => {
-    loadApplications()
-  }, [loadApplications])
-
-  // Reload applications when component becomes visible or tab is focused
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadApplications()
-      }
-    }
-
-    const handleFocus = () => {
-      loadApplications()
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('focus', handleFocus)
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [loadApplications])
-
   const loadApplications = useCallback(async () => {
     // Check authentication first
     const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true' || !!user
@@ -75,6 +46,31 @@ export default function AppliedJobs() {
       setLoading(false)
     }
   }, [user])
+
+  useEffect(() => {
+    loadApplications()
+  }, [loadApplications])
+
+  // Reload applications when component becomes visible or tab is focused
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadApplications()
+      }
+    }
+
+    const handleFocus = () => {
+      loadApplications()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [loadApplications])
 
   const getStatusConfig = (status: string) => {
     const configs: Record<string, { color: string; label: string }> = {

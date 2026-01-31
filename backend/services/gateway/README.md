@@ -19,7 +19,7 @@ The Gateway service serves as the primary entry point for the BHIV HR Platform, 
 ```
 gateway/
 ├── app/                    # FastAPI application core
-│   ├── main.py             # Main application with 77+ endpoints
+│   ├── main.py             # Main application with 82+ endpoints
 │   ├── database.py         # MongoDB async connection
 │   └── db_helpers.py       # MongoDB utility functions
 ├── config.py               # Environment configuration
@@ -44,19 +44,25 @@ gateway/
 - `GET /openapi.json` - OpenAPI Schema
 - `GET /v1/test-candidates` - Database Connectivity Test
 
-### Job Management (2 endpoints)
+### Job Management (4 endpoints)
+- `GET /v1/jobs` - List All Active Jobs (public)
+- `GET /v1/jobs/{job_id}` - Get a single job by ID (MongoDB ObjectId string)
 - `POST /v1/jobs` - Create New Job Posting
-- `GET /v1/jobs` - List All Active Jobs
+- `POST /v1/jobs/{job_id}/shortlist` - Mark a candidate as shortlisted for a job (JWT/API Key; upserts `job_applications`)
+
+**Job ID format:** All job IDs are MongoDB ObjectId strings (24-character hex). Use them in paths and request bodies; the frontend uses this format for screening, shortlist, and match endpoints.
 
 ### Candidate Management (5 endpoints)
-- `GET /v1/candidates` - Get All Candidates with Pagination
-- `GET /v1/candidates/search` - Search & Filter Candidates
-- `GET /v1/candidates/job/{job_id}` - Get All Candidates for Specific Job
-- `GET /v1/candidates/{candidate_id}` - Get Specific Candidate by ID
-- `POST /v1/candidates/bulk` - Bulk Upload Candidates
+- `GET /v1/candidates` - Get All Candidates with Pagination (JWT or API Key)
+- `GET /v1/candidates/search` - Search & Filter Candidates (JWT or API Key)
+- `GET /v1/candidates/job/{job_id}` - Get All Candidates for Specific Job (JWT or API Key)
+- `GET /v1/candidates/{candidate_id}` - Get Specific Candidate by ID (JWT or API Key)
+- `POST /v1/candidates/bulk` - Bulk Upload Candidates (API Key)
+
+Recruiter portal (Values Assessment, Export Reports, Search) uses JWT; these endpoints accept both JWT and API Key (`get_auth`).
 
 ### AI Matching Engine (2 endpoints)
-- `GET /v1/match/{job_id}/top` - AI-powered semantic candidate matching
+- `GET /v1/match/{job_id}/top` - AI-powered semantic candidate matching; on Agent timeout/failure, returns DB fallback matches. Timeout configurable via `AGENT_MATCH_TIMEOUT` (default 20s).
 - `POST /v1/match/batch` - Batch AI matching via Agent Service
 
 ### Assessment & Workflow (6 endpoints)
@@ -173,7 +179,7 @@ gateway/
 ### MongoDB Atlas
 - **Driver:** Motor (async MongoDB driver for FastAPI)
 - **Connection:** AsyncIOMotorClient with connection pooling
-- **Collections:** Candidates, jobs, feedback, interviews, offers, clients, users, matching_cache, audit_logs, rate_limits, csp_violations, company_scoring_preferences
+- **Collections:** candidates, jobs, job_applications (shortlist status), feedback, interviews, offers, clients, users, matching_cache, audit_logs, rate_limits, csp_violations, company_scoring_preferences
 - **Schema:** Dynamic schema with automatic ObjectId to string conversion
 - **Operations:** Async CRUD operations with proper error handling
 
@@ -201,6 +207,10 @@ GATEWAY_SECRET_KEY=<your-gateway-secret>
 # Service URLs
 AGENT_SERVICE_URL=http://localhost:9000
 LANGGRAPH_SERVICE_URL=http://localhost:9001
+
+# AI matching (optional)
+# Seconds to wait for Agent before falling back to DB matching. Default 20; set 60 for full AI when agent is fast.
+AGENT_MATCH_TIMEOUT=20
 
 # Optional: AI Services
 GEMINI_API_KEY=<your-gemini-key>

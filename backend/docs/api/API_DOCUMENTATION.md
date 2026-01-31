@@ -1,10 +1,12 @@
 # 📚 BHIV HR Platform - Complete API Documentation
 
-**Updated**: January 22, 2026  
+**Updated**: January 30, 2026  
 **API Version**: v4.3.0 Production Ready  
-**Total Endpoints**: 111 (80 Gateway + 6 Agent + 25 LangGraph)  
-**Status**: ✅ 3/3 Core Services Operational | 111 Endpoints Live | 99.9% Uptime | MongoDB Atlas  
+**Total Endpoints**: 113 (82 Gateway + 6 Agent + 25 LangGraph)  
+**Status**: ✅ 3/3 Core Services Operational | 113 Endpoints Live | 99.9% Uptime | MongoDB Atlas  
 **Architecture**: Three-Port Microservices (8000/Gateway, 9000/Agent, 9001/LangGraph)
+
+**Recent changes (Jan 2026):** Added `GET /v1/jobs/{job_id}` and `POST /v1/jobs/{job_id}/shortlist`; candidate listing/search endpoints now accept JWT or API Key (`get_auth`); job IDs are MongoDB ObjectId strings everywhere; AI match endpoint uses `AGENT_MATCH_TIMEOUT` with DB fallback.
 
 ---
 
@@ -12,11 +14,11 @@
 
 ### **Three-Port Microservices Architecture**
 
-**Status**: ✅ **3/3 CORE SERVICES OPERATIONAL** | **Total Endpoints**: 111
+**Status**: ✅ **3/3 CORE SERVICES OPERATIONAL** | **Total Endpoints**: 113
 
 | Service | Port | URL | Endpoints | Status |
 |---------|------|-----|-----------|--------|
-| **API Gateway** | 8000 | http://localhost:8000/docs | 80 | ✅ Running |
+| **API Gateway** | 8000 | http://localhost:8000/docs | 82 | ✅ Running |
 | **AI Engine** | 9000 | http://localhost:9000/docs | 6 | ✅ Running |
 | **LangGraph Automation** | 9001 | http://localhost:9001/docs | 25 | ✅ Running |
 
@@ -126,31 +128,39 @@ All 111 endpoints organized by functional category across the three microservice
 | Agent | GET | /test-db | API Key | AI engine database connectivity verification |
 | LangGraph | GET | /test-integration | API Key | Comprehensive service integration testing |
 
-### **Job Management Endpoints (2)**
+### **Job Management Endpoints (4)**
 
 | Service | Method | Path | Auth | Description |
 |---------|--------|------|------|-------------|
-| Gateway | GET | /v1/jobs | API Key | Retrieve all jobs with pagination and filtering |
+| Gateway | GET | /v1/jobs | None | List all active jobs (public) |
+| Gateway | GET | /v1/jobs/{job_id} | None | Get a single job by ID (MongoDB ObjectId string) |
 | Gateway | POST | /v1/jobs | API Key/JWT | Create new job postings with detailed specifications |
+| Gateway | POST | /v1/jobs/{job_id}/shortlist | JWT/API Key | Mark a candidate as shortlisted for a job (upserts `job_applications`) |
+
+**Job ID format:** All job identifiers are MongoDB ObjectId strings (24-character hex), e.g. `69722cbe8d9c05b1a84e1e71`. Use this format in URLs, request bodies, and frontend (no numeric job IDs).
 
 ### **Candidate Management Endpoints (5)**
 
 | Service | Method | Path | Auth | Description |
 |---------|--------|------|------|-------------|
-| Gateway | GET | /v1/candidates | API Key | Retrieve candidates with advanced pagination |
-| Gateway | GET | /v1/candidates/{id} | API Key | Get detailed information for specific candidate |
-| Gateway | GET | /v1/candidates/search | API Key | Advanced search with AI-powered matching |
+| Gateway | GET | /v1/candidates | JWT/API Key | Retrieve candidates with pagination (recruiter JWT or API key) |
+| Gateway | GET | /v1/candidates/{id} | JWT/API Key | Get detailed information for specific candidate |
+| Gateway | GET | /v1/candidates/search | JWT/API Key | Advanced search with filters (skills, location, experience) |
 | Gateway | POST | /v1/candidates/bulk | API Key | Bulk upload candidates with validation |
-| Gateway | GET | /v1/candidates/job/{job_id} | API Key | Get candidates who applied for specific job |
+| Gateway | GET | /v1/candidates/job/{job_id} | JWT/API Key | Get candidates for a job (job_id is MongoDB ObjectId string) |
+
+**Authentication:** Candidate listing and search endpoints accept **JWT (recruiter/client)** or **API Key** via `Authorization: Bearer <token>` so that recruiter portal and Values Assessment/Export Reports work with logged-in user tokens.
 
 ### **AI Matching & Analytics Endpoints (4)**
 
 | Service | Method | Path | Auth | Description |
 |---------|--------|------|------|-------------|
-| Gateway | GET | /v1/match/{job_id}/top | API Key | Top candidate matches using Phase 3 AI semantic matching |
+| Gateway | GET | /v1/match/{job_id}/top | JWT/API Key | Top candidate matches: tries Agent (AI), then DB fallback on timeout/failure |
 | Gateway | POST | /v1/match/batch | API Key | Batch processing for multiple job matching |
 | Agent | POST | /match | API Key | AI-powered candidate matching with RL integration |
 | Agent | POST | /batch-match | API Key | Batch AI matching for multiple jobs |
+
+**Match behaviour:** `GET /v1/match/{job_id}/top` calls the Agent service with a configurable timeout (`AGENT_MATCH_TIMEOUT`, default 20 seconds). If the Agent does not respond in time or errors, the gateway returns matches from the database (keyword/location fallback). Use `AGENT_MATCH_TIMEOUT=60` in `.env` for full AI wait when the agent is fast.
 
 ### **Authentication & User Management Endpoints (14)**
 

@@ -9,9 +9,9 @@
 | Metric | Value |
 |--------|-------|
 | **Platform Version** | v4.3.0 |
-| **Last Updated** | January 22, 2026 |
+| **Last Updated** | January 30, 2026 |
 | **Services** | 3 Core Microservices (Gateway, Agent, LangGraph) |
-| **Total Endpoints** | 111 (80 Gateway + 6 Agent + 25 LangGraph) |
+| **Total Endpoints** | 113 (82 Gateway + 6 Agent + 25 LangGraph) |
 | **Database** | MongoDB Atlas (fully migrated from PostgreSQL) |
 | **Security Rating** | A+ |
 | **Status** | ✅ Production Ready |
@@ -59,7 +59,7 @@ graph TD
 
 | Service | Port | Endpoints | Purpose | Health Check | Documentation |
 |---------|------|-----------|---------|--------------|---------------|
-| **API Gateway** | 8000 | 77+ | Main API entry point, authentication, orchestration | `/health` | `/docs` |
+| **API Gateway** | 8000 | 82+ | Main API entry point, authentication, orchestration | `/health` | `/docs` |
 | **AI Agent** | 9000 | 6 | Semantic matching, ML predictions, batch processing | `/health` | `/docs` |
 | **LangGraph** | 9001 | 25 | Workflow automation, RL integration, multi-channel communication | `/health` | `/docs` |
 

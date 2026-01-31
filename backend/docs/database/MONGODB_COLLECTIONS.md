@@ -11,15 +11,16 @@
 
 The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into functional groups:
 
-### **Core Application Collections (8)**
+### **Core Application Collections (9)**
 1. `candidates` - Candidate profiles and authentication
 2. `jobs` - Job postings and requirements  
 3. `applications` - Job application tracking
-4. `feedback` - BHIV values assessment
-5. `interviews` - Interview scheduling and results
-6. `offers` - Job offers and negotiations
-7. `users` - HR user management
-8. `clients` - Client company information
+4. `job_applications` - Per-job shortlist/application status (used by `POST /v1/jobs/{job_id}/shortlist`; `job_id` and `candidate_id` as strings)
+5. `feedback` - BHIV values assessment
+6. `interviews` - Interview scheduling and results
+7. `offers` - Job offers and negotiations
+8. `users` - HR user management
+9. `clients` - Client company information
 
 ### **System Collections (5)**
 9. `api_keys` - API authentication management
@@ -132,7 +133,25 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 - `{ job_id: 1, status: 1 }` (compound)
 - `{ applied_date: -1 }` (descending)
 
-### **4. feedback Collection**
+### **4. job_applications Collection**
+**Purpose**: Tracks per-job shortlist and application status; used by Gateway `POST /v1/jobs/{job_id}/shortlist` to mark candidates as shortlisted.
+```javascript
+{
+  "_id": ObjectId("..."),                    // Unique identifier
+  "job_id": "69722cbe8d9c05b1a84e1e71",     // Job ID (MongoDB ObjectId string)
+  "candidate_id": "507f1f77bcf86cd799439011", // Candidate ID (ObjectId string)
+  "status": "shortlisted",                   // e.g. "shortlisted", "applied"
+  "created_at": ISODate("2026-01-30T10:00:00Z"),
+  "updated_at": ISODate("2026-01-30T10:00:00Z")
+}
+```
+**Indexes** (recommended):
+- `{ job_id: 1, candidate_id: 1 }` (compound, unique for upsert)
+- `{ job_id: 1, status: 1 }`
+
+**Note:** Job and candidate identifiers are stored as strings (24-char hex ObjectId) for consistency with Gateway API paths and frontend.
+
+### **5. feedback Collection**
 **Purpose**: Stores BHIV values assessment and feedback
 ```javascript
 {
@@ -156,7 +175,7 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 - `{ candidate_id: 1, job_id: 1 }` (compound)
 - `{ average_score: -1 }` (descending)
 
-### **5. interviews Collection**
+### **6. interviews Collection**
 **Purpose**: Manages interview scheduling and results
 ```javascript
 {
@@ -180,7 +199,7 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 - `{ interview_date: 1 }`
 - `{ candidate_id: 1, status: 1 }` (compound)
 
-### **6. offers Collection**
+### **7. offers Collection**
 **Purpose**: Manages job offers and negotiations
 ```javascript
 {
@@ -204,7 +223,7 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 - `{ candidate_id: 1, status: 1 }` (compound)
 - `{ expiry_date: 1 }` (with status filter)
 
-### **7. users Collection**
+### **8. users Collection**
 **Purpose**: HR user management and authentication
 ```javascript
 {
@@ -229,7 +248,7 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 - `{ email: 1 }` (unique)
 - `{ role: 1, is_active: 1 }` (compound)
 
-### **8. clients Collection**
+### **9. clients Collection**
 **Purpose**: Client company information and authentication
 ```javascript
 {
@@ -260,7 +279,7 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 
 ## 🔐 System Collections
 
-### **9. api_keys Collection**
+### **10. api_keys Collection**
 **Purpose**: API authentication and rate limiting
 ```javascript
 {
@@ -278,7 +297,7 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 }
 ```
 
-### **10. rate_limits Collection**
+### **11. rate_limits Collection**
 **Purpose**: Dynamic API rate limiting
 ```javascript
 {
@@ -299,7 +318,7 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 - `{ ip_address: 1, endpoint: 1, window_start: 1 }` (unique compound)
 - `{ created_at: 1 }` (with TTL)
 
-### **11. audit_logs Collection**
+### **12. audit_logs Collection**
 **Purpose**: Complete system audit trail
 ```javascript
 {
@@ -323,7 +342,7 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 }
 ```
 
-### **12. notifications Collection**
+### **13. notifications Collection**
 **Purpose**: Multi-channel notification tracking
 ```javascript
 {
@@ -346,7 +365,7 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 
 ## 🤖 Reinforcement Learning Collections
 
-### **13. ml_feedback Collection**
+### **14. ml_feedback Collection**
 **Purpose**: Machine learning feedback for reinforcement learning
 ```javascript
 {
@@ -381,7 +400,7 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 }
 ```
 
-### **15. matching_cache Collection**
+### **16. matching_cache Collection**
 **Purpose**: AI matching results cache for performance
 ```javascript
 {
@@ -408,7 +427,7 @@ The BHIV HR Platform uses MongoDB Atlas with 17+ collections organized into func
 - `{ score: -1 }` (descending)
 - `{ expires_at: 1 }` (with TTL)
 
-### **16. company_scoring_preferences Collection**
+### **17. company_scoring_preferences Collection**
 **Purpose**: Adaptive learning engine for company-specific preferences
 ```javascript
 {

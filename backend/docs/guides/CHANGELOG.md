@@ -13,15 +13,37 @@
 | **Production Status** | ✅ 3/3 Core Services Operational |
 | **Security Rating** | A+ (Zero Vulnerabilities) |
 | **Uptime** | 99.9% |
-| **Total Endpoints** | 108 |
+| **Total Endpoints** | 113 |
 | **Database Schema** | MongoDB Atlas (17+ collections) |
 | **Monthly Cost** | $0 (Optimized Free Tier) |
 
 ---
 
+## 🚀 Version 4.3.0 - January 30, 2026 (API & Docs Update)
+
+**Job ID format, new endpoints, candidate auth, AI match fallback**
+
+### **API & Gateway changes**
+- **GET /v1/jobs/{job_id}** – Get a single job by ID (MongoDB ObjectId string). Fixes 404 when recruiter AI Shortlist/Screening loads job details.
+- **POST /v1/jobs/{job_id}/shortlist** – Mark a candidate as shortlisted for a job (JWT/API Key). Upserts `job_applications` with `job_id`, `candidate_id`, `status: "shortlisted"`.
+- **Job IDs:** All job identifiers are MongoDB ObjectId strings (24-char hex). Frontend and API use this format everywhere (no numeric job IDs).
+- **Candidate endpoints auth:** `GET /v1/candidates`, `GET /v1/candidates/stats`, `GET /v1/candidates/search`, `GET /v1/candidates/job/{job_id}`, `GET /v1/candidates/{candidate_id}` now accept **JWT or API Key** (`get_auth`) so recruiter portal (Values Assessment, Export Reports, Search) works with logged-in user tokens (fixes 401).
+- **AI match:** `GET /v1/match/{job_id}/top` uses configurable **AGENT_MATCH_TIMEOUT** (default 20s). On Agent timeout or failure, gateway returns DB fallback matches. Set `AGENT_MATCH_TIMEOUT=60` in `.env` for full AI wait when agent is fast.
+
+### **Database**
+- **job_applications** collection documented and used by shortlist endpoint (`job_id`, `candidate_id` as strings; `status`, `created_at`, `updated_at`).
+
+### **Documentation**
+- **backend/docs/api/API_DOCUMENTATION.md** – Job Management (4 endpoints), Candidate auth (JWT/API Key), Job ID format, match timeout/fallback; total 113 endpoints.
+- **backend/services/gateway/README.md** – New endpoints, env `AGENT_MATCH_TIMEOUT`, job ID format, fallback behaviour, collections list.
+- **backend/docs/database/MONGODB_COLLECTIONS.md** – Added `job_applications` collection; renumbered subsequent sections.
+- **backend/README.md**, **backend/docs/README.md** – Endpoint count 113, Gateway 82+, last updated January 30, 2026.
+
+---
+
 ## 🚀 Version 4.3.0 - January 22, 2026
 
-**🎯 CURRENT PRODUCTION VERSION - MongoDB Migration & Three-Port Architecture**
+**🎯 MongoDB Migration & Three-Port Architecture**
 
 ### **🔧 Critical System Fixes**
 

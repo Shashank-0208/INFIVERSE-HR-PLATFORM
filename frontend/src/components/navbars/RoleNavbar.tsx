@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useSidebar } from '../../context/SidebarContext'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage, clearAuthStorage } from '../../utils/authStorage'
 
 interface RoleNavbarProps {
   role: 'candidate' | 'recruiter' | 'client'
@@ -52,27 +53,13 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
 
   const handleLogout = async () => {
     try {
-      // Sign out and clear auth tokens
       await signOut()
-      
-      // Clear all localStorage items
-      localStorage.removeItem('user_role')
-      localStorage.removeItem('user_email')
-      localStorage.removeItem('user_name')
-      localStorage.removeItem('isAuthenticated')
-      localStorage.removeItem('candidate_id')
-      localStorage.removeItem('backend_candidate_id')
-      localStorage.removeItem('auth_token')
-      
-      // Navigate to home page
+      clearAuthStorage()
       navigate('/', { replace: true })
-      
-      // Force page reload to clear all state
       window.location.href = '/'
     } catch (error) {
       console.error('Logout error:', error)
-      // Even if signOut fails, clear localStorage and navigate
-      localStorage.clear()
+      clearAuthStorage()
       navigate('/', { replace: true })
       window.location.href = '/'
     }
@@ -177,12 +164,12 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
             >
               <div className={`w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br ${config.gradient} rounded-full flex items-center justify-center shadow-md`}>
                 <span className="text-white font-semibold text-xs sm:text-sm">
-                  {userName?.charAt(0).toUpperCase() || localStorage.getItem('user_name')?.charAt(0).toUpperCase() || role.charAt(0).toUpperCase()}
+                  {userName?.charAt(0).toUpperCase() || authStorage.getItem('user_name')?.charAt(0).toUpperCase() || role.charAt(0).toUpperCase()}
                 </span>
               </div>
               <div className="hidden lg:block text-left">
                 <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {userName || localStorage.getItem('user_name') || role.charAt(0).toUpperCase() + role.slice(1)}
+                  {userName || authStorage.getItem('user_name') || role.charAt(0).toUpperCase() + role.slice(1)}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {config.title}

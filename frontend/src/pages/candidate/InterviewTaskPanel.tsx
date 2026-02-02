@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { getInterviews, getTasks, submitTask, type Interview, type Task } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage } from '../../utils/authStorage'
 
 type TabType = 'interviews' | 'tasks'
 
@@ -21,7 +22,7 @@ export default function InterviewTaskPanel() {
 
   const loadData = async () => {
     // Check authentication first
-    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true' || !!user
+    const isAuthenticated = authStorage.getItem('isAuthenticated') === 'true' || !!user
     
     if (!isAuthenticated) {
       toast.error('Please login to view interviews and tasks')
@@ -29,8 +30,7 @@ export default function InterviewTaskPanel() {
       return
     }
 
-    // Get the latest backend_candidate_id from localStorage (MongoDB ObjectId string format)
-    const currentBackendId = localStorage.getItem('backend_candidate_id')
+    const currentBackendId = authStorage.getItem('backend_candidate_id')
     
     // If authenticated but no candidate ID, show empty state
     if (!currentBackendId) {

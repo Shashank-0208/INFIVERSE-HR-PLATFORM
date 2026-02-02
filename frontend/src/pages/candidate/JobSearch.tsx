@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { getJobs, applyForJob, getOrCreateBackendCandidateId, getCandidateApplications, type Job, type JobFilters } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage } from '../../utils/authStorage'
 
 export default function JobSearch() {
   const { user } = useAuth()
@@ -21,8 +22,8 @@ export default function JobSearch() {
   })
 
   // Get backend candidate ID (integer) for API calls
-  const backendCandidateId = localStorage.getItem('backend_candidate_id')
-  const candidateId = backendCandidateId || user?.id || localStorage.getItem('candidate_id') || ''
+  const backendCandidateId = authStorage.getItem('backend_candidate_id')
+  const candidateId = backendCandidateId || user?.id || authStorage.getItem('candidate_id') || ''
 
   useEffect(() => {
     fetchJobs()
@@ -30,7 +31,7 @@ export default function JobSearch() {
   }, [backendCandidateId])
 
   const fetchAppliedJobs = async () => {
-    const currentBackendId = localStorage.getItem('backend_candidate_id')
+    const currentBackendId = authStorage.getItem('backend_candidate_id')
     if (!currentBackendId) {
       console.log('No backend_candidate_id found, skipping fetch')
       return
@@ -87,7 +88,7 @@ export default function JobSearch() {
     setApplying(job.id)
     try {
       // Ensure we have a backend candidate ID before applying
-      let actualCandidateId = localStorage.getItem('backend_candidate_id')
+      let actualCandidateId = authStorage.getItem('backend_candidate_id')
       
       if (!actualCandidateId) {
         // Try to get or create backend candidate ID

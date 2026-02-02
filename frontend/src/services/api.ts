@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { authStorage } from '../utils/authStorage'
 
 // API Base URL - Gateway service
 // Standardized variable name: VITE_API_BASE_URL (see ENVIRONMENT_VARIABLES.md)
@@ -17,21 +18,17 @@ const api = axios.create({
 // Request interceptor - Use JWT token for authentication
 api.interceptors.request.use(
   async (config) => {
-    // Get JWT token from localStorage
-    let token = localStorage.getItem('auth_token');
+    let token = authStorage.getItem('auth_token');
     
-    // If token is missing but user is authenticated, don't clear immediately - might be a race condition
     if (!token) {
-      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+      const isAuthenticated = authStorage.getItem('isAuthenticated') === 'true';
       const isHealthCheck = config.url?.includes('/health');
       if (isHealthCheck) {
-        // /health is often called without auth - do not warn
       } else if (isAuthenticated) {
-        // Only warn, don't clear - might be a timing issue
         console.warn('⚠️ Token missing but user is authenticated for request:', config.url);
-        console.warn('This might be a race condition. Available localStorage keys:', Object.keys(localStorage));
+        console.warn('This might be a race condition. Available auth storage keys:', typeof sessionStorage !== 'undefined' ? Object.keys(sessionStorage) : []);
       } else {
-        console.warn('⚠️ No auth_token found in localStorage for request:', config.url);
+        console.warn('⚠️ No auth_token found in auth storage for request:', config.url);
       }
     } else {
       // Only log for non-health check endpoints to reduce noise (optional: gate by import.meta.env.DEV)
@@ -60,13 +57,12 @@ api.interceptors.response.use(
         console.error(`❌ 401 Unauthorized for: ${url}`);
         console.error('Response details:', error.response.data);
         
-        // Check if token exists
-        const token = localStorage.getItem('auth_token');
+        const token = authStorage.getItem('auth_token');
         if (token) {
           console.error('Token exists but was rejected. Token (first 50 chars):', token.substring(0, 50));
           console.error('This suggests the token is invalid, expired, or signed with wrong secret.');
         } else {
-          console.error('Token is missing from localStorage.');
+          console.error('Token is missing from auth storage.');
         }
         
         // Don't clear token immediately - let the app handle it
@@ -136,14 +132,13 @@ export const candidateLogin = async (data: CandidateLoginRequest) => {
   try {
     const response = await api.post('/v1/candidate/login', data)
     if (response.data.success) {
-      localStorage.setItem('auth_token', response.data.token || '')
-      localStorage.setItem('candidate_id', response.data.candidate_id)
-      // Also store as backend_candidate_id for consistency
+      authStorage.setItem('auth_token', response.data.token || '')
+      authStorage.setItem('candidate_id', response.data.candidate_id)
       if (response.data.candidate_id) {
-        localStorage.setItem('backend_candidate_id', response.data.candidate_id.toString())
+        authStorage.setItem('backend_candidate_id', response.data.candidate_id.toString())
       }
-      localStorage.setItem('user_name', response.data.name || '')
-      localStorage.setItem('user_email', data.email)
+      authStorage.setItem('user_name', response.data.name || '')
+      authStorage.setItem('user_email', data.email)
     }
     return response.data
   } catch (error) {
@@ -157,7 +152,7 @@ export const candidateRegister = async (data: CandidateRegisterRequest) => {
     const response = await api.post('/v1/candidate/register', data)
     // Store the backend candidate_id if registration successful
     if (response.data.candidate_id) {
-      localStorage.setItem('backend_candidate_id', response.data.candidate_id.toString())
+      authStorage.setItem('backend_candidate_id', response.data.candidate_id.toString())
     }
     return response.data
   } catch (error) {
@@ -169,14 +164,13 @@ export const candidateRegister = async (data: CandidateRegisterRequest) => {
 // Helper to get or create backend candidate ID
 export const getOrCreateBackendCandidateId = async (): Promise<string | null> => {
   // Check if we already have a backend candidate_id stored
-  const storedId = localStorage.getItem('backend_candidate_id')
+  const storedId = authStorage.getItem('backend_candidate_id')
   if (storedId) {
     return storedId
   }
 
-  // Get user info from localStorage (stored after JWT login)
-  const userEmail = localStorage.getItem('user_email');
-  const userName = localStorage.getItem('user_name') || 'User';
+  const userEmail = authStorage.getItem('user_email');
+  const userName = authStorage.getItem('user_name') || 'User';
   
   if (!userEmail) {
     console.warn('No authenticated user email found');
@@ -191,7 +185,7 @@ export const getOrCreateBackendCandidateId = async (): Promise<string | null> =>
     if (candidatesResponse.data?.candidates?.length > 0) {
       const candidate = candidatesResponse.data.candidates.find((c: any) => c.email === userEmail)
       if (candidate && candidate.id) {
-        localStorage.setItem('backend_candidate_id', candidate.id.toString())
+        authStorage.setItem('backend_candidate_id', candidate.id.toString())
         return candidate.id.toString()
       }
     }
@@ -217,7 +211,7 @@ export const getOrCreateBackendCandidateId = async (): Promise<string | null> =>
     
     // Check if registration was successful
     if (response.data.success !== false && response.data.candidate_id) {
-      localStorage.setItem('backend_candidate_id', response.data.candidate_id.toString());
+      authStorage.setItem('backend_candidate_id', response.data.candidate_id.toString());
       return response.data.candidate_id.toString();
     }
     
@@ -256,7 +250,7 @@ async function findCandidateByEmail(email: string): Promise<string | null> {
       const candidate = response.data.candidates.find((c: any) => c.email === email)
       if (candidate && candidate.id) {
         console.log('Found existing candidate by email:', candidate.id)
-        localStorage.setItem('backend_candidate_id', candidate.id.toString())
+        authStorage.setItem('backend_candidate_id', candidate.id.toString())
         return candidate.id.toString()
       }
     }
@@ -351,7 +345,7 @@ export interface Application {
 export const applyForJob = async (jobId: string, candidateId: string, resumeUrl?: string) => {
   try {
     // Use backend candidate_id if available (integer), otherwise use the provided ID
-    const backendCandidateId = localStorage.getItem('backend_candidate_id') || candidateId
+    const backendCandidateId = authStorage.getItem('backend_candidate_id') || candidateId
     
     const response = await api.post('/v1/candidate/apply', {
       job_id: jobId,
@@ -383,8 +377,7 @@ export const getCandidateApplications = async (candidateId: string): Promise<App
     // Handle 401 (authentication error)
     if (error?.response?.status === 401) {
       console.warn('Authentication failed when fetching applications. Token may be expired.')
-      // Optionally clear invalid token
-      localStorage.removeItem('auth_token')
+      authStorage.removeItem('auth_token')
       return []
     }
     // Handle 403 (forbidden)
@@ -423,8 +416,7 @@ export const getCandidateProfile = async (candidateId: string): Promise<Candidat
     // Handle 401 (authentication error)
     if (error?.response?.status === 401) {
       console.warn('Authentication failed. Token may be expired or invalid.')
-      // Optionally clear invalid token
-      localStorage.removeItem('auth_token')
+      authStorage.removeItem('auth_token')
       return null
     }
     // Handle 403 (forbidden - trying to access another candidate's profile)

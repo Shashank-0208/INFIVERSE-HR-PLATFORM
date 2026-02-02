@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { authStorage } from '../utils/authStorage';
 
 // Define types for user and auth response
 interface User {
@@ -39,7 +40,7 @@ class AuthService {
     try {
       // Get role from parameter, or from localStorage (stored during registration)
       // This ensures we use the role the user registered with
-      const storedRole = localStorage.getItem('user_role');
+      const storedRole = authStorage.getItem('user_role');
       const userRole = role || storedRole;
       
       let response;
@@ -68,11 +69,11 @@ class AuthService {
             
             console.log('🔐 Auto-detected: Client');
             this.setAuthToken(token);
-            localStorage.setItem(this.TOKEN_KEY, token);
-            localStorage.setItem('auth_token', token);
-            localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
-            localStorage.setItem('client_id', clientResponse.data.client_id);
-            localStorage.setItem('user_role', 'client');
+            authStorage.setItem(this.TOKEN_KEY, token);
+            authStorage.setItem('auth_token', token);
+            authStorage.setItem(this.USER_KEY, JSON.stringify(userData));
+            authStorage.setItem('client_id', clientResponse.data.client_id);
+            authStorage.setItem('user_role', 'client');
             
             return {
               success: true,
@@ -119,16 +120,15 @@ class AuthService {
             console.log('🔐 Client token first 50 chars:', token.substring(0, 50));
             
             this.setAuthToken(token);
-            localStorage.setItem(this.TOKEN_KEY, token); // Direct storage as backup
-            localStorage.setItem('auth_token', token); // Also store with explicit key
+            authStorage.setItem(this.TOKEN_KEY, token);
+            authStorage.setItem('auth_token', token);
             
-            // Verify token was stored immediately
-            const storedToken = localStorage.getItem(this.TOKEN_KEY);
-            const storedTokenDirect = localStorage.getItem('auth_token');
+            const storedToken = authStorage.getItem(this.TOKEN_KEY);
+            const storedTokenDirect = authStorage.getItem('auth_token');
             
             if (!storedToken && !storedTokenDirect) {
-              console.error('❌ CRITICAL: Failed to store client token! localStorage may be disabled or full.');
-              console.error('❌ Available localStorage keys:', Object.keys(localStorage));
+              console.error('❌ CRITICAL: Failed to store client token! Auth storage may be disabled or full.');
+              console.error('❌ Available storage keys:', typeof sessionStorage !== 'undefined' ? Object.keys(sessionStorage) : []);
             } else if (storedToken !== token && storedTokenDirect !== token) {
               console.error('❌ Client token stored but value mismatch!');
               console.error('❌ Expected length:', token.length, 'Stored length:', storedToken?.length || storedTokenDirect?.length);
@@ -137,9 +137,9 @@ class AuthService {
               console.log('✅ Client token verification: Stored token matches');
             }
             
-            localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
-            localStorage.setItem('client_id', response.data.client_id);
-            localStorage.setItem('user_role', 'client');
+            authStorage.setItem(this.USER_KEY, JSON.stringify(userData));
+            authStorage.setItem('client_id', response.data.client_id);
+            authStorage.setItem('user_role', 'client');
             
             return {
               success: true,
@@ -204,11 +204,11 @@ class AuthService {
               
               console.log('🔐 Storing client auth token after fallback login');
               this.setAuthToken(token);
-              localStorage.setItem(this.TOKEN_KEY, token);
-              localStorage.setItem('auth_token', token);
-              localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
-              localStorage.setItem('client_id', response.data.client_id);
-              localStorage.setItem('user_role', 'client');
+              authStorage.setItem(this.TOKEN_KEY, token);
+              authStorage.setItem('auth_token', token);
+              authStorage.setItem(this.USER_KEY, JSON.stringify(userData));
+              authStorage.setItem('client_id', response.data.client_id);
+              authStorage.setItem('user_role', 'client');
               
               return {
                 success: true,
@@ -250,18 +250,16 @@ class AuthService {
         console.log('🔐 Token length:', token.length);
         console.log('🔐 Token first 50 chars:', token.substring(0, 50));
         
-        // Store token using multiple methods to ensure it's saved
         this.setAuthToken(token);
-        localStorage.setItem(this.TOKEN_KEY, token); // Direct storage as backup
-        localStorage.setItem('auth_token', token); // Also store with explicit key
+        authStorage.setItem(this.TOKEN_KEY, token);
+        authStorage.setItem('auth_token', token);
         
-        // Verify token was stored immediately
-        const storedToken = localStorage.getItem(this.TOKEN_KEY);
-        const storedTokenDirect = localStorage.getItem('auth_token');
+        const storedToken = authStorage.getItem(this.TOKEN_KEY);
+        const storedTokenDirect = authStorage.getItem('auth_token');
         
         if (!storedToken && !storedTokenDirect) {
-          console.error('❌ CRITICAL: Failed to store token! localStorage may be disabled or full.');
-          console.error('❌ Available localStorage keys:', Object.keys(localStorage));
+          console.error('❌ CRITICAL: Failed to store token! Auth storage may be disabled or full.');
+          console.error('❌ Available storage keys:', typeof sessionStorage !== 'undefined' ? Object.keys(sessionStorage) : []);
         } else if (storedToken !== token && storedTokenDirect !== token) {
           console.error('❌ Token stored but value mismatch!');
           console.error('❌ Expected length:', token.length, 'Stored length:', storedToken?.length || storedTokenDirect?.length);
@@ -270,18 +268,15 @@ class AuthService {
           console.log('✅ Token verification: Stored token matches');
         }
         
-        localStorage.setItem(this.USER_KEY, JSON.stringify(userWithRole));
+        authStorage.setItem(this.USER_KEY, JSON.stringify(userWithRole));
+        authStorage.setItem('user_role', actualRole);
         
-        // Store role to ensure it persists for future logins
-        localStorage.setItem('user_role', actualRole);
-        
-        // Store candidate_id if available (for API calls)
         if (response.data.candidate_id) {
-          localStorage.setItem('backend_candidate_id', response.data.candidate_id.toString());
-          localStorage.setItem('candidate_id', response.data.candidate_id.toString());
+          authStorage.setItem('backend_candidate_id', response.data.candidate_id.toString());
+          authStorage.setItem('candidate_id', response.data.candidate_id.toString());
         } else if (userData.id) {
-          localStorage.setItem('backend_candidate_id', userData.id.toString());
-          localStorage.setItem('candidate_id', userData.id.toString());
+          authStorage.setItem('backend_candidate_id', userData.id.toString());
+          authStorage.setItem('candidate_id', userData.id.toString());
         }
         
         return {
@@ -328,8 +323,7 @@ class AuthService {
         if (response.data.success) {
           const final_client_id = response.data.client_id || client_id;
           
-          // Store client_id in localStorage for login
-          localStorage.setItem('client_id', final_client_id);
+          authStorage.setItem('client_id', final_client_id);
           
           // Store role for later login
           const userObj = {
@@ -431,26 +425,22 @@ class AuthService {
     }
   }
 
-  // Logout user and clear stored data
   logout(): void {
     this.removeAuthToken();
-    localStorage.removeItem(this.USER_KEY);
+    authStorage.removeItem(this.USER_KEY);
   }
 
-  // Get stored JWT token
   getAuthToken(): string | null {
-    return localStorage.getItem(this.TOKEN_KEY);
+    return authStorage.getItem(this.TOKEN_KEY);
   }
 
-  // Set JWT token in localStorage and axios defaults
   setAuthToken(token: string): void {
-    localStorage.setItem(this.TOKEN_KEY, token);
+    authStorage.setItem(this.TOKEN_KEY, token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   }
 
-  // Remove JWT token from storage and axios defaults
   removeAuthToken(): void {
-    localStorage.removeItem(this.TOKEN_KEY);
+    authStorage.removeItem(this.TOKEN_KEY);
     delete axios.defaults.headers.common['Authorization'];
   }
 
@@ -470,9 +460,8 @@ class AuthService {
     }
   }
 
-  // Get stored user data
   getUserData(): User | null {
-    const userData = localStorage.getItem(this.USER_KEY);
+    const userData = authStorage.getItem(this.USER_KEY);
     return userData ? JSON.parse(userData) : null;
   }
 

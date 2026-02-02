@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { authStorage } from '../utils/authStorage'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -40,7 +41,7 @@ export default function ProtectedRoute({
   }
 
   // Check if user is authenticated
-  const isAuthenticated = !!user || localStorage.getItem('isAuthenticated') === 'true'
+  const isAuthenticated = !!user || authStorage.getItem('isAuthenticated') === 'true'
   
   if (requireAuth && !isAuthenticated) {
     // Redirect to auth page with return URL
@@ -88,7 +89,7 @@ export function PublicRoute({ children }: { children: React.ReactNode }) {
   }
 
   // If user is already authenticated, redirect to their dashboard
-  const isAuthenticated = !!user || localStorage.getItem('isAuthenticated') === 'true'
+  const isAuthenticated = !!user || authStorage.getItem('isAuthenticated') === 'true'
   
   if (isAuthenticated && userRole) {
     const roleRedirects: Record<string, string> = {

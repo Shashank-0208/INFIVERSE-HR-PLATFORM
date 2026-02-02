@@ -22,4 +22,5 @@ EXPOSE 9001
 # HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 #     CMD python -c "import httpx; httpx.get('http://localhost:9001/health', timeout=5)" || exit 1
 
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-9001} --timeout-keep-alive 30
+# Port 9001 matches docker-compose.production.yml; override with PORT env if needed
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9001", "--timeout-keep-alive", "30"]

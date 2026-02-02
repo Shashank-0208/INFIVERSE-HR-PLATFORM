@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom'
 import { updateCandidateProfile, getCandidateProfile } from '../../services/api'
 import FormInput from '../../components/FormInput'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage } from '../../utils/authStorage'
 
 export default function CandidateProfile() {
   const { user } = useAuth()
@@ -30,8 +31,8 @@ export default function CandidateProfile() {
       setProfileLoading(true)
       console.log('Profile: Loading profile for candidate:', candidateId)
       
-      // First, try to load from localStorage as backup
-      const cachedProfile = localStorage.getItem('candidate_profile_data')
+      // First, try to load from per-tab auth storage as backup
+      const cachedProfile = authStorage.getItem('candidate_profile_data')
       if (cachedProfile) {
         try {
           const parsed = JSON.parse(cachedProfile)
@@ -59,8 +60,8 @@ export default function CandidateProfile() {
       const data = await getCandidateProfile(candidateId)
       console.log('Profile: Received data from backend:', data)
       if (data) {
-        // Store in localStorage as backup
-        localStorage.setItem('candidate_profile_data', JSON.stringify({ ...data, id: candidateId }))
+        // Store in per-tab auth storage as backup
+        authStorage.setItem('candidate_profile_data', JSON.stringify({ ...data, id: candidateId }))
         
         setSavedProfile(data)
         // Map backend field names to frontend state
@@ -84,7 +85,7 @@ export default function CandidateProfile() {
     } catch (error) {
       console.error('Failed to load profile:', error)
       // On error, try to use cached profile if available
-      const cachedProfile = localStorage.getItem('candidate_profile_data')
+      const cachedProfile = authStorage.getItem('candidate_profile_data')
       if (cachedProfile) {
         try {
           const parsed = JSON.parse(cachedProfile)
@@ -115,8 +116,8 @@ export default function CandidateProfile() {
 
   useEffect(() => {
     // Get backend candidate ID (integer) for API calls
-    const backendCandidateId = localStorage.getItem('backend_candidate_id')
-    const candidateId = backendCandidateId || user?.id || localStorage.getItem('candidate_id')
+    const backendCandidateId = authStorage.getItem('backend_candidate_id')
+    const candidateId = backendCandidateId || user?.id || authStorage.getItem('candidate_id')
     console.log('Profile: Using candidate ID:', candidateId, '(backend_id:', backendCandidateId, ')')
     if (candidateId) {
       loadProfile(candidateId)
@@ -128,8 +129,8 @@ export default function CandidateProfile() {
   // Reload profile when tab becomes visible or window gets focus (user switches back)
   useEffect(() => {
     const reloadProfile = () => {
-      const backendCandidateId = localStorage.getItem('backend_candidate_id')
-      const candidateId = backendCandidateId || user?.id || localStorage.getItem('candidate_id')
+      const backendCandidateId = authStorage.getItem('backend_candidate_id')
+      const candidateId = backendCandidateId || user?.id || authStorage.getItem('candidate_id')
       if (candidateId && !isEditing) {
         console.log('Profile: Reloading profile...')
         loadProfile(candidateId)
@@ -181,8 +182,8 @@ export default function CandidateProfile() {
 
     try {
       // Get backend candidate ID (integer) for API calls
-      const backendCandidateId = localStorage.getItem('backend_candidate_id')
-      const candidateId = backendCandidateId || user?.id || localStorage.getItem('candidate_id') || 'demo-candidate'
+      const backendCandidateId = authStorage.getItem('backend_candidate_id')
+      const candidateId = backendCandidateId || user?.id || authStorage.getItem('candidate_id') || 'demo-candidate'
       
       console.log('Profile Update: Using candidate ID:', candidateId)
       
@@ -227,8 +228,7 @@ export default function CandidateProfile() {
           id: candidateId,
         }
         
-        // Save to localStorage immediately for persistence
-        localStorage.setItem('candidate_profile_data', JSON.stringify(updatedProfile))
+        authStorage.setItem('candidate_profile_data', JSON.stringify(updatedProfile))
         setSavedProfile(updatedProfile)
         
         // Reload profile from backend to ensure we have the latest data

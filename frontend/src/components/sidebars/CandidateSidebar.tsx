@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSidebar } from '../../context/SidebarContext'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage, clearAuthStorage } from '../../utils/authStorage'
 import ApiStatus from '../ApiStatus'
 
 export default function CandidateSidebar() {
@@ -70,27 +71,13 @@ export default function CandidateSidebar() {
 
   const handleLogout = async () => {
     try {
-      // Sign out and clear auth tokens
       await signOut()
-      
-      // Clear all localStorage items
-      localStorage.removeItem('user_role')
-      localStorage.removeItem('user_email')
-      localStorage.removeItem('user_name')
-      localStorage.removeItem('isAuthenticated')
-      localStorage.removeItem('candidate_id')
-      localStorage.removeItem('backend_candidate_id')
-      localStorage.removeItem('auth_token')
-      
-      // Navigate to home page
+      clearAuthStorage()
       navigate('/', { replace: true })
-      
-      // Force page reload to clear all state
       window.location.href = '/'
     } catch (error) {
       console.error('Logout error:', error)
-      // Even if signOut fails, clear localStorage and navigate
-      localStorage.clear()
+      clearAuthStorage()
       navigate('/', { replace: true })
       window.location.href = '/'
     }
@@ -143,15 +130,15 @@ export default function CandidateSidebar() {
         <div className={`p-3 ${isCollapsed ? 'flex justify-center' : ''}`}>
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-              {localStorage.getItem('user_name')?.charAt(0).toUpperCase() || 'C'}
+              {authStorage.getItem('user_name')?.charAt(0).toUpperCase() || 'C'}
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden">
                 <p className="font-semibold text-gray-900 dark:text-white truncate text-sm">
-                  {localStorage.getItem('user_name') || 'Candidate'}
+                  {authStorage.getItem('user_name') || 'Candidate'}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {localStorage.getItem('user_email') || 'candidate@infiverse.hr'}
+                  {authStorage.getItem('user_email') || 'candidate@infiverse.hr'}
                 </p>
               </div>
             )}

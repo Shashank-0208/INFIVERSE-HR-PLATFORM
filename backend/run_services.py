@@ -73,27 +73,29 @@ SERVICES = {
     }
 }
 
-# Environment variables for all services
+# Environment variables for all services. Secrets must come from .env or process environment;
+# load_env_file() overwrites these from backend/.env when present. Do not hardcode secrets here.
 COMMON_ENV = {
-    "DATABASE_URL": "mongodb+srv://blackholeinfiverse56_db_user:Blackhole%40056@cluster0.gx7tlvm.mongodb.net/bhiv_hr?retryWrites=true&w=majority",
-    "API_KEY_SECRET": "prod_api_key_XUqM2msdCa4CYIaRywRNXRVc477nlI3AQ-lr6cgTB2o",
-    "JWT_SECRET_KEY": "bhiv_jwt_secret_key_12345",
-    "CANDIDATE_JWT_SECRET_KEY": "bhiv_candidate_jwt_secret_key_12345",
-    "GATEWAY_SECRET_KEY": "bhiv_gateway_secret_key_12345",
-    "GATEWAY_SERVICE_URL": "http://localhost:8000",
-    "AGENT_SERVICE_URL": "http://localhost:9000",
-    "LANGGRAPH_SERVICE_URL": "http://localhost:9001",
-    "ENVIRONMENT": "development",
-    "LOG_LEVEL": "INFO",
-    "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY", "AIzaSyC8vbb0qAgcFlHw6fA14Ta6Nr7zsG5ELIs"),
+    "DATABASE_URL": os.getenv("DATABASE_URL", ""),
+    "MONGODB_URI": os.getenv("MONGODB_URI", os.getenv("DATABASE_URL", "")),
+    "MONGODB_DB_NAME": os.getenv("MONGODB_DB_NAME", "bhiv_hr"),
+    "API_KEY_SECRET": os.getenv("API_KEY_SECRET", ""),
+    "JWT_SECRET_KEY": os.getenv("JWT_SECRET_KEY", ""),
+    "CANDIDATE_JWT_SECRET_KEY": os.getenv("CANDIDATE_JWT_SECRET_KEY", ""),
+    "GATEWAY_SECRET_KEY": os.getenv("GATEWAY_SECRET_KEY", ""),
+    "GATEWAY_SERVICE_URL": os.getenv("GATEWAY_SERVICE_URL", "http://localhost:8000"),
+    "AGENT_SERVICE_URL": os.getenv("AGENT_SERVICE_URL", "http://localhost:9000"),
+    "LANGGRAPH_SERVICE_URL": os.getenv("LANGGRAPH_SERVICE_URL", "http://localhost:9001"),
+    "ENVIRONMENT": os.getenv("ENVIRONMENT", "development"),
+    "LOG_LEVEL": os.getenv("LOG_LEVEL", "INFO"),
+    "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY", ""),
     "GEMINI_MODEL": os.getenv("GEMINI_MODEL", "gemini-pro"),
-    # Hugging Face Configuration - Use environment variables only
-    "HF_TOKEN": os.getenv("HF_TOKEN"),  # No default value to prevent hardcoding
-    "HF_HUB_DISABLE_SYMLINKS_WARNING": "1",
-    "HF_HUB_DISABLE_TELEMETRY": "1",
-    "HF_HUB_DISABLE_PROGRESS_BARS": "1",
-    "TRANSFORMERS_VERBOSITY": "error",
-    "TOKENIZERS_PARALLELISM": "false",
+    "HF_TOKEN": os.getenv("HF_TOKEN", ""),
+    "HF_HUB_DISABLE_SYMLINKS_WARNING": os.getenv("HF_HUB_DISABLE_SYMLINKS_WARNING", "1"),
+    "HF_HUB_DISABLE_TELEMETRY": os.getenv("HF_HUB_DISABLE_TELEMETRY", "1"),
+    "HF_HUB_DISABLE_PROGRESS_BARS": os.getenv("HF_HUB_DISABLE_PROGRESS_BARS", "1"),
+    "TRANSFORMERS_VERBOSITY": os.getenv("TRANSFORMERS_VERBOSITY", "error"),
+    "TOKENIZERS_PARALLELISM": os.getenv("TOKENIZERS_PARALLELISM", "false"),
 }
 
 # Track running processes

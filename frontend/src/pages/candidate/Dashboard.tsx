@@ -10,11 +10,12 @@ import {
   type Interview 
 } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage } from '../../utils/authStorage'
 
 export default function CandidateDashboard() {
   const navigate = useNavigate()
   const { userName: authUserName } = useAuth()
-  const userName = authUserName || localStorage.getItem('user_name') || 'Candidate'
+  const userName = authUserName || authStorage.getItem('user_name') || 'Candidate'
 
   const [stats, setStats] = useState<DashboardStats>({
     total_applications: 0,
@@ -28,10 +29,10 @@ export default function CandidateDashboard() {
   const [loading, setLoading] = useState(true)
   // Only trust token that was present at mount; do not set authReady from user updates,
   // since AuthContext may set user before token verification completes during signup.
-  const [authReady] = useState(() => !!localStorage.getItem('auth_token'))
+  const [authReady] = useState(() => !!authStorage.getItem('auth_token'))
 
   useEffect(() => {
-    const currentBackendId = localStorage.getItem('backend_candidate_id')
+    const currentBackendId = authStorage.getItem('backend_candidate_id')
     if (!authReady || !currentBackendId) {
       setLoading(false)
       return
@@ -40,9 +41,8 @@ export default function CandidateDashboard() {
   }, [authReady])
 
   const loadDashboardData = async () => {
-    const token = localStorage.getItem('auth_token')
-    // Use backend_candidate_id for API calls (MongoDB ObjectId string format)
-    const currentBackendId = localStorage.getItem('backend_candidate_id')
+    const token = authStorage.getItem('auth_token')
+    const currentBackendId = authStorage.getItem('backend_candidate_id')
     if (!currentBackendId || !token) {
       setLoading(false)
       return

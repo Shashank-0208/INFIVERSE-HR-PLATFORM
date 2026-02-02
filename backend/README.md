@@ -361,6 +361,7 @@ python run_services.py
 ```
 
 #### Method 2: Docker Compose (All Services)
+**Environment:** Compose loads `backend/.env` via `env_file: - .env` so JWT and API keys match the local backend (avoids "JWT signature invalid" when logging in). Run from the **backend** directory so `.env` resolves to `backend/.env`. Ensure `AGENT_MATCH_TIMEOUT=60` (and same `JWT_SECRET_KEY` / `CANDIDATE_JWT_SECRET_KEY`) in `backend/.env` as used when users log in.
 ```bash
 # Clone repository
 git clone <repository-url>
@@ -370,7 +371,9 @@ cd Infiverse-HR/backend
 cp .env.example .env
 # Edit .env with your MongoDB connection and secrets
 
-# Start all services(detact mode)
+# From backend directory so .env is loaded (JWT/API keys must match backend/.env)
+cd backend
+# Start all services (detached mode)
 docker-compose -f docker-compose.production.yml up -d --build
 
 # Stop all services
@@ -674,9 +677,10 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-Edit `.env` with your MongoDB connection and secrets (same as Method 1).
+Edit `.env` with your MongoDB connection and secrets (same as Method 1). Ensure `JWT_SECRET_KEY` and `CANDIDATE_JWT_SECRET_KEY` match the values used when users log in (Docker loads `backend/.env` via `env_file` so tokens validate). Set `AGENT_MATCH_TIMEOUT=60` for full AI wait; the gateway falls back to DB matching on Agent timeout or failure.
 
 #### Step 3: Start All Services with Docker
+**Run from the `backend` directory** so `env_file: .env` resolves to `backend/.env` and credentials match.
 ```bash
 docker-compose -f docker-compose.production.yml up --build
 ```

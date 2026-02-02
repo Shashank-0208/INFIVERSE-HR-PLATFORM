@@ -243,11 +243,29 @@ class JobCreate(BaseModel):
     title: str
     department: str  # Required: e.g., "Engineering", "Marketing", "Sales"
     location: str
-    experience_level: str  # Required: "entry", "mid", "senior", "lead"
+    experience_level: str  # Required: "entry", "mid", "senior", "lead" (case-insensitive)
     requirements: str
     description: str
     client_id: Optional[int] = 1
     employment_type: Optional[str] = "Full-time"
+    
+    @field_validator('experience_level')
+    @classmethod
+    def normalize_experience_level(cls, v: str) -> str:
+        """Normalize experience_level to lowercase for consistency"""
+        if not v:
+            return v
+        normalized = v.lower().strip()
+        # Map common variations to standard values
+        mapping = {
+            'entry': 'entry',
+            'mid': 'mid',
+            'middle': 'mid',
+            'senior': 'senior',
+            'lead': 'lead',
+            'leadership': 'lead'
+        }
+        return mapping.get(normalized, normalized)
     
     model_config = {
         "json_schema_extra": {
@@ -545,6 +563,12 @@ async def create_job(job: JobCreate, auth: dict = Depends(get_auth)):
             "status": "active",
             "created_at": datetime.now(timezone.utc)
         }
+        # Add optional fields if provided
+        if job.employment_type:
+            document["employment_type"] = job.employment_type
+        if job.client_id:
+            document["client_id"] = job.client_id
+        
         result = await db.jobs.insert_one(document)
         job_id = str(result.inserted_id)
         
@@ -554,11 +578,10 @@ async def create_job(job: JobCreate, auth: dict = Depends(get_auth)):
             "created_at": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
-        return {
-            "message": "Job creation failed",
-            "error": str(e),
-            "status": "failed"
-        }
+        raise HTTPException(
+            status_code=500,
+            detail=f"Job creation failed: {str(e)}"
+        )
 
 @app.get("/v1/jobs", tags=["Job Management"])
 async def list_jobs():

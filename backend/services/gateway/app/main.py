@@ -1,4 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Security, Response, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 import json
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +23,7 @@ from app.database import get_mongo_db, get_mongo_client
 from app.db_helpers import find_one_by_field, find_many, count_documents, insert_one, update_one, delete_one, convert_objectid_to_str
 from bson import ObjectId
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field, model_validator
 import time
 import psutil
 
@@ -102,6 +104,27 @@ app = FastAPI(
     version="4.2.0",
     description="Enterprise HR Platform with Advanced Security Features"
 )
+
+# Exception handler for validation errors
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Custom handler for validation errors to provide detailed error messages"""
+    errors = []
+    for error in exc.errors():
+        field = ".".join(str(loc) for loc in error["loc"])
+        errors.append({
+            "field": field,
+            "message": error["msg"],
+            "type": error["type"]
+        })
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": errors,
+            "message": "Validation error: Please check the request data",
+            "errors": errors
+        }
+    )
 
 # CORS Configuration - Allow Vercel frontend and all origins for flexibility
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
@@ -248,13 +271,42 @@ class JobCreate(BaseModel):
     description: str
     client_id: Optional[int] = 1
     employment_type: Optional[str] = "Full-time"
+    # Support frontend field name aliases for flexibility
+    experience_required: Optional[str] = Field(None, alias='experience_required', exclude=True)
+    job_type: Optional[str] = Field(None, alias='job_type', exclude=True)
+    skills_required: Optional[str] = Field(None, alias='skills_required', exclude=True)
     
-    @field_validator('experience_level')
+    @model_validator(mode='before')
     @classmethod
-    def normalize_experience_level(cls, v: str) -> str:
+    def map_frontend_fields(cls, data: Any) -> Any:
+        """Map frontend field names to backend field names for compatibility"""
+        if isinstance(data, dict):
+            # Map experience_required to experience_level if experience_level not provided
+            if 'experience_required' in data and 'experience_level' not in data:
+                data['experience_level'] = data.pop('experience_required')
+            # Map job_type to employment_type if employment_type not provided
+            if 'job_type' in data and 'employment_type' not in data:
+                data['employment_type'] = data.pop('job_type')
+            # Map skills_required to requirements if requirements not provided
+            if 'skills_required' in data and 'requirements' not in data:
+                skills = data['skills_required']
+                if isinstance(skills, list):
+                    data['requirements'] = ', '.join(str(s) for s in skills)
+                else:
+                    data['requirements'] = str(skills)
+                data.pop('skills_required')
+        return data
+    
+    @field_validator('experience_level', mode='before')
+    @classmethod
+    def normalize_experience_level(cls, v) -> str:
         """Normalize experience_level to lowercase for consistency"""
-        if not v:
-            return v
+        if v is None:
+            raise ValueError('experience_level is required')
+        if not isinstance(v, str):
+            v = str(v)
+        if not v.strip():
+            raise ValueError('experience_level cannot be empty')
         normalized = v.lower().strip()
         # Map common variations to standard values
         mapping = {

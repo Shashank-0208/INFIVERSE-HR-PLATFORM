@@ -49,7 +49,9 @@ try:
         get_auth as jwt_get_auth, 
         get_api_key as jwt_get_api_key, 
         validate_api_key as jwt_validate_api_key,
-        security as jwt_security
+        security as jwt_security,
+        get_recruiter_auth as jwt_get_recruiter_auth,
+        require_role as jwt_require_role
     )
 except ImportError:
     # Fallback if monitoring module is not available
@@ -76,13 +78,17 @@ except ImportError:
             get_auth as jwt_get_auth, 
             get_api_key as jwt_get_api_key, 
             validate_api_key as jwt_validate_api_key,
-            security as jwt_security
+            security as jwt_security,
+            get_recruiter_auth as jwt_get_recruiter_auth,
+            require_role as jwt_require_role
         )
     except ImportError:
         jwt_get_auth = None
         jwt_get_api_key = None
         jwt_validate_api_key = None
         jwt_security = None
+        jwt_get_recruiter_auth = None
+        jwt_require_role = None
 
 # Use security scheme from jwt_auth.py (with auto_error=False) if available
 # Otherwise create a fallback with auto_error=False to allow credentials to be None
@@ -501,7 +507,7 @@ async def test_candidates_db(api_key: str = Depends(get_api_key)):
 
 # Job Management (2 endpoints)
 @app.post("/v1/jobs", tags=["Job Management"])
-async def create_job(job: JobCreate, api_key: str = Depends(get_api_key)):
+async def create_job(job: JobCreate, auth: dict = Depends(get_auth)):
     """Create New Job Posting
     
     **Required Fields:**
@@ -512,8 +518,21 @@ async def create_job(job: JobCreate, api_key: str = Depends(get_api_key)):
     - requirements: Job requirements
     - description: Job description
     
-    **Authentication:** Bearer token required
+    **Authentication:** Bearer token required (API key, recruiter, or client JWT token)
     """
+    # Check if user has permission to create jobs
+    # API keys have full access
+    if auth.get("type") == "api_key":
+        pass  # API keys have full access
+    else:
+        # For JWT tokens, check role
+        user_role = auth.get("role", "")
+        if user_role not in ["recruiter", "client", "admin"]:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access denied. Job creation requires recruiter, client, or admin role. Current role: {user_role}"
+            )
+    
     try:
         db = await get_mongo_db()
         document = {

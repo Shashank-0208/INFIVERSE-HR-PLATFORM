@@ -464,35 +464,41 @@ export default function JobSearch() {
             </div>
             
             <div className="p-6 space-y-6">
-              {/* Job Info */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Job Info - same card pattern for all fields including Salary */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                 <div className="text-center p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
                   <p className="text-xs text-gray-500 dark:text-gray-400">Location</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.location}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.location || '—'}</p>
                 </div>
                 <div className="text-center p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
                   <p className="text-xs text-gray-500 dark:text-gray-400">Job Type</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.job_type}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.job_type || '—'}</p>
                 </div>
                 <div className="text-center p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
                   <p className="text-xs text-gray-500 dark:text-gray-400">Experience</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.experience_required}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.experience_required || '—'}</p>
                 </div>
                 <div className="text-center p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
                   <p className="text-xs text-gray-500 dark:text-gray-400">Department</p>
                   <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.department || 'N/A'}</p>
                 </div>
-              </div>
-
-              {/* Salary */}
-              {(selectedJob.salary_min || selectedJob.salary_max) && (
-                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400">Salary Range</p>
-                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-                    ₹{selectedJob.salary_min?.toLocaleString()} - ₹{selectedJob.salary_max?.toLocaleString()}
+                <div className="text-center p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Salary Range (INR)</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {selectedJob.salary_min != null || selectedJob.salary_max != null
+                      ? (() => {
+                          const min = selectedJob.salary_min != null ? Number(selectedJob.salary_min) : null
+                          const max = selectedJob.salary_max != null ? Number(selectedJob.salary_max) : null
+                          const fmt = (n: number) => n.toLocaleString('en-IN')
+                          if (min != null && max != null) return `₹${fmt(min)} – ₹${fmt(max)}`
+                          if (min != null) return `₹${fmt(min)}+`
+                          if (max != null) return `Up to ₹${fmt(max)}`
+                          return 'Not mentioned'
+                        })()
+                      : 'Not mentioned'}
                   </p>
                 </div>
-              )}
+              </div>
 
               {/* Skills Required */}
               {selectedJob.skills_required && (Array.isArray(selectedJob.skills_required) ? selectedJob.skills_required.length > 0 : selectedJob.skills_required.length > 0) && (

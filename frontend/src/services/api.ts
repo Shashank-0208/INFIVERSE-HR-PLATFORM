@@ -291,6 +291,26 @@ export interface JobFilters {
   search?: string
 }
 
+/** Normalize API job shape to Job (experience_level → experience_required, requirements → skills_required, etc.). */
+function normalizeJob(raw: Record<string, unknown>): Job {
+  const req = raw.requirements as string | undefined
+  return {
+    id: (raw.id as string) ?? '',
+    title: (raw.title as string) ?? '',
+    department: raw.department as string | undefined,
+    location: (raw.location as string) ?? '',
+    job_type: (raw.job_type as string) ?? (raw.employment_type as string) ?? '',
+    experience_required: (raw.experience_required as string) ?? (raw.experience_level as string) ?? '',
+    salary_min: raw.salary_min != null ? Number(raw.salary_min) : undefined,
+    salary_max: raw.salary_max != null ? Number(raw.salary_max) : undefined,
+    skills_required: (raw.skills_required as string[] | string) ?? (req ? (req.includes(',') ? req.split(',').map(s => s.trim()) : req) : []),
+    description: (raw.description as string) ?? '',
+    status: (raw.status as string) ?? 'active',
+    created_at: raw.created_at as string | undefined,
+    company: raw.company as string | undefined,
+  }
+}
+
 export const getJobs = async (filters?: JobFilters): Promise<Job[]> => {
   try {
     const params = new URLSearchParams()
@@ -301,7 +321,8 @@ export const getJobs = async (filters?: JobFilters): Promise<Job[]> => {
     if (filters?.search) params.append('search', filters.search)
     
     const response = await api.get(`/v1/jobs?${params.toString()}`)
-    return response.data.jobs || response.data || []
+    const list = response.data.jobs || response.data || []
+    return Array.isArray(list) ? list.map((j: Record<string, unknown>) => normalizeJob(j)) : []
   } catch (error) {
     console.error('Error fetching jobs:', error)
     throw error
@@ -311,7 +332,7 @@ export const getJobs = async (filters?: JobFilters): Promise<Job[]> => {
 export const getJobById = async (jobId: string): Promise<Job> => {
   try {
     const response = await api.get(`/v1/jobs/${jobId}`)
-    return response.data
+    return normalizeJob(response.data || {})
   } catch (error) {
     console.error('Error fetching job:', error)
     throw error

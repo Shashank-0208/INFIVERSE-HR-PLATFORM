@@ -271,6 +271,8 @@ class JobCreate(BaseModel):
     description: str
     client_id: Optional[int] = 1
     employment_type: Optional[str] = "Full-time"
+    salary_min: Optional[float] = None  # Optional salary range (INR)
+    salary_max: Optional[float] = None
     # Support frontend field name aliases for flexibility
     experience_required: Optional[str] = Field(None, alias='experience_required', exclude=True)
     job_type: Optional[str] = Field(None, alias='job_type', exclude=True)
@@ -620,6 +622,10 @@ async def create_job(job: JobCreate, auth: dict = Depends(get_auth)):
             document["employment_type"] = job.employment_type
         if job.client_id:
             document["client_id"] = job.client_id
+        if job.salary_min is not None:
+            document["salary_min"] = float(job.salary_min)
+        if job.salary_max is not None:
+            document["salary_max"] = float(job.salary_max)
         
         result = await db.jobs.insert_one(document)
         job_id = str(result.inserted_id)
@@ -675,8 +681,10 @@ async def list_jobs(
                 "experience_level": doc.get("experience_level"),
                 "requirements": doc.get("requirements"),
                 "description": doc.get("description"),
-                "job_type": doc.get("job_type"),
+                "job_type": doc.get("job_type") or doc.get("employment_type"),
                 "employment_type": doc.get("employment_type"),
+                "salary_min": doc.get("salary_min"),
+                "salary_max": doc.get("salary_max"),
                 "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
             })
         return {"jobs": jobs, "count": len(jobs)}
@@ -797,8 +805,10 @@ async def get_job_by_id(job_id: str):
             "experience_level": doc.get("experience_level"),
             "requirements": doc.get("requirements"),
             "description": doc.get("description"),
-            "job_type": doc.get("job_type"),
+            "job_type": doc.get("job_type") or doc.get("employment_type"),
             "employment_type": doc.get("employment_type"),
+            "salary_min": doc.get("salary_min"),
+            "salary_max": doc.get("salary_max"),
             "status": doc.get("status"),
             "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
         }

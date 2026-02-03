@@ -641,6 +641,55 @@ async def create_job(job: JobCreate, auth: dict = Depends(get_auth)):
             detail=f"Job creation failed: {str(e)}"
         )
 
+
+def _job_salary_from_doc(doc: Dict[str, Any]) -> tuple:
+    """Derive (salary_min, salary_max) from a job document for backward compatibility.
+    Supports: salary_min/salary_max (current), salary_range (string, e.g. seed data),
+    and salary (single number). Returns (min, max) with None where not available."""
+    try:
+        smin = doc.get("salary_min")
+        smax = doc.get("salary_max")
+        if smin is not None and smax is not None:
+            return (float(smin) if smin != "" else None, float(smax) if smax != "" else None)
+        if smin is not None:
+            return (float(smin) if smin != "" else None, float(smax) if smax and smax != "" else None)
+        if smax is not None:
+            return (float(smin) if smin and smin != "" else None, float(smax) if smax != "" else None)
+    except (TypeError, ValueError):
+        pass
+    # Legacy: salary_range string (e.g. "$120,000 - $150,000" or "500000-800000")
+    salary_range = doc.get("salary_range")
+    if salary_range and isinstance(salary_range, str):
+        s = salary_range.strip()
+        # Remove common prefixes and split on dash
+        s_clean = re.sub(r"[$€£,\s]", "", s)
+        parts = re.split(r"[-–—]", s_clean, maxsplit=1)
+        if len(parts) >= 2:
+            try:
+                low = float(parts[0].strip())
+                high = float(parts[1].strip())
+                if low <= high:
+                    return (low, high)
+                return (high, low)
+            except (TypeError, ValueError):
+                pass
+        try:
+            single = float(s_clean)
+            return (single, single)
+        except (TypeError, ValueError):
+            pass
+    # Legacy: single salary number
+    salary = doc.get("salary")
+    if salary is not None and salary != "":
+        try:
+            v = float(salary)
+            if v >= 0:
+                return (v, v)
+        except (TypeError, ValueError):
+            pass
+    return (None, None)
+
+
 @app.get("/v1/jobs", tags=["Job Management"])
 async def list_jobs(
     search: Optional[str] = None,
@@ -673,6 +722,7 @@ async def list_jobs(
         jobs_list = await cursor.to_list(length=100)
         jobs = []
         for doc in jobs_list:
+            salary_min, salary_max = _job_salary_from_doc(doc)
             jobs.append({
                 "id": str(doc["_id"]),
                 "title": doc.get("title"),
@@ -683,8 +733,8 @@ async def list_jobs(
                 "description": doc.get("description"),
                 "job_type": doc.get("job_type") or doc.get("employment_type"),
                 "employment_type": doc.get("employment_type"),
-                "salary_min": doc.get("salary_min"),
-                "salary_max": doc.get("salary_max"),
+                "salary_min": salary_min,
+                "salary_max": salary_max,
                 "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
             })
         return {"jobs": jobs, "count": len(jobs)}
@@ -797,6 +847,7 @@ async def get_job_by_id(job_id: str):
             doc = await db.jobs.find_one({"id": job_id})
         if not doc:
             raise HTTPException(status_code=404, detail="Job not found")
+        salary_min, salary_max = _job_salary_from_doc(doc)
         return {
             "id": str(doc["_id"]),
             "title": doc.get("title"),
@@ -807,8 +858,8 @@ async def get_job_by_id(job_id: str):
             "description": doc.get("description"),
             "job_type": doc.get("job_type") or doc.get("employment_type"),
             "employment_type": doc.get("employment_type"),
-            "salary_min": doc.get("salary_min"),
-            "salary_max": doc.get("salary_max"),
+            "salary_min": salary_min,
+            "salary_max": salary_max,
             "status": doc.get("status"),
             "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
         }

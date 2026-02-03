@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { searchCandidates, getJobs, type CandidateProfile } from '../../services/api'
+import { searchCandidates, getJobs, getCandidateSuggestions, type CandidateProfile } from '../../services/api'
 import Table from '../../components/Table'
 import Loading from '../../components/Loading'
+import AutocompleteSearch from '../../components/AutocompleteSearch'
 
 // MultiSelect Dropdown Component
 interface MultiSelectDropdownProps {
@@ -115,13 +116,14 @@ function MultiSelectDropdown({ label, options, selected, onChange, placeholder =
 
 export default function CandidateSearch() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [candidates, setCandidates] = useState<CandidateProfile[]>([])
   const [jobs, setJobs] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [searchClicked, setSearchClicked] = useState(false)
   
-  // Search filters
-  const [searchQuery, setSearchQuery] = useState('')
+  // Search filters (prefill from navbar global search)
+  const [searchQuery, setSearchQuery] = useState(() => (location.state as { searchQuery?: string })?.searchQuery || '')
   const [selectedJob, setSelectedJob] = useState('all')
   const [experienceFilter, setExperienceFilter] = useState('any')
   const [seniorityFilter, setSeniorityFilter] = useState<string[]>([])
@@ -265,35 +267,51 @@ export default function CandidateSearch() {
               Search Candidates
             </label>
             <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, skills, experience, location..."
-                className="input-field pl-10"
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              />
-              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 z-10 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
+              <AutocompleteSearch
+                value={searchQuery}
+                onChange={setSearchQuery}
+                fetchSuggestions={getCandidateSuggestions}
+                getSuggestionLabel={(s) => `${(s as { name?: string }).name || ''} – ${(s as { email?: string }).email || ''}`}
+                placeholder="Search by name, skills, experience, location..."
+                inputClassName="input-field pl-10"
+                minLength={1}
+                debounceMs={250}
+                maxSuggestions={10}
+                emptyOptionLabel="No matching candidates"
+                onEmptySelect={() => toast('No candidates match your search. Try different terms.', { icon: 'ℹ' })}
+              />
             </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Type to see suggestions (e.g. Sarah, Steven); then click Search to apply filters.</p>
           </div>
           <div className="md:col-span-1">
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Filter by Job
             </label>
-            <select
-              value={selectedJob}
-              onChange={(e) => setSelectedJob(e.target.value)}
-              className="input-field"
-            >
-              <option value="all">All Jobs</option>
-              {jobs.map((job) => (
-                <option key={job.id} value={`Job ID ${job.id} - ${job.title}`}>
-                  Job ID {job.id} - {job.title}
-                </option>
-              ))}
-            </select>
+            <AutocompleteSearch
+              value={selectedJob === 'all' ? '' : selectedJob}
+              onChange={(v) => setSelectedJob(v ? v : 'all')}
+              fetchSuggestions={async (q) => {
+                const lower = (q || '').toLowerCase()
+                return jobs
+                  .filter((j) => ((j.title || '') + (j.id || '')).toLowerCase().includes(lower))
+                  .slice(0, 15)
+                  .map((j) => ({ id: j.id, title: j.title, department: j.department }))
+              }}
+              getSuggestionLabel={(s) => `Job ID ${(s as { id: string }).id} - ${(s as { title?: string }).title || ''}`}
+              placeholder="Type to search jobs (or All Jobs)"
+              inputClassName="input-field"
+              minLength={0}
+              debounceMs={150}
+              maxSuggestions={15}
+              emptyOptionLabel="No matching jobs"
+              onEmptySelect={() => toast('No jobs match your search.', { icon: 'ℹ' })}
+            />
+            {selectedJob && selectedJob !== 'all' && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Selected: {selectedJob}</p>
+            )}
           </div>
         </div>
 

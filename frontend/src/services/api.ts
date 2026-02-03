@@ -318,6 +318,54 @@ export const getJobById = async (jobId: string): Promise<Job> => {
   }
 }
 
+/** Search-as-you-type: job suggestions by title/department. Requires auth. */
+export const getJobSuggestions = async (q: string, limit = 10): Promise<{ id: string; title: string; department: string; location?: string }[]> => {
+  if (!q?.trim()) return []
+  try {
+    const response = await api.get('/v1/jobs/autocomplete', { params: { q: q.trim(), limit } })
+    return response.data?.suggestions ?? []
+  } catch (error) {
+    console.error('Job suggestions error:', error)
+    return []
+  }
+}
+
+/** Search-as-you-type: candidate suggestions by name/email/skills. Requires auth. */
+export const getCandidateSuggestions = async (q: string, limit = 10): Promise<{ id: string; name: string; email: string; technical_skills?: string; location?: string }[]> => {
+  if (!q?.trim()) return []
+  try {
+    const response = await api.get('/v1/candidates/autocomplete', { params: { q: q.trim(), limit } })
+    return response.data?.suggestions ?? []
+  } catch (error) {
+    console.error('Candidate suggestions error:', error)
+    return []
+  }
+}
+
+/** Search-as-you-type: skill suggestions from active jobs' requirements (for candidate browse jobs skills field). */
+export const getJobSkillSuggestions = async (q: string, limit = 15): Promise<{ id: string; label: string }[]> => {
+  if (!q?.trim()) return []
+  try {
+    const response = await api.get('/v1/jobs/skills/autocomplete', { params: { q: q.trim(), limit } })
+    return response.data?.suggestions ?? []
+  } catch (error) {
+    console.error('Job skill suggestions error:', error)
+    return []
+  }
+}
+
+/** Search-as-you-type: location suggestions from active jobs (for candidate browse jobs location field). */
+export const getJobLocationSuggestions = async (q: string, limit = 15): Promise<{ id: string; label: string }[]> => {
+  if (!q?.trim()) return []
+  try {
+    const response = await api.get('/v1/jobs/locations/autocomplete', { params: { q: q.trim(), limit } })
+    return response.data?.suggestions ?? []
+  } catch (error) {
+    console.error('Job location suggestions error:', error)
+    return []
+  }
+}
+
 export const createJob = async (jobData: Partial<Job>) => {
   try {
     const response = await api.post('/v1/jobs', jobData)

@@ -13,6 +13,7 @@ import {
 } from '../../services/api'
 import Table from '../../components/Table'
 import Loading from '../../components/Loading'
+import AutocompleteSearch from '../../components/AutocompleteSearch'
 
 export default function ApplicantsMatching() {
   const { jobId: urlJobId } = useParams()
@@ -22,6 +23,7 @@ export default function ApplicantsMatching() {
   const effectiveJobId = urlJobId || jobIdFromQuery || ''
 
   const [jobId, setJobId] = useState<string>(effectiveJobId)
+  const [jobSearchInput, setJobSearchInput] = useState('')
   const [job, setJob] = useState<Job | null>(null)
   const [jobs, setJobs] = useState<Job[]>([])
   const [candidates, setCandidates] = useState<MatchResult[]>([])
@@ -195,23 +197,37 @@ export default function ApplicantsMatching() {
         <h2 className="section-title mb-4">Generate AI Shortlist</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {/* Job selection (MongoDB ObjectId); supports URL ?jobId= or :jobId */}
+          {/* Job selection - search-as-you-type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Job
             </label>
-            <select
-              value={jobId}
-              onChange={(e) => setJobId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            >
-              <option value="">Select a job</option>
-              {jobs.map((j) => (
-                <option key={j.id} value={j.id}>
-                  {j.title} ({j.id})
-                </option>
-              ))}
-            </select>
+            <AutocompleteSearch
+              value={jobId ? (jobs.find((j) => j.id === jobId) ? `${jobs.find((j) => j.id === jobId)?.title} (${jobId})` : jobId) : jobSearchInput}
+              onChange={(v) => {
+                setJobSearchInput(v)
+                if (jobId) setJobId('')
+              }}
+              onSelect={(item) => {
+                setJobId((item as { id: string }).id)
+                setJobSearchInput('')
+              }}
+              fetchSuggestions={async (q) => {
+                const lower = (q || '').toLowerCase()
+                return jobs
+                  .filter((j) => ((j.title || '') + (j.id || '')).toLowerCase().includes(lower))
+                  .slice(0, 15)
+                  .map((j) => ({ id: j.id, title: j.title, department: j.department }))
+              }}
+              getSuggestionLabel={(s) => `${(s as { title?: string }).title || ''} (${(s as { id: string }).id})`}
+              placeholder="Select a job or type to search..."
+              inputClassName="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              minLength={0}
+              debounceMs={150}
+              maxSuggestions={15}
+              emptyOptionLabel="No matching jobs"
+              onEmptySelect={() => toast('No jobs match your search.', { icon: 'ℹ' })}
+            />
           </div>
 
           {/* Generate Button */}

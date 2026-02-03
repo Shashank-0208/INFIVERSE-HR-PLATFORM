@@ -636,13 +636,35 @@ async def create_job(job: JobCreate, auth: dict = Depends(get_auth)):
         )
 
 @app.get("/v1/jobs", tags=["Job Management"])
-async def list_jobs():
-    """List All Active Jobs (Public Endpoint)"""
+async def list_jobs(
+    search: Optional[str] = None,
+    skills: Optional[str] = None,
+    location: Optional[str] = None,
+    experience: Optional[str] = None,
+    job_type: Optional[str] = None,
+):
+    """List Active Jobs with optional search and filters (Public Endpoint)."""
     try:
         db = await get_mongo_db()
-        cursor = db.jobs.find({"status": "active"}).sort("created_at", -1).limit(100)
+        query = {"status": "active"}
+        if search and search.strip():
+            q = re.escape(search.strip())[:100]
+            query["$or"] = [
+                {"title": {"$regex": q, "$options": "i"}},
+                {"department": {"$regex": q, "$options": "i"}},
+                {"requirements": {"$regex": q, "$options": "i"}},
+                {"description": {"$regex": q, "$options": "i"}},
+            ]
+        if skills and skills.strip():
+            query["requirements"] = {"$regex": re.escape(skills.strip())[:200], "$options": "i"}
+        if location and location.strip():
+            query["location"] = {"$regex": re.escape(location.strip())[:100], "$options": "i"}
+        if experience and experience.strip():
+            query["experience_level"] = {"$regex": re.escape(experience.strip())[:50], "$options": "i"}
+        if job_type and job_type.strip():
+            query["job_type"] = {"$regex": re.escape(job_type.strip())[:50], "$options": "i"}
+        cursor = db.jobs.find(query).sort("created_at", -1).limit(100)
         jobs_list = await cursor.to_list(length=100)
-        
         jobs = []
         for doc in jobs_list:
             jobs.append({
@@ -653,12 +675,106 @@ async def list_jobs():
                 "experience_level": doc.get("experience_level"),
                 "requirements": doc.get("requirements"),
                 "description": doc.get("description"),
+                "job_type": doc.get("job_type"),
+                "employment_type": doc.get("employment_type"),
                 "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
             })
-        
         return {"jobs": jobs, "count": len(jobs)}
     except Exception as e:
         return {"jobs": [], "count": 0, "error": str(e)}
+
+
+@app.get("/v1/jobs/autocomplete", tags=["Job Management"])
+async def jobs_autocomplete(q: Optional[str] = None, limit: int = 10):
+    """Search-as-you-type: return job suggestions by title or department (public for candidate job search)."""
+    if not q or not str(q).strip():
+        return {"suggestions": []}
+    q = str(q).strip()[:50]
+    if not re.match(r"^[A-Za-z0-9\s\-_.]+$", q):
+        return {"suggestions": []}
+    limit = max(1, min(limit, 20))
+    try:
+        db = await get_mongo_db()
+        regex = {"$regex": re.escape(q), "$options": "i"}
+        cursor = db.jobs.find({
+            "status": "active",
+            "$or": [{"title": regex}, {"department": regex}]
+        }).sort("created_at", -1).limit(limit)
+        jobs_list = await cursor.to_list(length=limit)
+        suggestions = []
+        for doc in jobs_list:
+            suggestions.append({
+                "id": str(doc["_id"]),
+                "title": doc.get("title") or "",
+                "department": doc.get("department") or "",
+                "location": doc.get("location") or "",
+            })
+        return {"suggestions": suggestions}
+    except Exception as e:
+        return {"suggestions": [], "error": str(e)}
+
+
+def _extract_skills_from_requirements(requirements: str) -> set:
+    """Extract skill-like tokens from job requirements string (comma/space separated)."""
+    if not requirements or not isinstance(requirements, str):
+        return set()
+    seen = set()
+    for part in re.split(r"[,/\n;|]+", requirements):
+        for token in part.split():
+            token = token.strip()
+            if len(token) >= 2 and re.match(r"^[A-Za-z0-9.+_-]+$", token):
+                seen.add(token)
+    return seen
+
+
+@app.get("/v1/jobs/skills/autocomplete", tags=["Job Management"])
+async def job_skills_autocomplete(q: Optional[str] = None, limit: int = 15):
+    """Search-as-you-type: return skill suggestions from active jobs' requirements (public for candidate browse jobs)."""
+    if not q or not str(q).strip():
+        return {"suggestions": []}
+    q = str(q).strip()[:50]
+    if not re.match(r"^[A-Za-z0-9\s\-_.]+$", q):
+        return {"suggestions": []}
+    limit = max(1, min(limit, 25))
+    try:
+        db = await get_mongo_db()
+        cursor = db.jobs.find({"status": "active"}, {"requirements": 1})
+        jobs_list = await cursor.to_list(length=500)
+        all_skills = set()
+        for doc in jobs_list:
+            req = doc.get("requirements") or ""
+            all_skills.update(_extract_skills_from_requirements(req))
+        q_lower = q.lower()
+        matching = sorted(s for s in all_skills if q_lower in s.lower())[:limit]
+        return {"suggestions": [{"id": s, "label": s} for s in matching]}
+    except Exception as e:
+        return {"suggestions": [], "error": str(e)}
+
+
+@app.get("/v1/jobs/locations/autocomplete", tags=["Job Management"])
+async def job_locations_autocomplete(q: Optional[str] = None, limit: int = 15):
+    """Search-as-you-type: return location suggestions from active jobs (public for candidate browse jobs)."""
+    if not q or not str(q).strip():
+        return {"suggestions": []}
+    q = str(q).strip()[:50]
+    if not re.match(r"^[A-Za-z0-9\s\-_,.]+$", q):
+        return {"suggestions": []}
+    limit = max(1, min(limit, 25))
+    try:
+        db = await get_mongo_db()
+        regex = {"$regex": re.escape(q), "$options": "i"}
+        cursor = db.jobs.find({"status": "active", "location": regex}, {"location": 1})
+        jobs_list = await cursor.to_list(length=500)
+        seen = set()
+        for doc in jobs_list:
+            loc = doc.get("location")
+            if loc and isinstance(loc, str) and loc.strip():
+                seen.add(loc.strip())
+        matching = sorted(seen)[:limit]
+        return {"suggestions": [{"id": s, "label": s} for s in matching]}
+    except Exception as e:
+        return {"suggestions": [], "error": str(e)}
+
 
 @app.get("/v1/jobs/{job_id}", tags=["Job Management"])
 async def get_job_by_id(job_id: str):
@@ -841,14 +957,52 @@ async def get_candidate_stats(auth=Depends(get_auth)):
             "dashboard_ready": False
         }
 
+
+@app.get("/v1/candidates/autocomplete", tags=["Candidate Management"])
+async def candidates_autocomplete(q: Optional[str] = None, limit: int = 10, auth=Depends(get_auth)):
+    """Search-as-you-type: return candidate suggestions by name, email, or skills. Min 1 character."""
+    if not q or not str(q).strip():
+        return {"suggestions": []}
+    q = str(q).strip()[:50]
+    if not re.match(r"^[A-Za-z0-9\s@.\-_,]+$", q):
+        return {"suggestions": []}
+    limit = max(1, min(limit, 20))
+    try:
+        db = await get_mongo_db()
+        regex = {"$regex": re.escape(q), "$options": "i"}
+        cursor = db.candidates.find({
+            "$or": [
+                {"name": regex},
+                {"email": regex},
+                {"technical_skills": regex},
+            ]
+        }).sort("created_at", -1).limit(limit)
+        candidates_list = await cursor.to_list(length=limit)
+        suggestions = []
+        for doc in candidates_list:
+            suggestions.append({
+                "id": str(doc["_id"]),
+                "name": doc.get("name") or "",
+                "email": doc.get("email") or "",
+                "technical_skills": doc.get("technical_skills") or "",
+                "location": doc.get("location") or "",
+            })
+        return {"suggestions": suggestions}
+    except Exception as e:
+        return {"suggestions": [], "error": str(e)}
+
+
 @app.get("/v1/candidates/search", tags=["Candidate Management"])
 async def search_candidates(
-    skills: Optional[str] = None, 
-    location: Optional[str] = None, 
-    experience_min: Optional[int] = None, 
+    search: Optional[str] = None,
+    query: Optional[str] = None,
+    skills: Optional[str] = None,
+    location: Optional[str] = None,
+    experience_min: Optional[int] = None,
     auth=Depends(get_auth)
 ):
-    """Search & Filter Candidates"""
+    """Search & Filter Candidates. Use search or query for name/skills/email free text."""
+    q_text = (search or query or "").strip()[:100]
     if skills:
         if len(skills) > 200:
             raise HTTPException(status_code=400, detail="Skills filter too long (max 200 characters).")
@@ -861,21 +1015,23 @@ async def search_candidates(
             raise HTTPException(status_code=400, detail="Invalid characters in location filter.")
     if experience_min is not None and experience_min < 0:
         raise HTTPException(status_code=400, detail="experience_min must be non-negative.")
-    
+
     try:
         db = await get_mongo_db()
         query = {}
-        
+        if q_text:
+            query["$or"] = [
+                {"name": {"$regex": re.escape(q_text), "$options": "i"}},
+                {"email": {"$regex": re.escape(q_text), "$options": "i"}},
+                {"technical_skills": {"$regex": re.escape(q_text), "$options": "i"}},
+            ]
         if skills:
-            # Case-insensitive regex search for skills
             query["technical_skills"] = {"$regex": skills, "$options": "i"}
-        
         if location:
             query["location"] = {"$regex": location, "$options": "i"}
-        
         if experience_min is not None:
             query["experience_years"] = {"$gte": experience_min}
-        
+
         cursor = db.candidates.find(query).limit(50)
         candidates_list = await cursor.to_list(length=50)
         

@@ -1,9 +1,11 @@
 # 🚀 BHIV HR Platform - Operational Runbook
 
-**Version**: 3.0.0  
-**Last Updated**: November 21, 2025  
+**Version**: 4.3.1  
+**Last Updated**: January 22, 2026  
 **Target Audience**: Operations Team, DevOps, System Administrators  
-**Platform**: Windows + Docker + Render Cloud  
+**Platform**: Windows + Docker + Render Cloud + MongoDB Atlas  
+**Database**: MongoDB Atlas (Primary)  
+**Architecture**: Microservices (111 endpoints)  
 **Status**: ✅ Production Ready
 
 ---
@@ -32,10 +34,10 @@
 
 ### **Architecture Summary**
 - **Type**: Microservices Architecture
-- **Services**: 6 services + PostgreSQL database
+- **Services**: 6 services + MongoDB Atlas database
 - **Deployment**: Docker containers (local) + Render cloud (production)
-- **Total Endpoints**: 89 (74 Gateway + 6 Agent + 9 LangGraph)
-- **Database**: PostgreSQL 17 with Schema v4.3.0
+- **Total Endpoints**: 111 (80 Gateway + 6 Agent + 25 LangGraph)
+- **Database**: MongoDB Atlas (Primary) with 17+ collections
 
 ### **Service Inventory**
 
@@ -47,7 +49,7 @@
 | HR Portal | 8501 | Streamlit 1.41.1 | ✅ Live | bhiv-hr-portal-u670.onrender.com |
 | Client Portal | 8502 | Streamlit 1.41.1 | ✅ Live | bhiv-hr-client-portal-3iod.onrender.com |
 | Candidate Portal | 8503 | Streamlit 1.41.1 | ✅ Live | bhiv-hr-candidate-portal-abe6.onrender.com |
-| Database | 5432 | PostgreSQL 17 | ✅ Live | Internal Render URL |
+| Database | 27017 | MongoDB Atlas | ✅ Live | Cluster URL |
 
 ### **Key Metrics**
 - **Uptime Target**: 99.9%
@@ -75,13 +77,13 @@ Software:
   Docker: 20.10+ with Docker Compose
   Python: 3.12.7 (for BAT scripts)
   Git: 2.30+
-  PostgreSQL Client: 15+ (optional, for direct DB access)
+  MongoDB Client: 4.4+ (optional, for direct DB access)
 ```
 
 #### **Production Environment**
 ```yaml
 Platform: Render Cloud (Oregon, US West)
-Services: 6 web services + 1 PostgreSQL database
+Services: 6 web services + 1 MongoDB Atlas cluster
 Tier: Free tier (optimized for zero cost)
 SSL: Automatic HTTPS certificates
 CDN: Global content delivery
@@ -102,7 +104,7 @@ lsof -i :9001  # LangGraph
 lsof -i :8501  # HR Portal
 lsof -i :8502  # Client Portal
 lsof -i :8503  # Candidate Portal
-lsof -i :5432  # PostgreSQL
+lsof -i :27017  # MongoDB Atlas
 
 # Kill process if port is in use (Windows)
 taskkill /PID <process_id> /F
@@ -116,7 +118,7 @@ kill -9 <PID>
 #### **Required Variables**
 ```bash
 # Database Configuration
-DATABASE_URL=postgresql://user:pass@host:5432/bhiv_hr
+DATABASE_URL=mongodb+srv://user:pass@cluster.mongodb.net/bhiv_hr
 
 # Authentication Secrets
 API_KEY_SECRET=<YOUR_API_KEY>
@@ -225,13 +227,10 @@ Database → Gateway → Agent → LangGraph → Portals
 #### **Full System Startup**
 ```bash
 # Step 1: Start database first
-docker-compose -f docker-compose.production.yml up -d db
-sleep 10
-
-# Verify database is ready
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "SELECT 1"
-# Expected output: 1
+# MongoDB Atlas is managed by cloud provider
+# Verify MongoDB connection
+python test_mongodb_atlas.py
+# Expected: Connection successful
 
 # Step 2: Start Gateway service
 docker-compose -f docker-compose.production.yml up -d gateway
@@ -293,8 +292,8 @@ curl -I http://localhost:8502
 curl -I http://localhost:8503
 
 # Database Connection
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "SELECT COUNT(*) FROM candidates"
+# MongoDB Atlas connection test
+python test_mongodb_atlas.py
 ```
 
 ### **Production Startup (Render)**
@@ -302,6 +301,7 @@ docker-compose -f docker-compose.production.yml exec db \
 ```bash
 # Production services auto-start on Render
 # Manual restart if needed:
+# MongoDB Atlas auto-managed - no manual restart required
 
 # Option 1: Via Render Dashboard
 # 1. Go to dashboard.render.com
@@ -365,7 +365,7 @@ docker-compose -f docker-compose.production.yml ps
 docker-compose -f docker-compose.production.yml down
 
 # Stop and remove volumes (CAUTION: deletes data)
-docker-compose -f docker-compose.production.yml down -v
+# MongoDB Atlas data persists - no volume removal needed
 
 # Stop with timeout (force after 30 seconds)
 docker-compose -f docker-compose.production.yml down -t 30
@@ -397,6 +397,7 @@ docker system prune -a --volumes -f
 
 # Services auto-sleep after 15 minutes of inactivity (free tier)
 # They wake up automatically on first request (30-60 second delay)
+# MongoDB Atlas is always available
 ```
 
 ---
@@ -460,17 +461,17 @@ curl https://bhiv-hr-gateway-ltg0.onrender.com/health
 
 ```yaml
 Dependency Chain:
-  Database (db)
+  MongoDB Atlas (cloud-managed)
     ↓
-  Gateway (depends on db)
+  Gateway (depends on MongoDB)
     ↓
-  Agent (depends on db)
-  LangGraph (depends on db)
+  Agent (depends on MongoDB)
+  LangGraph (depends on MongoDB)
     ↓
-  Portals (depend on gateway)
+  Portals (depend on Gateway)
 
 Restart Order:
-  1. Database
+  1. MongoDB Atlas (verify connectivity)
   2. Gateway
   3. Agent + LangGraph (parallel)
   4. Portals (parallel)
@@ -495,11 +496,12 @@ Restart Order:
 
 ```bash
 # Connect to local database
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr
+# MongoDB Atlas connection
+python test_mongodb_atlas.py
 
 # Connect to production database (if credentials available)
-psql "postgresql://user:pass@host:5432/bhiv_hr?sslmode=require"
+# MongoDB Atlas connection via MongoDB Compass or CLI
+# Connection string: mongodb+srv://user:pass@cluster.mongodb.net/bhiv_hr
 
 # Using database tools
 python tools/database/database_url_checker.py
@@ -513,27 +515,16 @@ docker-compose -f docker-compose.production.yml exec db \
   psql -U bhiv_user -d bhiv_hr -c "SELECT 1"
 
 # Check database size
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT pg_size_pretty(pg_database_size('bhiv_hr')) AS size"
+# MongoDB Atlas size monitoring via dashboard
+# Or use MongoDB Compass for detailed metrics
 
 # Check table counts
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT schemaname, tablename, 
-         pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
-  FROM pg_tables 
-  WHERE schemaname = 'public' 
-  ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC"
+# MongoDB Atlas collection sizes
+# Use MongoDB Compass or Atlas dashboard for collection metrics
 
 # Check active connections
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT count(*) as connections, 
-         state, 
-         application_name 
-  FROM pg_stat_activity 
-  GROUP BY state, application_name"
+# MongoDB Atlas connection monitoring
+# View in Atlas dashboard or use MongoDB monitoring tools
 
 # Comprehensive database check
 python tools/database/precise_db_check.py
@@ -543,21 +534,20 @@ python tools/database/precise_db_check.py
 
 ```bash
 # Check current schema version
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT version FROM schema_version ORDER BY applied_at DESC LIMIT 1"
+# MongoDB Atlas schema version tracking
+# Use MongoDB schema validation or version collection
 
 # List all tables
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "\dt"
+# MongoDB Atlas collections
+# Use MongoDB Compass or Atlas UI to view collections
 
 # Describe specific table
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "\d candidates"
+# MongoDB Atlas collection schema
+# Use MongoDB Compass to inspect collection structure
 
 # Check indexes
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "\di"
+# MongoDB Atlas indexes
+# View in Atlas dashboard or use db.collection.getIndexes()
 
 # Deploy schema updates
 python tools/database/database_sync_manager.py
@@ -647,12 +637,8 @@ docker stats --no-stream
 curl http://localhost:8000/metrics | grep -E "request_count|response_time|error_rate"
 
 # Database performance
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT query, calls, mean_exec_time, max_exec_time 
-  FROM pg_stat_statements 
-  ORDER BY mean_exec_time DESC 
-  LIMIT 10"
+# MongoDB Atlas performance monitoring
+# Use Atlas Performance Advisor or MongoDB profiler
 
 # API response time testing
 time curl http://localhost:8000/v1/candidates
@@ -736,9 +722,8 @@ echo "Backup created: $BACKUP_FILE"
 # 4. Action: Run scripts/backup_database.sh
 # 5. Save
 
-# Linux Cron
-# Add to crontab:
-0 2 * * * /path/to/scripts/backup_database.sh
+# MongoDB Atlas provides automated backups
+# Configure via Atlas dashboard: Backup → Cloud Backup
 ```
 
 ### **Database Restore**
@@ -784,14 +769,14 @@ docker-compose -f docker-compose.production.yml stop db
 ### **Production Backup (Render)**
 
 ```bash
-# Render provides automated daily backups (free tier: 7 days retention)
-# Access via Render Dashboard:
-# 1. Go to database service
-# 2. Click "Backups" tab
-# 3. Download or restore as needed
+# MongoDB Atlas automated backups (7-30 days retention)
+# Access via Atlas Dashboard:
+# 1. Go to Cluster → Backup
+# 2. View snapshots or create manual backup
+# 3. Restore from any snapshot point-in-time
 
-# Manual production backup (if credentials available)
-pg_dump "postgresql://user:pass@host:5432/bhiv_hr?sslmode=require" > production_backup.sql
+# Manual backup via mongodump
+mongodump --uri="mongodb+srv://user:pass@cluster.mongodb.net/bhiv_hr" --out=backup
 ```
 
 ---
@@ -802,56 +787,42 @@ pg_dump "postgresql://user:pass@host:5432/bhiv_hr?sslmode=require" > production_
 
 #### **Vacuum and Analyze**
 ```bash
-# Run VACUUM ANALYZE (recommended weekly)
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "VACUUM ANALYZE"
+# MongoDB Atlas auto-optimization
+# No manual VACUUM needed - Atlas handles optimization
 
 # Vacuum specific table
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "VACUUM ANALYZE candidates"
+# MongoDB Atlas collection optimization
+# Use Atlas Performance Advisor for recommendations
 
 # Full vacuum (requires more time and locks)
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "VACUUM FULL"
+# MongoDB Atlas compaction
+# Use Atlas dashboard to compact collections if needed
 ```
 
 #### **Index Management**
 ```bash
 # List all indexes
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT schemaname, tablename, indexname, indexdef 
-  FROM pg_indexes 
-  WHERE schemaname = 'public' 
-  ORDER BY tablename, indexname"
+# MongoDB Atlas indexes
+# View in Atlas dashboard or use db.collection.getIndexes()
 
 # Check index usage
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT schemaname, tablename, indexname, idx_scan, idx_tup_read, idx_tup_fetch
-  FROM pg_stat_user_indexes 
-  ORDER BY idx_scan ASC"
+# MongoDB Atlas index usage statistics
+# Use Atlas Performance Advisor or db.collection.stats()
 
 # Rebuild indexes (if needed)
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "REINDEX DATABASE bhiv_hr"
+# MongoDB Atlas index rebuild
+# Drop and recreate indexes via Atlas dashboard if needed
 ```
 
 #### **Query Optimization**
 ```bash
 # Find slow queries
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT query, calls, mean_exec_time, max_exec_time, stddev_exec_time
-  FROM pg_stat_statements 
-  WHERE mean_exec_time > 100
-  ORDER BY mean_exec_time DESC 
-  LIMIT 20"
+# MongoDB Atlas slow query analysis
+# Use Atlas Performance Advisor or MongoDB profiler
 
 # Explain query plan
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  EXPLAIN ANALYZE SELECT * FROM candidates WHERE status='active' LIMIT 100"
+# MongoDB Atlas query analysis
+# Use Atlas Performance Advisor or explain() method
 ```
 
 ### **Application Performance**
@@ -953,33 +924,29 @@ docker-compose -f docker-compose.production.yml exec db \
   psql -U bhiv_user -d bhiv_hr -c "SELECT 1"
 
 # Check connection count
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT count(*) FROM pg_stat_activity"
+# MongoDB Atlas connection monitoring
+# View in Atlas dashboard
 ```
 
 **Solutions:**
 ```bash
 # Solution 1: Restart database
-docker-compose -f docker-compose.production.yml restart db
+# MongoDB Atlas restart not needed - cloud managed
 sleep 10
 
 # Solution 2: Check DATABASE_URL format
-# Correct format: postgresql://user:pass@host:5432/dbname
+# Correct format: mongodb+srv://user:pass@cluster.mongodb.net/dbname
 
 # Solution 3: Clear connection pool
 docker-compose -f docker-compose.production.yml restart gateway agent langgraph
 
 # Solution 4: Check for long-running queries
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT pid, now() - pg_stat_activity.query_start AS duration, query 
-  FROM pg_stat_activity 
-  WHERE state = 'active' AND now() - pg_stat_activity.query_start > interval '5 minutes'"
+# MongoDB Atlas long-running operations
+# Use Atlas dashboard or db.currentOp()
 
 # Kill long-running query if needed
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "SELECT pg_terminate_backend(<pid>)"
+# MongoDB Atlas operation termination
+# Use Atlas dashboard or db.killOp(<opid>)
 ```
 
 #### **Issue 3: Authentication Failures**
@@ -1001,6 +968,7 @@ python tools/security/get_all_api_keys.py
 # Verify JWT secrets match
 type .env | findstr JWT_SECRET_KEY  # Windows
 grep JWT_SECRET_KEY .env            # Linux/Mac
+# Also check MONGODB_URI for database connection
 ```
 
 **Solutions:**
@@ -1044,7 +1012,7 @@ docker-compose -f docker-compose.production.yml logs agent --tail=50
 curl http://localhost:9000/test-db
 
 # Check if Phase 3 engine loaded
-docker-compose -f docker-compose.production.yml logs agent | grep -i "phase3"
+docker-compose -f docker-compose.production.yml logs agent | grep -i "ai\|matching"
 ```
 
 **Solutions:**
@@ -1055,9 +1023,8 @@ sleep 10
 curl http://localhost:9000/health
 
 # Solution 2: Check candidate has skills
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT id, name, technical_skills FROM candidates WHERE id=1"
+# MongoDB Atlas candidate data check
+# Use MongoDB Compass or db.candidates.findOne({id: 1})
 
 # Solution 3: Manually trigger matching
 curl -X POST http://localhost:8000/v1/match/1/top \
@@ -1123,12 +1090,8 @@ curl http://localhost:9001/health
 docker-compose -f docker-compose.production.yml logs langgraph | grep -i "notification\|twilio\|email"
 
 # Check workflow status
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT id, workflow_type, status, error_message 
-  FROM workflows 
-  WHERE status='failed' 
-  ORDER BY created_at DESC LIMIT 10"
+# MongoDB Atlas workflow status check
+# Use db.workflows.find({status: "failed"}).sort({created_at: -1}).limit(10)
 ```
 
 **Solutions:**
@@ -1139,6 +1102,7 @@ python tools/utilities/send_test_messages.py --channel=whatsapp --to="+155512345
 # Solution 2: Check credentials
 type .env | findstr TWILIO  # Windows
 grep TWILIO .env            # Linux/Mac
+# Also check GMAIL_, TELEGRAM_ credentials
 
 # Solution 3: Restart LangGraph
 docker-compose -f docker-compose.production.yml restart langgraph
@@ -1168,11 +1132,8 @@ docker stats --no-stream
 time curl http://localhost:8000/v1/candidates
 
 # Check database performance
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT query, calls, mean_exec_time, max_exec_time 
-  FROM pg_stat_statements 
-  ORDER BY mean_exec_time DESC LIMIT 10"
+# MongoDB Atlas performance monitoring
+# Use Atlas Performance Advisor or profiler
 
 # Check for missing indexes
 python tools/database/precise_db_check.py
@@ -1192,12 +1153,8 @@ docker-compose -f docker-compose.production.yml exec db \
   psql -U bhiv_user -d bhiv_hr -c "TRUNCATE TABLE matching_cache"
 
 # Solution 4: Check for long-running queries
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT pid, query, state, now() - query_start AS duration
-  FROM pg_stat_activity 
-  WHERE state = 'active' 
-  ORDER BY duration DESC"
+# MongoDB Atlas long-running operations
+# Use Atlas dashboard or db.currentOp()
 ```
 
 ### **Diagnostic Tools**
@@ -1247,9 +1204,9 @@ python tools/portal/comprehensive_portal_explorer.py
 
 ```yaml
 Primary Contact:
-  Name: Shashank Mishra
-  Role: System Architect
-  Contact: [Via Slack @shashank-mishra]
+  Name: Ishan Shirode
+  Role: Lead Backend Engineer
+  Contact: [Team communication channel]
   Availability: 24/7 for Critical issues
 
 Secondary Contact:
@@ -1261,7 +1218,7 @@ Secondary Contact:
 Escalation Path:
   1. Operations Team Member (first responder)
   2. Team Lead (if not resolved in 15 minutes)
-  3. Shashank Mishra (if Critical or not resolved in 1 hour)
+  3. Ishan Shirode (if Critical or not resolved in 1 hour)
   4. Management (if downtime >30 minutes)
 ```
 
@@ -1379,7 +1336,7 @@ docker-compose -f docker-compose.production.yml up -d
 curl http://localhost:8000/health
 curl http://localhost:8000/v1/candidates
 
-# ESCALATE IMMEDIATELY TO SHASHANK
+# ESCALATE IMMEDIATELY TO ISHAN SHIRODE
 ```
 
 ### **Emergency Scenario: Security Breach**
@@ -1410,7 +1367,7 @@ python tools/security/security_audit_checker.py
 # Step 6: Check for unauthorized changes
 git log --since="24 hours ago" --all
 
-# ESCALATE IMMEDIATELY TO SHASHANK AND SECURITY TEAM
+# ESCALATE IMMEDIATELY TO ISHAN SHIRODE AND SECURITY TEAM
 ```
 
 ---
@@ -1539,11 +1496,8 @@ python tools/security/check_api_keys.py
 python tools/security/security_audit_checker.py
 
 # Check for failed login attempts
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT * FROM audit_logs 
-  WHERE action='login_failed' 
-  AND created_at > NOW() - INTERVAL '24 hours'"
+# MongoDB Atlas audit logs
+# Use Atlas dashboard or db.audit_logs.find()
 
 # Check rate limiting status
 curl http://localhost:8000/v1/security/rate-limit-status
@@ -1571,8 +1525,8 @@ docker-compose -f docker-compose.production.yml exec db \
 docker-compose -f docker-compose.production.yml restart
 
 # Update database password
-# 1. Change password in PostgreSQL
-# 2. Update DATABASE_URL in .env
+# 1. Change password in MongoDB Atlas
+# 2. Update MONGODB_URI in .env
 # 3. Restart all services
 ```
 
@@ -1588,11 +1542,8 @@ docker-compose -f docker-compose.production.yml stop <service>
 docker-compose -f docker-compose.production.yml logs <service> > incident_logs.txt
 
 # 3. Check audit logs
-docker-compose -f docker-compose.production.yml exec db \
-  psql -U bhiv_user -d bhiv_hr -c "
-  SELECT * FROM audit_logs 
-  WHERE created_at > NOW() - INTERVAL '24 hours' 
-  ORDER BY created_at DESC" > audit_evidence.txt
+# MongoDB Atlas audit logs
+# Export from Atlas dashboard or use db.audit_logs.find()
 
 # 4. Change all credentials
 # 5. Run security audit
@@ -1602,7 +1553,7 @@ python tools/security/security_audit_checker.py
 # Create incident report in handover/incidents/
 
 # 7. Notify security team
-# ESCALATE IMMEDIATELY
+# ESCALATE IMMEDIATELY TO ISHAN SHIRODE
 ```
 
 ---
@@ -1701,10 +1652,10 @@ git push -f origin main
 
 ```yaml
 Primary Contact:
-  Name: Shashank Mishra
-  Role: System Architect & Lead Developer
-  Contact: Slack @shashank-mishra
-  GitHub: @Shashank-0208
+  Name: Ishan Shirode
+  Role: Lead Backend Engineer
+  Contact: Team communication channel
+  GitHub: @ishan-shirode
   Availability: 24/7 for Critical issues
 
 Operations Team:
@@ -1723,7 +1674,7 @@ Documentation:
 ### **When to Escalate**
 
 ```yaml
-Immediate Escalation (Contact Shashank):
+Immediate Escalation (Contact Ishan Shirode):
   - Production system completely down
   - Database corruption or data loss
   - Security breach detected
@@ -1842,20 +1793,20 @@ API Testing:
   Format: Bearer <YOUR_API_KEY>
 
 Database:
-  User: bhiv_user
+  Cluster: MongoDB Atlas
   Database: bhiv_hr
-  Port: 5432
+  Connection: mongodb+srv://
 ```
 
 ---
 
 ## 📝 Document Information
 
-**Document Version**: 3.0.0  
-**Last Updated**: November 21, 2025  
-**Next Review**: February 21, 2026  
+**Document Version**: 4.3.1  
+**Last Updated**: January 22, 2026  
+**Next Review**: April 22, 2026  
 **Owner**: Operations Team  
-**Approver**: Shashank Mishra
+**Approver**: Ishan Shirode
 
 **Change Log**:
 - v3.0.0 (Nov 21, 2025): Complete rewrite with comprehensive procedures

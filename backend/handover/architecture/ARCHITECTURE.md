@@ -34,7 +34,7 @@
             │                       │                       │
     ┌───────▼──────┐      ┌────────▼────────┐    ┌───────▼──────┐
     │  AI Agent    │      │   LangGraph     │    │  Database    │
-    │  (FastAPI)   │      │  Orchestrator   │    │ PostgreSQL   │
+    │  (FastAPI)   │      │  Orchestrator   │    │ MongoDB Atlas│
     │  • Phase 3   │      │  • Workflows    │    │  • 14 Tables │
     │  • Semantic  │      │  • RL Engine    │    │  • 4 RL Tabs │
     │  • 6 Endpts  │      │  • 25 Endpoints │    │  • Schema v4 │
@@ -45,7 +45,7 @@
 - **Pattern:** Microservices Architecture
 - **Communication:** REST APIs + Event-Driven
 - **Deployment:** Docker Containers on Render
-- **Database:** Centralized PostgreSQL 17
+- **Database:** MongoDB Atlas
 - **Total Services:** 6 (3 Portals + 3 Backend Services)
 - **Total Endpoints:** 111 (80 Gateway + 6 Agent + 25 LangGraph)
 
@@ -297,7 +297,7 @@
 ---
 
 ### 2.7 Database Module
-**Purpose:** Centralized PostgreSQL database with comprehensive schema
+**Purpose:** MongoDB Atlas database with comprehensive schema
 
 **Key Files:**
 - `services/db/consolidated_schema.sql` - Complete schema v4.3.0
@@ -361,7 +361,7 @@
             ┌───────▼──────┐ ┌────▼─────┐ ┌─────▼──────┐
             │  AI Agent    │ │LangGraph │ │ Database   │
             │              │ │          │ │            │
-            │  • Matching  │ │• Workflow│ │• PostgreSQL│
+            │  • Matching  │ │• Workflow│ │• MongoDB   │
             │  • Analysis  │ │• RL Eng  │ │• Schema v4 │
             └──────────────┘ └──────────┘ └────────────┘
 ```
@@ -632,7 +632,7 @@
 - **UI Components:** Custom Streamlit components
 
 ### Database
-- **RDBMS:** PostgreSQL 17
+- **Database:** MongoDB Atlas
 - **ORM:** SQLAlchemy >=2.0.23, <2.1.0
 - **Connection Pool:** psycopg2-binary >=2.9.7, <3.0.0
 - **Migrations:** Alembic
@@ -741,7 +741,7 @@
 │  └──────────────┘  └──────────────┘  └───────────┘ │
 │                                                      │
 │  ┌─────────────────────────────────────────────┐   │
-│  │     PostgreSQL 17 (Managed Database)        │   │
+│  │     MongoDB Atlas (Managed Database)        │   │
 │  │     Connection String: DATABASE_URL         │   │
 │  └─────────────────────────────────────────────┘   │
 │                                                      │
@@ -757,7 +757,7 @@
 - Candidate Portal: `bhiv-hr-candidate-portal-abe6.onrender.com`
 
 ### Environment Variables (Per Service)
-- `DATABASE_URL` - PostgreSQL connection string
+- `DATABASE_URL` - MongoDB Atlas connection string
 - `API_KEY_SECRET` - API authentication key
 - `JWT_SECRET_KEY` - Client JWT secret
 - `CANDIDATE_JWT_SECRET_KEY` - Candidate JWT secret

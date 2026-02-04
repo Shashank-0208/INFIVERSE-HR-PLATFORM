@@ -16,7 +16,11 @@
 # Frontend: Run separately with `npm run dev` on port 3000
 #
 # Usage:
-#   docker-compose -f docker-compose.production.yml up --build
+#   cd backend && docker-compose -f docker-compose.production.yml up --build
+#
+# Environment:
+#   Loads backend/.env so JWT/API keys match local backend (avoids token mismatch).
+#   Run from backend/ so ${VAR} and env_file resolve to backend/.env.
 #
 # MongoDB Atlas Connection:
 #   Uses DATABASE_URL from .env file pointing to MongoDB Atlas
@@ -30,6 +34,8 @@ services:
     build: ./services/gateway
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-bhiv_hr}
@@ -39,6 +45,7 @@ services:
       LANGGRAPH_SERVICE_URL: http://langgraph:9001
       CANDIDATE_JWT_SECRET_KEY: ${CANDIDATE_JWT_SECRET_KEY}
       GATEWAY_SECRET_KEY: ${GATEWAY_SECRET_KEY}
+      AGENT_MATCH_TIMEOUT: ${AGENT_MATCH_TIMEOUT:-60}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       OBSERVABILITY_ENABLED: ${OBSERVABILITY_ENABLED:-true}
       PYTHON_VERSION: ${PYTHON_VERSION:-3.11}
@@ -62,6 +69,8 @@ services:
     build: ./services/agent
     ports:
       - "9000:9000"
+    env_file:
+      - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-bhiv_hr}
@@ -69,6 +78,13 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       CANDIDATE_JWT_SECRET_KEY: ${CANDIDATE_JWT_SECRET_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      # Hugging Face Configuration
+      HF_TOKEN: ${HF_TOKEN}
+      HF_HUB_DISABLE_SYMLINKS_WARNING: ${HF_HUB_DISABLE_SYMLINKS_WARNING:-1}
+      HF_HUB_DISABLE_TELEMETRY: ${HF_HUB_DISABLE_TELEMETRY:-1}
+      HF_HUB_DISABLE_PROGRESS_BARS: ${HF_HUB_DISABLE_PROGRESS_BARS:-1}
+      TRANSFORMERS_VERBOSITY: ${TRANSFORMERS_VERBOSITY:-error}
+      TOKENIZERS_PARALLELISM: ${TOKENIZERS_PARALLELISM:-false}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       OBSERVABILITY_ENABLED: ${OBSERVABILITY_ENABLED:-true}
       PYTHON_VERSION: ${PYTHON_VERSION:-3.11}
@@ -92,6 +108,8 @@ services:
     build: ./services/langgraph
     ports:
       - "9001:9001"
+    env_file:
+      - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-bhiv_hr}
@@ -133,6 +151,8 @@ services:
     build: ./services/portal
     ports:
       - "8501:8501"
+    env_file:
+      - .env
     environment:
       GATEWAY_SERVICE_URL: http://gateway:8000
       AGENT_SERVICE_URL: http://agent:9000
@@ -165,6 +185,8 @@ services:
     build: ./services/client_portal
     ports:
       - "8502:8502"
+    env_file:
+      - .env
     environment:
       GATEWAY_SERVICE_URL: http://gateway:8000
       AGENT_SERVICE_URL: http://agent:9000
@@ -199,6 +221,8 @@ services:
     build: ./services/candidate_portal
     ports:
       - "8503:8503"
+    env_file:
+      - .env
     environment:
       GATEWAY_SERVICE_URL: http://gateway:8000
       API_KEY_SECRET: ${API_KEY_SECRET}

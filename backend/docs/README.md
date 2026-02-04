@@ -1,7 +1,7 @@
 # 📚 BHIV HR Platform - Documentation Index
 
 **Complete Documentation Suite**  
-**Updated**: January 16, 2026  
+**Updated**: January 30, 2026  
 **Version**: v4.3.0  
 **Status**: ✅ All Documentation Current
 
@@ -15,7 +15,7 @@
 3. Setup: [Backend README](../README.md)
 
 ### **For API Integration**
-1. [Complete API Documentation](api/API_DOCUMENTATION.md) - All 112 endpoints
+1. [Complete API Documentation](api/API_DOCUMENTATION.md) - All 113 endpoints
 2. [API Testing Guide](testing/API_TESTING_GUIDE.md)
 3. [Postman Collection](../handover/postman/postman_collection.json)
 
@@ -57,7 +57,7 @@ API documentation and reference.
 
 | Document | Description |
 |----------|-------------|
-| [API_DOCUMENTATION.md](api/API_DOCUMENTATION.md) | Complete API reference (112 endpoints) |
+| [API_DOCUMENTATION.md](api/API_DOCUMENTATION.md) | Complete API reference (113 endpoints) |
 
 ### **🗄️ Database** (`database/`)
 Database documentation and setup guides.
@@ -67,7 +67,7 @@ Database documentation and setup guides.
 | [DATABASE_DOCUMENTATION.md](database/DATABASE_DOCUMENTATION.md) | MongoDB collections and schemas |
 | [CONNECTION_DIAGRAM.md](database/CONNECTION_DIAGRAM.md) | Database connection guide |
 | [DBEAVER_SETUP_GUIDE.md](database/DBEAVER_SETUP_GUIDE.md) | Database client setup |
-| [QUICK_QUERIES.sql](database/QUICK_QUERIES.sql) | Useful MongoDB queries |
+| [MONGODB_QUICK_QUERIES.md](database/MONGODB_QUICK_QUERIES.md) | Useful MongoDB queries |
 
 ### **🔒 Security** (`security/`)
 Security documentation and audits.
@@ -121,7 +121,7 @@ System analysis and documentation updates.
 - **Connection**: Set `DATABASE_URL` in `.env`
 
 ### **Testing**
-- **Test Suite**: `tests/test_complete_112_endpoints.py`
+- **Test Suite**: `tests/comprehensive_endpoint_tests.py`
 - **Postman**: `handover/postman/postman_collection.json`
 - **Test Results**: `tests/test_results.json`
 
@@ -130,8 +130,8 @@ System analysis and documentation updates.
 ## 📝 Important Notes
 
 ### **Current System Status**
-- ✅ **6 Services**: Gateway (81), Agent (6), LangGraph (25), Portals (Reference)
-- ✅ **112 Endpoints**: Total across all services
+- ✅ **6 Services**: Gateway (80), Agent (6), LangGraph (25), Portals (Reference)
+- ✅ **111 Endpoints**: Total across all services
 - ✅ **Database**: MongoDB Atlas (PostgreSQL is legacy reference only)
 - ✅ **Portals**: Streamlit portals available via Docker only, for reference
 
@@ -143,7 +143,7 @@ System analysis and documentation updates.
 ### **Documentation Standards**
 - All URLs use `localhost` (no production URLs)
 - Database references are MongoDB Atlas
-- Endpoint count: 112 total
+- Endpoint count: 113 total
 - Services: 3 core (Gateway, Agent, LangGraph) + 3 portals (Reference)
 
 ---
@@ -157,6 +157,6 @@ System analysis and documentation updates.
 
 ---
 
-**Status**: ✅ All Documentation Current | **Updated**: January 16, 2026 | **Version**: v4.3.0
+**Status**: ✅ All Documentation Current | **Updated**: January 30, 2026 | **Version**: v4.3.0
 
 *Built with Integrity, Honesty, Discipline, Hard Work & Gratitude*

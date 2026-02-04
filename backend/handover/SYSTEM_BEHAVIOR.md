@@ -1,7 +1,9 @@
 # SYSTEM_BEHAVIOR.md
 **BHIV HR Platform - Critical Handover Documentation**  
 **Version**: 4.3.1  
-**Generated**: December 22, 2025  
+**Updated**: January 22, 2026  
+**Database**: MongoDB Atlas (migrated from PostgreSQL)  
+**Architecture**: Microservices with 111 endpoints (80 Gateway + 6 Agent + 25 LangGraph)  
 **Status**: Production Ready - Zero Dependency Handover  
 
 ---
@@ -12,10 +14,11 @@
 
 ### **Architecture Summary**
 - **6 Microservices**: Gateway, Agent, LangGraph, Portal, Client Portal, Candidate Portal
-- **Database**: PostgreSQL 17 with Schema v4.3.1 (19 tables)
-- **Deployment**: Docker containers with dynamic port allocation
+- **Database**: MongoDB Atlas (Primary) with 17+ collections
+- **Deployment**: Docker containers with dynamic port allocation + Render Cloud
 - **Authentication**: Triple authentication (API Key + Client JWT + Candidate JWT)
-- **Total Endpoints**: 119 (88 Gateway + 6 Agent + 25 LangGraph)
+- **Total Endpoints**: 111 (80 Gateway + 6 Agent + 25 LangGraph)
+- **Monitoring**: Integrated Prometheus metrics, health checks, audit logging
 
 ---
 
@@ -62,10 +65,11 @@ connect_timeout=10
 ```
 
 #### **Database Behavior**
-- **Auto-reconnection**: `pool_pre_ping=True` ensures connection validity
-- **Connection Pooling**: Shared across all services
-- **Transaction Management**: Uses `engine.begin()` for atomic operations
-- **Error Handling**: Graceful fallback with error messages in responses
+- **Connection Management**: MongoDB Atlas cluster with auto-failover
+- **Connection Pooling**: Atlas connection pool optimization
+- **Transaction Management**: Uses MongoDB atomic operations and multi-document transactions
+- **Error Handling**: Graceful fallback with detailed error messages in responses
+- **Data Model**: Document-based schema with flexible collections
 
 ### **3. API ENDPOINT BEHAVIOR**
 
@@ -377,10 +381,11 @@ LangGraph → Gateway: Status updates
 
 ### **Current Production Status**
 - **Services**: 6/6 operational
-- **Endpoints**: 119 total (100% functional)
-- **Database**: Schema v4.3.1 with 19 tables
+- **Endpoints**: 111 total (100% functional)
+- **Database**: MongoDB Atlas with 17+ collections
 - **Uptime**: 99.9%
 - **Cost**: $0/month (optimized free tier)
+- **Migration**: Successfully migrated from PostgreSQL to MongoDB Atlas (Jan 2026)
 
 ### **Data Verification Commands**
 ```bash

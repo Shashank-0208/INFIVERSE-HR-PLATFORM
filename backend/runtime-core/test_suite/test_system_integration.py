@@ -1,5 +1,5 @@
 """
-System Integration Test Suite for BHIV Application Framework
+System Integration Test Suite for Sovereign Application Runtime (SAR)
 Tests the integration between different services
 """
 import pytest

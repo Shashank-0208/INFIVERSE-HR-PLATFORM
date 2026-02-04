@@ -1,175 +1,191 @@
-# SAR Known Limitations
+# BHIV Application Framework - Known Limitations and Constraints
 
-This document outlines all known limitations, constraints, and areas for improvement in the Sovereign Application Runtime (SAR).
+## Overview
 
-## Architecture & Design Limitations
+This document outlines the current limitations, constraints, and areas for improvement in the BHIV Application Framework. Understanding these limitations is crucial for proper deployment planning, performance expectations, and future development priorities.
 
-### Multi-Tenancy
-- **Database Isolation**: Currently relies on application-level tenant isolation; database-level isolation requires additional implementation
-- **Resource Sharing**: No built-in mechanism for cross-tenant resource sharing when explicitly allowed
-- **Tenant Hierarchy**: No support for tenant parent-child relationships or organizational hierarchies
-- **Tenant Migration**: No built-in tools for migrating tenants between systems
+## Current Limitations
 
-### Scalability Constraints
-- **Single Process Limitations**: Workflow engine may face limitations with very high concurrent workflow execution
-- **In-Memory Storage**: Audit and workflow storage backends have limited persistence options
-- **Connection Pooling**: Database connection management may need optimization for high-load scenarios
-- **Caching**: Limited caching mechanisms for frequently accessed data
+### 1. Database Architecture
 
-## Performance Limitations
+#### File-Based Storage (Current)
+- **Issue**: The framework currently uses file-based storage for audit logs and some workflow data
+- **Impact**: May not scale well for enterprise deployments with high transaction volumes
+- **Mitigation**: PostgreSQL integration is planned and partially implemented in the codebase
+- **Timeline**: Migration to production-ready database storage planned for next release
 
-### Workflow Engine
-- **Complex Workflow Performance**: Very complex workflows with many dependencies may experience slower execution
-- **Workflow State Storage**: In-memory workflow state storage limits the number of concurrent long-running workflows
-- **Task Execution**: Sequential task execution may be slower than parallel processing in some scenarios
+#### Limited Transaction Support
+- **Issue**: File-based operations may lack ACID properties during high concurrency
+- **Impact**: Potential data consistency issues under heavy load
+- **Mitigation**: Use PostgreSQL backend when available; implement retry logic
+- **Status**: Will be resolved with database migration
 
-### Audit Logging
-- **Log Volume**: High-volume systems may generate audit logs faster than they can be processed
-- **Storage Growth**: File-based audit storage may grow large without automatic archival
-- **Search Performance**: Audit log searching may be slow on very large datasets without indexing
+### 2. Scalability Constraints
 
-### Authentication
-- **Token Validation**: JWT token validation is done synchronously which may impact performance under high load
-- **2FA Validation**: TOTP validation is done in-memory without distributed caching
-- **Session Management**: No distributed session management for multi-instance deployments
+#### Single Instance Deployment
+- **Issue**: Currently designed for single-instance deployment
+- **Impact**: Limited horizontal scaling capabilities
+- **Mitigation**: Session state is stored in JWT tokens to enable basic clustering
+- **Future Enhancement**: Clustering and load balancing features planned
 
-## Security Limitations
+#### Memory Management
+- **Issue**: Some services hold data in memory for performance
+- **Impact**: Memory usage grows with concurrent users
+- **Mitigation**: Implement proper caching with TTL and cleanup mechanisms
+- **Status**: Memory management improvements in roadmap
 
-### Authentication & Authorization
-- **Password Policy**: Built-in password policy is basic; more complex policies require customization
-- **Account Lockout**: Basic account lockout mechanism; more sophisticated anti-automation measures not implemented
-- **Session Security**: Session management follows basic patterns; advanced session security features not included
+### 3. Performance Considerations
 
-### Data Protection
-- **Encryption at Rest**: No built-in encryption for data at rest; relies on infrastructure-level encryption
-- **Field-Level Encryption**: No built-in field-level encryption for sensitive data
-- **Data Masking**: No automatic data masking for development/test environments
+#### AI/RL Service Dependencies
+- **Issue**: Some advanced features depend on external AI/RL services
+- **Impact**: Performance and availability tied to external service reliability
+- **Mitigation**: Implemented graceful degradation when AI/RL services unavailable
+- **Configuration**: Timeout and retry settings configurable via environment variables
 
-## Integration Limitations
+#### Workflow Engine Performance
+- **Issue**: Complex workflows with many dependencies may have performance overhead
+- **Impact**: Longer execution times for complex business processes
+- **Optimization**: Workflow execution engine optimization planned for future release
 
-### Third-Party Integration
-- **Artha ERP Integration**: Generic interfaces exist but specific ERP business logic requires additional development
-- **External Authentication**: Limited support for external authentication providers (OAuth, SAML, etc.)
-- **Event Systems**: Basic event publishing; complex event processing requires additional infrastructure
+### 4. Integration Limitations
 
-### Storage Systems
-- **Audit Storage**: Limited to file and in-memory backends; no native support for cloud storage services
-- **Workflow Persistence**: No built-in support for external workflow persistence systems
-- **Data Archival**: No automated data archival or lifecycle management
+#### Adapter Performance
+- **Issue**: Each adapter call introduces potential latency
+- **Impact**: Overall response time may increase with multiple active adapters
+- **Configuration**: Per-adapter timeout and retry settings available
+- **Best Practice**: Monitor adapter performance and disable non-critical adapters if needed
 
-## Deployment Limitations
+#### Third-Party Service Dependencies
+- **Issue**: Adapters depend on external service availability
+- **Impact**: Framework reliability affected by third-party service uptime
+- **Mitigation**: Fail-safe adapter design ensures core functionality remains operational
 
-### Container Orchestration
-- **Kubernetes**: Basic Docker support but no native Kubernetes deployment manifests
-- **Service Discovery**: No built-in service discovery mechanisms
-- **Configuration Management**: Basic environment variable configuration only
+### 5. Security Considerations
 
-### Monitoring & Observability
-- **Metrics Collection**: Basic health checks only; comprehensive metrics require additional tools
-- **Distributed Tracing**: No built-in distributed tracing across services
-- **Log Aggregation**: No built-in log aggregation or centralized logging
+#### Rate Limiting Granularity
+- **Issue**: Current rate limiting is basic and per-endpoint
+- **Impact**: May not adequately protect against sophisticated attacks
+- **Enhancement**: More granular, adaptive rate limiting planned
 
-## Feature Limitations
+#### Certificate Management
+- **Issue**: SSL/TLS certificate management not built into the framework
+- **Impact**: Requires external load balancer or reverse proxy for HTTPS
+- **Deployment**: Requires proper infrastructure setup for production security
 
-### Workflow Engine
-- **Complex Scheduling**: Basic scheduling only; complex cron-like scheduling not supported
-- **External Task Execution**: No built-in support for executing tasks on external systems
-- **Workflow Versioning**: No built-in workflow versioning or migration between versions
-- **Human Tasks**: Limited support for human workflow tasks requiring user interaction
+### 6. Monitoring and Observability
 
-### Audit Logging
-- **Log Analysis**: No built-in log analysis or visualization tools
-- **Compliance Reports**: Basic audit logs without built-in compliance reporting
-- **Real-time Processing**: No real-time audit log processing or alerting
+#### Basic Metrics
+- **Issue**: Currently provides basic health check metrics only
+- **Impact**: Limited insights into performance bottlenecks
+- **Enhancement**: Advanced monitoring and analytics capabilities planned
+- **Integration**: Prometheus-compatible metrics export planned
 
-### Role Management
-- **Dynamic Roles**: Roles must be defined in code; no runtime role creation
-- **Role Inheritance**: Limited role inheritance patterns; complex hierarchies require customization
-- **Time-based Permissions**: No built-in time-based access controls
+#### Log Aggregation
+- **Issue**: Logs are stored separately by service
+- **Impact**: Difficult to correlate events across services
+- **Solution**: Centralized logging integration possible but not built-in
+- **Recommendation**: Use external log aggregation tools in production
 
-## Technology Stack Limitations
+## Configuration Constraints
 
-### Language & Framework
-- **Python Version**: Currently tied to Python 3.12; version upgrades may require testing
-- **FastAPI Framework**: Framework-specific patterns may limit flexibility
-- **Async Limitations**: Some operations may block the async event loop
+### Environment Variable Dependencies
+- **Constraint**: Heavy reliance on environment variables for configuration
+- **Impact**: Complex deployment configurations
+- **Best Practice**: Maintain environment-specific configuration files
 
-### Dependencies
-- **Third-Party Packages**: Relies on external packages that may have their own limitations
-- **Security Updates**: Requires regular updates to maintain security
-- **Version Compatibility**: May have compatibility issues with future package versions
+### Hardcoded Values
+- **Issue**: Some default values are hardcoded (e.g., default API key)
+- **Impact**: May require code changes for certain customizations
+- **Improvement**: Moving toward more configurable defaults
 
-## Operational Limitations
+## Platform Limitations
 
-### Maintenance
-- **Database Migrations**: No built-in database migration system for schema changes
-- **Configuration Changes**: Some configuration changes require service restarts
-- **Monitoring**: Basic monitoring only; advanced monitoring requires additional tools
+### Operating System Support
+- **Primary Support**: Optimized for Linux and Windows environments
+- **Limited Testing**: macOS support available but less thoroughly tested
+- **Container Support**: Docker-based deployment recommended for consistency
 
-### Disaster Recovery
-- **Backup Procedures**: No built-in backup procedures; relies on infrastructure backups
-- **Recovery Procedures**: Recovery procedures not explicitly defined
-- **Data Consistency**: No built-in data consistency checks or repair tools
+### Browser Compatibility
+- **Modern Browsers**: Optimized for modern browsers (Chrome, Firefox, Safari, Edge)
+- **Legacy Support**: Internet Explorer not supported
+- **Mobile**: Responsive design implemented but primarily web-focused
 
-## Performance Considerations
+## Data Migration Constraints
 
-### Resource Usage
-- **Memory Usage**: In-memory operations may consume significant memory under load
-- **CPU Usage**: Complex operations may be CPU-intensive
-- **Network Usage**: Service-to-service communication adds network overhead
+### Tenant Data Portability
+- **Issue**: Tenant data is isolated but migration between instances requires coordination
+- **Process**: Manual data migration procedures needed for tenant transfers
+- **Future**: Automated tenant migration tools in development roadmap
 
-### Concurrency
-- **Database Connections**: Limited database connection pool without configuration
-- **Concurrent Requests**: Performance may degrade under very high concurrent load
-- **Background Tasks**: Limited background task processing capabilities
+### Audit Log Retention
+- **Current**: File-based audit logs with manual rotation
+- **Limitation**: No automated archival or compression
+- **Enterprise Need**: Long-term audit log storage requires external solution
 
-## Current Status & Verification
+## Development and Maintenance
 
-### ✅ **Fully Verified Components**
-- **Authentication**: All endpoints tested - login, 2FA setup/verify/status, password management (validate, change, generate, policy)
-- **Authorization**: RBAC system fully functional - role assignment, permission checking, protected endpoints
-- **Audit Logging**: Event logging, retrieval, statistics, custom events - all operational
-- **Workflow Engine**: Definition registration, instance management (start, pause, resume, cancel) - all working
-- **Multi-Tenancy**: Tenant isolation, cross-tenant blocking - fully verified
-- **Middleware Stack**: All 4 middleware layers (Role, Tenant, Audit, Workflow) - fully operational
-- **Security**: Invalid tokens, expired JWTs, unauthorized access - properly blocked
+### Framework Extensibility
+- **Flexibility**: Highly extensible but requires understanding of framework patterns
+- **Learning Curve**: New developers need time to understand the architecture
+- **Documentation**: Comprehensive documentation available but continuous updates needed
 
-### 🔄 **Current Limitations**
-- **File-based Audit Storage**: Retrieval functionality has simplified implementation that doesn't read from files yet
-- **Async Audit Processing**: Events are stored but require flush interval to be processed
-- **Role Assignment via API**: Requires existing admin permissions (bootstrap issue)
+### Version Upgrade Path
+- **Compatibility**: Major version upgrades may require manual migration steps
+- **Testing**: Thorough testing required for version upgrades
+- **Rollback**: Rollback procedures need to be validated for each deployment
 
-### 📋 **Endpoints Verified**
-- **Authentication**: 9 endpoints (login, 2FA, password management) - ALL WORKING
-- **Tenancy**: 5 endpoints (isolation, context) - ALL WORKING
-- **Role Enforcement**: 10 endpoints (RBAC, permissions) - ALL WORKING
-- **Audit Logging**: 8 endpoints (events, trail, stats) - ALL WORKING
-- **Workflow Engine**: 11 endpoints (definitions, instances) - ALL WORKING
+## Regulatory and Compliance
 
-## Future Enhancement Opportunities
+### Regional Compliance Variations
+- **Variations**: Different regions may have specific compliance requirements
+- **Customization**: May require region-specific customizations
+- **Validation**: Local compliance validation required for deployment
 
-### Planned Improvements
-- **Enhanced Workflow Engine**: More sophisticated workflow patterns and execution
-- **Advanced Security**: Additional authentication methods and security features
-- **Better Scalability**: Improved horizontal scaling capabilities
-- **Comprehensive Monitoring**: Built-in metrics and observability
+### Data Privacy
+- **GDPR/CCPA**: Framework supports privacy requirements but implementation-specific
+- **Audit Requirements**: Specific audit requirements may need customization
+- **Data Residency**: Tenant isolation supports data residency but infrastructure must comply
 
-### Potential Additions
-- **API Gateway**: Built-in API gateway functionality
-- **Service Mesh**: Integration with service mesh technologies
-- **Advanced Analytics**: Built-in analytics and reporting
-- **Machine Learning**: ML-powered insights and automation
+## Future Enhancements Roadmap
 
-## Workarounds & Mitigation Strategies
+### Priority Improvements
+1. **Database Migration**: Complete PostgreSQL integration
+2. **Clustering Support**: Native horizontal scaling capabilities  
+3. **Advanced Monitoring**: Built-in metrics and observability
+4. **Enhanced Security**: Advanced authentication methods (OAuth, SAML)
+5. **Mobile Optimization**: Enhanced mobile and tablet experience
+6. **AI/RL Integration**: Advanced machine learning capabilities
 
-### Current Workarounds
-- **Scalability**: Use external load balancers and multiple instances
-- **Persistence**: Use external databases for audit and workflow data
-- **Monitoring**: Integrate with external monitoring solutions
-- **Security**: Implement additional security at the infrastructure level
+### Planned Features
+- Microservices architecture with service mesh
+- Advanced workflow orchestration
+- Real-time collaboration features
+- Advanced analytics and reporting
+- Multi-language support
+- Enhanced accessibility features
 
-### Mitigation Recommendations
-- **Performance**: Monitor performance under load and optimize accordingly
-- **Security**: Implement additional security measures at network and infrastructure levels
-- **Scalability**: Plan for horizontal scaling with external services
-- **Reliability**: Implement proper backup and disaster recovery procedures
+## Risk Mitigation Strategies
+
+### For Production Deployments
+1. **Thorough Testing**: Comprehensive testing in staging environment
+2. **Monitoring Setup**: Implement monitoring before production deployment
+3. **Backup Procedures**: Validate backup and restore procedures
+4. **Performance Testing**: Load testing with expected user volumes
+5. **Security Review**: Security assessment by qualified professionals
+
+### For High-Availability Requirements
+1. **Infrastructure Planning**: Plan for clustering and load balancing
+2. **Database Setup**: Configure production-grade database backend
+3. **Disaster Recovery**: Implement comprehensive disaster recovery procedures
+4. **SLA Planning**: Define and communicate realistic SLA expectations
+
+## Conclusion
+
+While the BHIV Application Framework has these known limitations, it provides a robust, secure, and extensible foundation for multi-tenant SaaS applications. Most limitations are addressed in the development roadmap and have documented mitigation strategies. The framework has been designed with these constraints in mind and provides graceful degradation when certain features are not available.
+
+For enterprise deployments, it's recommended to review these limitations against specific requirements and plan accordingly. Many limitations are architectural decisions made for security, maintainability, and sovereign deployment capabilities.
+
+---
+**Document Version**: 1.0  
+**Last Updated**: January 17, 2026  
+**Framework Version**: BHIV Application Framework v1.0

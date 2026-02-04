@@ -1,41 +1,42 @@
-# API Contract — BHIV HR Platform
+# API Contract — BHIV HR Platform Gateway API (Part 1)
 
-**Version:** 3.0.0  
-**Last Updated:** December 2024  
+**Version:** 4.1.0  
+**Last Updated:** January 22, 2026  
 **Total Endpoints:** 111 (80 Gateway + 6 Agent + 25 LangGraph)  
-**Documentation Style:** Stripe API Standard
+**Database:** MongoDB Atlas  
+**Analysis Source:** Comprehensive endpoint analysis from services directories
 
 ---
 
 ## Table of Contents
 
-### Part 1: Core Services
+### Part 1: Core Services (1-18 of 111)
 1. [Authentication & Standards](#authentication--standards)
-2. [Gateway API - Authentication (4 endpoints)](#gateway-authentication)
-3. [Gateway API - AI Integration (2 endpoints)](#gateway-ai-integration)
-4. [Gateway API - LangGraph Workflows (7 endpoints)](#gateway-langgraph-workflows)
-5. [Gateway API - RL + Feedback Agent (4 endpoints)](#gateway-rl-feedback)
+2. [Gateway API - Monitoring (3 endpoints)](#gateway-monitoring)
+3. [Gateway API - Core API (5 endpoints)](#gateway-core-api) 
+4. [Gateway API - AI Integration (2 endpoints)](#gateway-ai-integration)
 
-### Part 2: Gateway Core Features
-- Monitoring (3 endpoints)
-- Core API (5 endpoints)
+### Part 2: Gateway Core Features (19-35 of 111)
 - Job Management (2 endpoints)
-- Candidate Management (5 endpoints)
-- Analytics & Statistics (3 endpoints)
+- Candidate Management (6 endpoints)
+- Analytics & Statistics (2 endpoints)
+- Candidate Portal (2 endpoints)
+- RL + Feedback Agent (4 endpoints)
+- Recruiter Portal (1 endpoint)
 
-### Part 3: Gateway Advanced Features
+### Part 3: Gateway Advanced Features (36-45 of 111)
 - AI Matching Engine (2 endpoints)
 - Assessment & Workflow (6 endpoints)
 - Client Portal API (2 endpoints)
-- Security Testing (12 endpoints)
 
-### Part 4: Gateway Security & Portals
+### Part 4: Gateway Security & Portals (46-80 of 111)
+- Security Testing (10 endpoints)
 - CSP Management (4 endpoints)
 - Two-Factor Authentication (8 endpoints)
 - Password Management (6 endpoints)
-- Candidate Portal (5 endpoints)
+- Candidate Portal (6 endpoints)
 
-### Part 5: AI Agent & LangGraph Services
+### Part 5: AI Agent & LangGraph Services (81-111 of 111)
 - AI Agent API (6 endpoints)
 - LangGraph API (25 endpoints)
 
@@ -75,7 +76,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 {
   "status": "success",
   "data": {},
-  "timestamp": "2024-12-09T13:37:00Z"
+  "timestamp": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -85,7 +86,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
   "status": "error",
   "error": "Error message",
   "detail": "Detailed error description",
-  "timestamp": "2024-12-09T13:37:00Z"
+  "timestamp": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -118,171 +119,378 @@ X-RateLimit-Remaining: 45
 X-RateLimit-Reset: 1702134000
 ```
 
+### Timeout Configurations
+
+| Operation | Timeout |
+|-----------|---------|
+| API Requests | 30s |
+| Database Operations | 15s |
+| External Service Calls | 60s |
+| File Uploads | 120s |
+
 ---
 
-## Gateway Authentication
+## Gateway Monitoring
 
-### 1. POST /auth/2fa/setup
+### 1. GET /metrics
 
-**Purpose:** Initialize 2FA for user account with QR code generation
+**Purpose:** Export Prometheus metrics for monitoring
 
-**Authentication:** Bearer token required
+**Authentication:** None (public monitoring endpoint)
+
+**Implementation:** `services/gateway/app/main.py` → `get_prometheus_metrics()`
+
+**Timeout:** 10s
 
 **Request:**
 ```http
-POST /auth/2fa/setup
-Content-Type: application/json
-Authorization: Bearer YOUR_API_KEY
+GET /metrics
+```
 
-{
-  "user_id": "user_12345"
-}
+**Response (200 OK):**
+```text
+# HELP http_requests_total Total HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",endpoint="/health"} 1234
+http_requests_total{method="POST",endpoint="/v1/jobs"} 567
+
+# HELP http_request_duration_seconds HTTP request duration
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{le="0.1"} 890
+http_request_duration_seconds_bucket{le="0.5"} 1150
+http_request_duration_seconds_sum 234.5
+http_request_duration_seconds_count 1234
+
+# HELP active_connections Active database connections
+# TYPE active_connections gauge
+active_connections 8
+```
+
+**When Called:** Prometheus scrapes metrics every 15s
+
+**Database Impact:** None (system metrics only)
+
+---
+
+### 2. GET /health/detailed
+
+**Purpose:** Detailed health check with system metrics
+
+**Authentication:** None (public health endpoint)
+
+**Implementation:** `services/gateway/app/main.py` → `detailed_health_check()`
+
+**Timeout:** 5s
+
+**Request:**
+```http
+GET /health/detailed
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "message": "2FA setup initiated",
-  "user_id": "user_12345",
-  "secret": "JBSWY3DPEHPK3PXP",
-  "qr_code": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
-  "manual_entry_key": "JBSWY3DPEHPK3PXP",
-  "instructions": "Scan QR code with Google Authenticator, Microsoft Authenticator, or Authy"
+  "status": "healthy",
+  "service": "BHIV HR Gateway",
+  "version": "4.2.0",
+  "timestamp": "2026-01-22T13:37:00Z",
+  "uptime_seconds": 86400,
+  "database": {
+    "status": "connected",
+    "pool_size": 10,
+    "active_connections": 3,
+    "idle_connections": 7
+  },
+  "dependencies": {
+    "agent_service": "healthy",
+    "langgraph_service": "healthy",
+    "mongodb": "healthy"
+  },
+  "system": {
+    "cpu_usage": 25.5,
+    "memory_usage": 512,
+    "disk_usage": 45.2
+  }
 }
 ```
 
-**Error Responses:**
-- 401 Unauthorized: Invalid API key
-- 400 Bad Request: Missing user_id
+**When Called:** Load balancer health checks, monitoring dashboard
 
-**When Called:** User enables 2FA in security settings
-
-**Implemented In:** `services/gateway/routes/auth.py` → `setup_2fa()`
+**Database Impact:** None (system metrics only)
 
 ---
 
-### 2. POST /auth/2fa/verify
+### 3. GET /metrics/dashboard
 
-**Purpose:** Verify TOTP code during 2FA authentication
+**Purpose:** Metrics dashboard data for admin UI
 
 **Authentication:** Bearer token required
 
+**Implementation:** `services/gateway/app/main.py` → `metrics_dashboard()`
+
+**Timeout:** 20s
+
 **Request:**
 ```http
-POST /auth/2fa/verify
-Content-Type: application/json
+GET /metrics/dashboard
 Authorization: Bearer YOUR_API_KEY
-
-{
-  "user_id": "user_12345",
-  "totp_code": "123456"
-}
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "message": "2FA verification successful",
-  "user_id": "user_12345",
-  "verified": true,
-  "verified_at": "2024-12-09T13:37:00Z"
+  "performance_summary": {
+    "avg_response_time_ms": 45.2,
+    "p95_response_time_ms": 120.5,
+    "p99_response_time_ms": 250.0,
+    "requests_per_minute": 150,
+    "error_rate": 0.02
+  },
+  "business_metrics": {
+    "total_candidates": 1234,
+    "active_jobs": 45,
+    "applications_today": 67,
+    "interviews_scheduled": 23
+  },
+  "system_metrics": {
+    "cpu_usage": 25.5,
+    "memory_mb": 512,
+    "disk_usage_percent": 45.2,
+    "active_connections": 8
+  },
+  "generated_at": "2026-01-22T13:37:00Z"
 }
 ```
 
-**Error Responses:**
-- 401 Unauthorized: Invalid 2FA code
-- 400 Bad Request: Missing required fields
+**When Called:** Admin dashboard loads metrics
 
-**When Called:** User submits 2FA code during login
-
-**Implemented In:** `services/gateway/routes/auth.py` → `verify_2fa()`
+**Database Impact:** Multiple aggregate queries for metrics
 
 ---
 
-### 3. POST /auth/login
+## Gateway Core API
 
-**Purpose:** User login with 2FA support
+### 4. GET /openapi.json
+
+**Purpose:** OpenAPI schema for API documentation
+
+**Authentication:** None (public documentation)
+
+**Implementation:** `services/gateway/app/main.py` → `get_openapi()`
+
+**Timeout:** 2s
+
+**Request:**
+```http
+GET /openapi.json
+```
+
+**Response (200 OK):**
+```json
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "BHIV HR Platform API Gateway",
+    "version": "4.2.0",
+    "description": "Enterprise HR Platform with Advanced Security Features"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**When Called:** API documentation tools, client SDK generation
+
+**Database Impact:** None (static response)
+
+---
+
+### 5. GET /docs
+
+**Purpose:** Interactive API documentation (Swagger UI)
+
+**Authentication:** None (public documentation)
+
+**Implementation:** `services/gateway/app/main.py` → `get_docs()`
+
+**Timeout:** 5s
+
+**Request:**
+```http
+GET /docs
+```
+
+**Response (200 OK):**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BHIV HR Platform API</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+</body>
+</html>
+```
+
+**When Called:** Developers access API documentation
+
+**Database Impact:** None (static response)
+
+---
+
+### 6. GET /
+
+**Purpose:** API root information and service status
 
 **Authentication:** None (public endpoint)
 
+**Implementation:** `services/gateway/app/main.py` → `read_root()`
+
+**Timeout:** 5s
+
 **Request:**
 ```http
-POST /auth/login
-Content-Type: application/json
-
-{
-  "username": "demo_user",
-  "password": "demo_password",
-  "totp_code": "123456"
-}
+GET /
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "message": "Login successful",
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer",
-  "expires_in": 3600,
-  "user_id": "user_12345",
-  "2fa_verified": true
+  "message": "BHIV HR Platform API Gateway",
+  "version": "4.2.0",
+  "status": "healthy",
+  "endpoints": 80,
+  "documentation": "/docs",
+  "monitoring": "/metrics",
+  "production_url": "https://bhiv-hr-gateway-ltg0.onrender.com",
+  "langgraph_integration": "active",
+  "ai_workflows": [
+    "candidate_applied",
+    "shortlisted",
+    "interview_scheduled"
+  ]
 }
 ```
 
-**Error Responses:**
-- 401 Unauthorized: Invalid credentials
-- 403 Forbidden: Account locked
+**Response Headers:**
+```http
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 59
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Content-Security-Policy: default-src 'self'
+```
 
-**When Called:** User attempts to login
+**When Called:** Service discovery, health check
 
-**Implemented In:** `services/gateway/routes/auth.py` → `login_with_2fa()`
+**Database Impact:** None (static response)
 
 ---
 
-### 4. GET /auth/2fa/status/{user_id}
+### 7. GET /health
 
-**Purpose:** Check 2FA status for user
+**Purpose:** Basic health check endpoint
 
-**Authentication:** Bearer token required
+**Authentication:** None (public health endpoint)
+
+**Implementation:** `services/gateway/app/main.py` → `health_check()`
+
+**Timeout:** 2s
 
 **Request:**
 ```http
-GET /auth/2fa/status/user_12345
+GET /health
+```
+
+**Response (200 OK):**
+```json
+{
+  "status": "healthy",
+  "service": "BHIV HR Gateway",
+  "version": "4.2.0",
+  "timestamp": "2026-01-22T13:37:00Z"
+}
+```
+
+**Response Headers:**
+```http
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 59
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Content-Security-Policy: default-src 'self'
+```
+
+**When Called:** Load balancer health checks, monitoring systems
+
+**Database Impact:** None (static response)
+
+---
+
+### 8. GET /v1/test-candidates
+
+**Purpose:** Test database connectivity with candidate count
+
+**Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/app/main.py` → `test_candidates_db()`
+
+**Timeout:** 10s
+
+**Request:**
+```http
+GET /v1/test-candidates
 Authorization: Bearer YOUR_API_KEY
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "user_id": "user_12345",
-  "2fa_enabled": true,
-  "setup_date": "2024-01-01T12:00:00Z",
-  "last_used": "2024-12-09T08:30:00Z",
-  "backup_codes_remaining": 8
+  "database_status": "connected",
+  "total_candidates": 1234,
+  "test_timestamp": "2026-01-22T13:37:00Z"
 }
 ```
 
 **Error Responses:**
-- 404 Not Found: User not found
-- 401 Unauthorized: Invalid API key
+- 500 Internal Server Error: Database connection failed
 
-**When Called:** Dashboard loads user security settings
+**When Called:** System diagnostics, deployment verification
 
-**Implemented In:** `services/gateway/routes/auth.py` → `get_2fa_status()`
+**Database Impact:** COUNT query on candidates collection
 
 ---
 
 ## Gateway AI Integration
 
-### 5. POST /api/v1/ai/test-communication
+### 9. POST /api/v1/test-communication
 
 **Purpose:** Test multi-channel communication system (Email, WhatsApp, Telegram)
 
 **Authentication:** Bearer token required
 
+**Implementation:** `services/gateway/routes/ai_integration.py` → `test_communication_system()`
+
+**Timeout:** 30s
+
 **Request:**
 ```http
-POST /api/v1/ai/test-communication
+POST /api/v1/test-communication
 Content-Type: application/json
 Authorization: Bearer YOUR_API_KEY
 
@@ -315,7 +523,7 @@ Authorization: Bearer YOUR_API_KEY
       "provider": "telegram_bot_api"
     }
   },
-  "test_timestamp": "2024-12-09T13:37:00Z"
+  "test_timestamp": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -325,19 +533,23 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Admin tests notification system
 
-**Implemented In:** `services/gateway/routes/ai_integration.py` → `test_communication_system()`
+**Database Impact:** None (external service calls only)
 
 ---
 
-### 6. POST /api/v1/ai/gemini/analyze
+### 10. POST /api/v1/gemini/analyze
 
 **Purpose:** Analyze candidate profile using Google Gemini AI
 
 **Authentication:** Bearer token required
 
+**Implementation:** `services/gateway/routes/ai_integration.py` → `analyze_with_gemini()`
+
+**Timeout:** 60s
+
 **Request:**
 ```http
-POST /api/v1/ai/gemini/analyze
+POST /api/v1/gemini/analyze
 Content-Type: application/json
 Authorization: Bearer YOUR_API_KEY
 
@@ -363,7 +575,7 @@ Authorization: Bearer YOUR_API_KEY
     "recommendation": "Strong candidate - proceed to interview"
   },
   "ai_model": "gemini-pro",
-  "analyzed_at": "2024-12-09T13:37:00Z"
+  "analyzed_at": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -373,17 +585,19 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** HR requests AI analysis of candidate
 
-**Implemented In:** `services/gateway/routes/ai_integration.py` → `analyze_with_gemini()`
+**Database Impact:** SELECT from candidates collection
 
 ---
 
-## Gateway LangGraph Workflows
-
-### 7. POST /api/v1/workflow/trigger
+### 11. POST /api/v1/workflow/trigger
 
 **Purpose:** Trigger automated workflow for candidate processing
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/langgraph_integration.py` → `trigger_workflow()`
+
+**Timeout:** 10s
 
 **Request:**
 ```http
@@ -405,8 +619,8 @@ Authorization: Bearer YOUR_API_KEY
   "status": "success",
   "workflow_id": "wf_abc123def456",
   "workflow_type": "candidate_application",
-  "triggered_at": "2024-12-09T13:37:00Z",
-  "estimated_completion": "2024-12-09T13:42:00Z",
+  "triggered_at": "2026-01-22T13:37:00Z",
+  "estimated_completion": "2026-01-22T13:42:00Z",
   "tracking_url": "/api/v1/workflow/status/wf_abc123def456"
 }
 ```
@@ -425,15 +639,19 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Candidate submits application, HR triggers manual workflow
 
-**Implemented In:** `services/gateway/langgraph_integration.py` → `trigger_workflow()`
+**Database Impact:** INSERT into workflows collection
 
 ---
 
-### 8. GET /api/v1/workflow/status/{workflow_id}
+### 12. GET /api/v1/workflow/status/{workflow_id}
 
 **Purpose:** Get real-time workflow execution status
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/langgraph_integration.py` → `get_workflow_status()`
+
+**Timeout:** 15s
 
 **Request:**
 ```http
@@ -458,9 +676,9 @@ Authorization: Bearer YOUR_API_KEY
     "recommendation_generation",
     "notification_dispatch"
   ],
-  "started_at": "2024-12-09T13:37:00Z",
-  "estimated_completion": "2024-12-09T13:42:00Z",
-  "last_updated": "2024-12-09T13:40:00Z"
+  "started_at": "2026-01-22T13:37:00Z",
+  "estimated_completion": "2026-01-22T13:42:00Z",
+  "last_updated": "2026-01-22T13:40:00Z"
 }
 ```
 
@@ -470,15 +688,19 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Dashboard polls for workflow updates, WebSocket alternative
 
-**Implemented In:** `services/gateway/langgraph_integration.py` → `get_workflow_status()`
+**Database Impact:** SELECT from workflows collection
 
 ---
 
-### 9. GET /api/v1/workflow/list
+### 13. GET /api/v1/workflow/list
 
 **Purpose:** List all workflows with filtering options
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/langgraph_integration.py` → `list_workflows()`
+
+**Timeout:** 20s
 
 **Request:**
 ```http
@@ -497,7 +719,7 @@ Authorization: Bearer YOUR_API_KEY
       "candidate_id": 123,
       "job_id": 45,
       "progress_percentage": 65,
-      "started_at": "2024-12-09T13:37:00Z"
+      "started_at": "2026-01-22T13:37:00Z"
     },
     {
       "workflow_id": "wf_def456",
@@ -506,8 +728,8 @@ Authorization: Bearer YOUR_API_KEY
       "candidate_id": 124,
       "job_id": 46,
       "progress_percentage": 100,
-      "started_at": "2024-12-09T13:30:00Z",
-      "completed_at": "2024-12-09T13:35:00Z"
+      "started_at": "2026-01-22T13:30:00Z",
+      "completed_at": "2026-01-22T13:35:00Z"
     }
   ],
   "total_count": 2,
@@ -524,15 +746,59 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Dashboard loads workflow list, admin monitors system
 
-**Implemented In:** `services/gateway/langgraph_integration.py` → `list_workflows()`
+**Database Impact:** SELECT from workflows collection with filters
 
 ---
 
-### 10. GET /api/v1/workflow/health
+### 14. GET /api/v1/workflows
+
+**Purpose:** Alternative endpoint to list workflows
+
+**Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/langgraph_integration.py` → `list_workflows_alt()`
+
+**Timeout:** 20s
+
+**Request:**
+```http
+GET /api/v1/workflows?status=running&limit=20
+Authorization: Bearer YOUR_API_KEY
+```
+
+**Response (200 OK):**
+```json
+{
+  "workflows": [
+    {
+      "workflow_id": "wf_abc123",
+      "workflow_type": "candidate_application",
+      "status": "running",
+      "candidate_id": 123,
+      "job_id": 45,
+      "progress_percentage": 65,
+      "started_at": "2026-01-22T13:37:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+**When Called:** Alternative workflow listing interface
+
+**Database Impact:** SELECT from workflows collection
+
+---
+
+### 15. GET /api/v1/workflow/health
 
 **Purpose:** Check LangGraph service health and connectivity
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/langgraph_integration.py` → `check_langgraph_health()`
+
+**Timeout:** 10s
 
 **Request:**
 ```http
@@ -550,7 +816,7 @@ Authorization: Bearer YOUR_API_KEY
   "active_workflows": 5,
   "total_workflows_processed": 1234,
   "database_connection": "connected",
-  "last_health_check": "2024-12-09T13:37:00Z"
+  "last_health_check": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -559,15 +825,19 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Gateway startup, periodic health checks
 
-**Implemented In:** `services/gateway/langgraph_integration.py` → `check_langgraph_health()`
+**Database Impact:** Health check with LangGraph service
 
 ---
 
-### 11. POST /api/v1/webhooks/candidate-applied
+### 16. POST /api/v1/webhooks/candidate-applied
 
 **Purpose:** Webhook triggered when candidate applies for job
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/langgraph_integration.py` → `webhook_candidate_applied()`
+
+**Timeout:** 30s
 
 **Request:**
 ```http
@@ -583,7 +853,7 @@ Authorization: Bearer YOUR_API_KEY
   "candidate_phone": "+1234567890",
   "candidate_name": "John Doe",
   "job_title": "Senior Software Engineer",
-  "applied_at": "2024-12-09T13:37:00Z"
+  "applied_at": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -595,7 +865,7 @@ Authorization: Bearer YOUR_API_KEY
   "workflow_triggered": true,
   "workflow_id": "wf_abc123",
   "notifications_sent": ["email", "whatsapp"],
-  "processed_at": "2024-12-09T13:37:00Z"
+  "processed_at": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -612,15 +882,19 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** Candidate portal submits application
 
-**Implemented In:** `services/gateway/langgraph_integration.py` → `webhook_candidate_applied()`
+**Database Impact:** Trigger workflow and notification processes
 
 ---
 
-### 12. POST /api/v1/webhooks/candidate-shortlisted
+### 17. POST /api/v1/webhooks/candidate-shortlisted
 
 **Purpose:** Webhook triggered when candidate is shortlisted
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/langgraph_integration.py` → `webhook_candidate_shortlisted()`
+
+**Timeout:** 30s
 
 **Request:**
 ```http
@@ -633,7 +907,7 @@ Authorization: Bearer YOUR_API_KEY
   "job_id": 45,
   "shortlisted_by": "hr_manager_001",
   "matching_score": 85.5,
-  "shortlisted_at": "2024-12-09T13:37:00Z"
+  "shortlisted_at": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -646,7 +920,7 @@ Authorization: Bearer YOUR_API_KEY
   "workflow_id": "wf_def456",
   "notifications_sent": ["email", "whatsapp", "telegram"],
   "next_action": "schedule_interview",
-  "processed_at": "2024-12-09T13:37:00Z"
+  "processed_at": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -656,15 +930,19 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** HR shortlists candidate in portal
 
-**Implemented In:** `services/gateway/langgraph_integration.py` → `webhook_candidate_shortlisted()`
+**Database Impact:** Trigger workflow and notification processes
 
 ---
 
-### 13. POST /api/v1/webhooks/interview-scheduled
+### 18. POST /api/v1/webhooks/interview-scheduled
 
-**Purpose:** Webhook triggered when interview is scheduled
+**Purpose:** Webhook for when interview is scheduled
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/app/main.py` → `interview_scheduled_webhook()`
+
+**Timeout:** 30s
 
 **Request:**
 ```http
@@ -675,12 +953,11 @@ Authorization: Bearer YOUR_API_KEY
 {
   "candidate_id": 123,
   "job_id": 45,
-  "interview_id": 999,
-  "interview_date": "2024-12-15T14:00:00Z",
-  "interviewer": "Sarah Johnson",
+  "interview_id": 789,
+  "scheduled_time": "2026-01-25T14:00:00Z",
   "interview_type": "technical",
-  "meeting_link": "https://meet.google.com/abc-defg-hij",
-  "scheduled_at": "2024-12-09T13:37:00Z"
+  "interviewer": "tech_lead_001",
+  "meeting_link": "https://meet.google.com/abc-defg-hij"
 }
 ```
 
@@ -689,260 +966,47 @@ Authorization: Bearer YOUR_API_KEY
 {
   "status": "success",
   "webhook_processed": true,
-  "workflow_triggered": true,
-  "workflow_id": "wf_ghi789",
   "notifications_sent": ["email", "whatsapp"],
-  "calendar_invite_sent": true,
-  "reminder_scheduled": true,
-  "processed_at": "2024-12-09T13:37:00Z"
+  "calendar_event_created": true,
+  "reminders_set": true,
+  "processed_at": "2026-01-22T13:37:00Z"
 }
 ```
 
 **Error Responses:**
-- 400 Bad Request: Invalid interview data
-- 404 Not Found: Candidate or job not found
+- 400 Bad Request: Invalid payload
+- 404 Not Found: Candidate, job, or interview not found
 
-**When Called:** HR schedules interview in portal
+**When Called:** Interview coordinator schedules interview
 
-**Implemented In:** `services/gateway/langgraph_integration.py` → `webhook_interview_scheduled()`
-
----
-
-## Gateway RL Feedback
-
-### 14. POST /api/v1/rl/predict
-
-**Purpose:** Get RL-enhanced matching prediction for candidate-job pair
-
-**Authentication:** Bearer token required
-
-**Request:**
-```http
-POST /api/v1/rl/predict
-Content-Type: application/json
-Authorization: Bearer YOUR_API_KEY
-
-{
-  "candidate_id": 123,
-  "job_id": 45,
-  "candidate_features": {
-    "experience_years": 5,
-    "technical_skills": ["Python", "FastAPI", "PostgreSQL"],
-    "education_level": "Bachelor",
-    "seniority_level": "Senior"
-  },
-  "job_features": {
-    "experience_required": 5,
-    "required_skills": ["Python", "FastAPI", "Docker"],
-    "department": "Engineering"
-  }
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "status": "success",
-  "prediction": {
-    "rl_score": 87.5,
-    "confidence": 0.92,
-    "recommendation": "strong_match",
-    "factors": {
-      "skills_alignment": 0.95,
-      "experience_match": 0.88,
-      "historical_performance": 0.85
-    },
-    "model_version": "rl_v2.1.0",
-    "feedback_samples_used": 150
-  },
-  "predicted_at": "2024-12-09T13:37:00Z"
-}
-```
-
-**Error Responses:**
-- 400 Bad Request: Missing required features
-- 503 Service Unavailable: RL service unavailable
-
-**When Called:** AI matching engine requests RL enhancement
-
-**Implemented In:** `services/gateway/routes/rl_routes.py` → `rl_predict_match()`
-
----
-
-### 15. POST /api/v1/rl/feedback
-
-**Purpose:** Submit feedback to improve RL model
-
-**Authentication:** Bearer token required
-
-**Request:**
-```http
-POST /api/v1/rl/feedback
-Content-Type: application/json
-Authorization: Bearer YOUR_API_KEY
-
-{
-  "candidate_id": 123,
-  "job_id": 45,
-  "prediction_id": "pred_abc123",
-  "actual_outcome": "hired",
-  "feedback_score": 5,
-  "feedback_notes": "Excellent hire, exceeded expectations",
-  "submitted_by": "hr_manager_001"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "status": "success",
-  "feedback_id": "fb_xyz789",
-  "reward_signal": 1.0,
-  "model_updated": true,
-  "new_model_version": "rl_v2.1.1",
-  "submitted_at": "2024-12-09T13:37:00Z"
-}
-```
-
-**Sequence:**
-1. Validate feedback data
-2. Calculate reward signal
-3. Store in rl_feedback table
-4. Trigger model retraining if threshold met
-5. Update model performance metrics
-
-**Error Responses:**
-- 400 Bad Request: Invalid feedback data
-- 404 Not Found: Prediction not found
-
-**When Called:** HR provides hiring outcome feedback
-
-**Implemented In:** `services/gateway/routes/rl_routes.py` → `submit_rl_feedback()`
-
----
-
-### 16. GET /api/v1/rl/analytics
-
-**Purpose:** Get RL system analytics and performance metrics
-
-**Authentication:** Bearer token required
-
-**Request:**
-```http
-GET /api/v1/rl/analytics?time_range=30d
-Authorization: Bearer YOUR_API_KEY
-```
-
-**Response (200 OK):**
-```json
-{
-  "status": "success",
-  "analytics": {
-    "total_predictions": 1234,
-    "total_feedback": 567,
-    "feedback_rate": 0.46,
-    "model_accuracy": 0.87,
-    "average_confidence": 0.85,
-    "top_performing_features": [
-      "skills_alignment",
-      "experience_match",
-      "education_level"
-    ],
-    "recent_improvements": {
-      "accuracy_delta": 0.05,
-      "confidence_delta": 0.03
-    },
-    "model_version": "rl_v2.1.1",
-    "last_retrain": "2024-12-08T10:00:00Z"
-  },
-  "time_range": "30d",
-  "generated_at": "2024-12-09T13:37:00Z"
-}
-```
-
-**Error Responses:**
-- 401 Unauthorized: Invalid API key
-
-**When Called:** Admin dashboard loads RL metrics
-
-**Implemented In:** `services/gateway/routes/rl_routes.py` → `get_rl_analytics()`
-
----
-
-### 17. GET /api/v1/rl/performance
-
-**Purpose:** Get detailed RL model performance metrics
-
-**Authentication:** Bearer token required
-
-**Request:**
-```http
-GET /api/v1/rl/performance?model_version=rl_v2.1.1
-Authorization: Bearer YOUR_API_KEY
-```
-
-**Response (200 OK):**
-```json
-{
-  "status": "success",
-  "performance": {
-    "model_version": "rl_v2.1.1",
-    "accuracy": 0.87,
-    "precision": 0.89,
-    "recall": 0.85,
-    "f1_score": 0.87,
-    "auc_roc": 0.92,
-    "confusion_matrix": {
-      "true_positive": 450,
-      "true_negative": 380,
-      "false_positive": 45,
-      "false_negative": 58
-    },
-    "performance_by_category": {
-      "engineering": 0.90,
-      "marketing": 0.85,
-      "sales": 0.82
-    },
-    "training_data_size": 5000,
-    "last_evaluation": "2024-12-09T10:00:00Z"
-  },
-  "retrieved_at": "2024-12-09T13:37:00Z"
-}
-```
-
-**Error Responses:**
-- 404 Not Found: Model version not found
-- 401 Unauthorized: Invalid API key
-
-**When Called:** Admin reviews model performance, ML team monitors metrics
-
-**Implemented In:** `services/gateway/routes/rl_routes.py` → `get_rl_performance()`
+**Database Impact:** Create calendar events and send notifications
 
 ---
 
 ## Summary Table - Part 1
 
-| Endpoint | Method | Category | Purpose | Auth Required |
-|----------|--------|----------|---------|---------------|
-| /auth/2fa/setup | POST | Authentication | Setup 2FA | Yes |
-| /auth/2fa/verify | POST | Authentication | Verify 2FA code | Yes |
-| /auth/login | POST | Authentication | User login | No |
-| /auth/2fa/status/{user_id} | GET | Authentication | Check 2FA status | Yes |
-| /api/v1/ai/test-communication | POST | AI Integration | Test notifications | Yes |
-| /api/v1/ai/gemini/analyze | POST | AI Integration | AI candidate analysis | Yes |
-| /api/v1/workflow/trigger | POST | LangGraph | Trigger workflow | Yes |
-| /api/v1/workflow/status/{workflow_id} | GET | LangGraph | Get workflow status | Yes |
-| /api/v1/workflow/list | GET | LangGraph | List workflows | Yes |
-| /api/v1/workflow/health | GET | LangGraph | Check service health | Yes |
-| /api/v1/webhooks/candidate-applied | POST | LangGraph | Application webhook | Yes |
-| /api/v1/webhooks/candidate-shortlisted | POST | LangGraph | Shortlist webhook | Yes |
-| /api/v1/webhooks/interview-scheduled | POST | LangGraph | Interview webhook | Yes |
-| /api/v1/rl/predict | POST | RL + Feedback | RL prediction | Yes |
-| /api/v1/rl/feedback | POST | RL + Feedback | Submit feedback | Yes |
-| /api/v1/rl/analytics | GET | RL + Feedback | Get analytics | Yes |
-| /api/v1/rl/performance | GET | RL + Feedback | Get performance | Yes |
+| Endpoint | Method | Category | Purpose | Auth Required | Timeout |
+|----------|--------|----------|---------|---------------|---------|
+| /metrics | GET | Monitoring | Prometheus metrics | No | 10s |
+| /health/detailed | GET | Monitoring | Detailed health check | No | 5s |
+| /metrics/dashboard | GET | Monitoring | Dashboard metrics | Yes | 20s |
+| /openapi.json | GET | Core API | OpenAPI schema | No | 2s |
+| /docs | GET | Core API | API documentation | No | 5s |
+| / | GET | Core API | Service info | No | 5s |
+| /health | GET | Core API | Basic health check | No | 2s |
+| /v1/test-candidates | GET | Core API | Test database | Yes | 10s |
+| /api/v1/test-communication | POST | AI Integration | Test notifications | Yes | 30s |
+| /api/v1/gemini/analyze | POST | AI Integration | AI candidate analysis | Yes | 60s |
+| /api/v1/workflow/trigger | POST | LangGraph | Trigger workflow | Yes | 10s |
+| /api/v1/workflow/status/{workflow_id} | GET | LangGraph | Get workflow status | Yes | 15s |
+| /api/v1/workflow/list | GET | LangGraph | List workflows | Yes | 20s |
+| /api/v1/workflows | GET | LangGraph | List workflows alt | Yes | 20s |
+| /api/v1/workflow/health | GET | LangGraph | Check service health | Yes | 10s |
+| /api/v1/webhooks/candidate-applied | POST | LangGraph | Application webhook | Yes | 30s |
+| /api/v1/webhooks/candidate-shortlisted | POST | LangGraph | Shortlist webhook | Yes | 30s |
+| /api/v1/webhooks/interview-scheduled | POST | LangGraph | Interview scheduled webhook | Yes | 30s |
 
-**Total Endpoints in Part 1:** 17 of 111
+**Total Endpoints in Part 1:** 18 (1-18 of 111)
 
 ---
 

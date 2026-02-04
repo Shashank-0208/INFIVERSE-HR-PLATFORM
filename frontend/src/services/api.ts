@@ -1,7 +1,11 @@
 import axios from 'axios'
+import { authStorage } from '../utils/authStorage'
 
 // API Base URL - Gateway service
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://bhiv-hr-gateway-l0xp.onrender.com'
+// Standardized variable name: VITE_API_BASE_URL (see ENVIRONMENT_VARIABLES.md)
+// Default to localhost for local development, use env var or Render URL for production
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+  (import.meta.env.DEV ? 'http://localhost:8000' : 'https://bhiv-hr-gateway-l0xp.onrender.com')
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,10 +18,23 @@ const api = axios.create({
 // Request interceptor - Use JWT token for authentication
 api.interceptors.request.use(
   async (config) => {
-    // Get JWT token from localStorage
-    const token = localStorage.getItem('auth_token');
+    let token = authStorage.getItem('auth_token');
     
-    if (token) {
+    if (!token) {
+      const isAuthenticated = authStorage.getItem('isAuthenticated') === 'true';
+      const isHealthCheck = config.url?.includes('/health');
+      if (isHealthCheck) {
+      } else if (isAuthenticated) {
+        console.warn('⚠️ Token missing but user is authenticated for request:', config.url);
+        console.warn('This might be a race condition. Available auth storage keys:', typeof sessionStorage !== 'undefined' ? Object.keys(sessionStorage) : []);
+      } else {
+        console.warn('⚠️ No auth_token found in auth storage for request:', config.url);
+      }
+    } else {
+      // Only log for non-health check endpoints to reduce noise (optional: gate by import.meta.env.DEV)
+      if (!config.url?.includes('/health') && import.meta.env.DEV) {
+        console.log('✅ Adding Authorization header for request:', config.url);
+      }
       config.headers.Authorization = `Bearer ${token}`;
     }
     
@@ -32,7 +49,35 @@ api.interceptors.response.use(
   async (error) => {
     // Log errors for debugging
     if (error.response) {
-      console.error(`API Error: ${error.response.status} - ${error.config?.url}`)
+      const status = error.response.status;
+      const url = error.config?.url;
+      
+      if (status === 401) {
+        // 401 Unauthorized - token might be invalid or expired
+        console.error(`❌ 401 Unauthorized for: ${url}`);
+        console.error('Response details:', error.response.data);
+        
+        const token = authStorage.getItem('auth_token');
+        if (token) {
+          console.error('Token exists but was rejected. Token (first 50 chars):', token.substring(0, 50));
+          console.error('This suggests the token is invalid, expired, or signed with wrong secret.');
+        } else {
+          console.error('Token is missing from auth storage.');
+        }
+        
+        // Don't clear token immediately - let the app handle it
+        // The token might be valid but the endpoint might require different auth
+      } else {
+        console.error(`API Error: ${status} - ${url}`);
+      }
+    } else if (error.request) {
+      // Network error - no response received
+      console.error(`Network Error: Unable to reach API at ${error.config?.baseURL}${error.config?.url}`)
+      // Add a more descriptive error message
+      error.message = error.message || `Cannot connect to server. Please ensure the backend is running at ${error.config?.baseURL}`
+      error.isNetworkError = true
+    } else {
+      console.error('API Error:', error.message)
     }
     return Promise.reject(error)
   }
@@ -87,10 +132,13 @@ export const candidateLogin = async (data: CandidateLoginRequest) => {
   try {
     const response = await api.post('/v1/candidate/login', data)
     if (response.data.success) {
-      localStorage.setItem('auth_token', response.data.token || '')
-      localStorage.setItem('candidate_id', response.data.candidate_id)
-      localStorage.setItem('user_name', response.data.name || '')
-      localStorage.setItem('user_email', data.email)
+      authStorage.setItem('auth_token', response.data.token || '')
+      authStorage.setItem('candidate_id', response.data.candidate_id)
+      if (response.data.candidate_id) {
+        authStorage.setItem('backend_candidate_id', response.data.candidate_id.toString())
+      }
+      authStorage.setItem('user_name', response.data.name || '')
+      authStorage.setItem('user_email', data.email)
     }
     return response.data
   } catch (error) {
@@ -104,7 +152,7 @@ export const candidateRegister = async (data: CandidateRegisterRequest) => {
     const response = await api.post('/v1/candidate/register', data)
     // Store the backend candidate_id if registration successful
     if (response.data.candidate_id) {
-      localStorage.setItem('backend_candidate_id', response.data.candidate_id.toString())
+      authStorage.setItem('backend_candidate_id', response.data.candidate_id.toString())
     }
     return response.data
   } catch (error) {
@@ -116,26 +164,43 @@ export const candidateRegister = async (data: CandidateRegisterRequest) => {
 // Helper to get or create backend candidate ID
 export const getOrCreateBackendCandidateId = async (): Promise<string | null> => {
   // Check if we already have a backend candidate_id stored
-  const storedId = localStorage.getItem('backend_candidate_id')
+  const storedId = authStorage.getItem('backend_candidate_id')
   if (storedId) {
     return storedId
   }
 
-  // Try to create a candidate using the JWT authenticated user data
+  const userEmail = authStorage.getItem('user_email');
+  const userName = authStorage.getItem('user_name') || 'User';
+  
+  if (!userEmail) {
+    console.warn('No authenticated user email found');
+    return null;
+  }
+
+  // First, try to get existing candidate by email (check if profile exists)
   try {
-    // Get user info from localStorage (stored after JWT login)
-    const userEmail = localStorage.getItem('user_email');
-    const userName = localStorage.getItem('user_name') || 'User';
-    
-    if (!userEmail) {
-      console.warn('No authenticated user email found');
-      return null;
+    // Try to get candidate profile - if it exists, we can extract the ID
+    // We'll search through candidates endpoint or try to find by email
+    const candidatesResponse = await api.get(`/v1/candidates?search=${encodeURIComponent(userEmail)}`)
+    if (candidatesResponse.data?.candidates?.length > 0) {
+      const candidate = candidatesResponse.data.candidates.find((c: any) => c.email === userEmail)
+      if (candidate && candidate.id) {
+        authStorage.setItem('backend_candidate_id', candidate.id.toString())
+        return candidate.id.toString()
+      }
     }
-    
+  } catch (searchError) {
+    console.log('Could not find candidate by search, will try other methods')
+  }
+
+  // Try to create a candidate using the JWT authenticated user data
+  // Note: Backend requires password, so we'll use a default password
+  // In production, this should be handled differently
+  try {
     const response = await api.post('/v1/candidate/register', {
       name: userName,
       email: userEmail,
-      // Additional fields can be populated as needed
+      password: 'temp_password_123', // Temporary password - user should update profile
       phone: '',
       location: '',
       experience_years: 0,
@@ -144,34 +209,59 @@ export const getOrCreateBackendCandidateId = async (): Promise<string | null> =>
       seniority_level: '',
     });
     
-    if (response.data.candidate_id) {
-      localStorage.setItem('backend_candidate_id', response.data.candidate_id.toString());
+    // Check if registration was successful
+    if (response.data.success !== false && response.data.candidate_id) {
+      authStorage.setItem('backend_candidate_id', response.data.candidate_id.toString());
       return response.data.candidate_id.toString();
     }
+    
+    // If email already exists, try to get candidate ID from error or try login
+    if (response.data.error && response.data.error.includes('already registered')) {
+      // Email exists, try to get candidate by trying login with a dummy password
+      // Or better: try to find candidate by email through profile endpoint
+      console.log('Email already registered, trying to find existing candidate...')
+      return await findCandidateByEmail(userEmail)
+    }
+    
     return null;
   } catch (error: any) {
-    // If user already exists (email conflict), try to login instead
-    if (error?.response?.status === 400 || error?.response?.status === 409) {
-      try {
-        const userEmail = localStorage.getItem('user_email');
-        if (!userEmail) {
-          console.warn('No authenticated user email found');
-          return null;
-        }
-        
-        const loginResponse = await api.post('/v1/candidate/login', {
-          email: userEmail,
-        });
-        if (loginResponse.data.candidate_id) {
-          localStorage.setItem('backend_candidate_id', loginResponse.data.candidate_id.toString());
-          return loginResponse.data.candidate_id.toString();
-        }
-      } catch (loginError) {
-        console.warn('Could not retrieve backend candidate ID');
+    console.error('Error creating backend candidate:', error);
+    
+    // If registration failed due to email exists (422 or error message)
+    if (error?.response?.status === 422 || 
+        error?.response?.data?.error?.includes('already registered') ||
+        error?.response?.data?.success === false) {
+      console.log('Email already exists, trying to find candidate...')
+      return await findCandidateByEmail(userEmail)
+    }
+    
+    return null;
+  }
+}
+
+// Helper to find candidate by email
+async function findCandidateByEmail(email: string): Promise<string | null> {
+  try {
+    // Try to get candidates and find by email
+    // The endpoint returns paginated results, so we might need to check multiple pages
+    // For now, try first page (50 candidates)
+    const response = await api.get('/v1/candidates?limit=100')
+    if (response.data?.candidates) {
+      const candidate = response.data.candidates.find((c: any) => c.email === email)
+      if (candidate && candidate.id) {
+        console.log('Found existing candidate by email:', candidate.id)
+        authStorage.setItem('backend_candidate_id', candidate.id.toString())
+        return candidate.id.toString()
       }
     }
-    console.error('Error creating backend candidate:', error);
-    return null;
+    
+    // If not found in first page, candidate might not exist yet
+    // User needs to complete profile to create candidate record
+    console.warn('Could not find candidate by email. User may need to complete profile setup.')
+    return null
+  } catch (error) {
+    console.error('Error finding candidate by email:', error)
+    return null
   }
 }
 
@@ -201,6 +291,26 @@ export interface JobFilters {
   search?: string
 }
 
+/** Normalize API job shape to Job (experience_level → experience_required, requirements → skills_required, etc.). */
+function normalizeJob(raw: Record<string, unknown>): Job {
+  const req = raw.requirements as string | undefined
+  return {
+    id: (raw.id as string) ?? '',
+    title: (raw.title as string) ?? '',
+    department: raw.department as string | undefined,
+    location: (raw.location as string) ?? '',
+    job_type: (raw.job_type as string) ?? (raw.employment_type as string) ?? '',
+    experience_required: (raw.experience_required as string) ?? (raw.experience_level as string) ?? '',
+    salary_min: raw.salary_min != null ? Number(raw.salary_min) : undefined,
+    salary_max: raw.salary_max != null ? Number(raw.salary_max) : undefined,
+    skills_required: (raw.skills_required as string[] | string) ?? (req ? (req.includes(',') ? req.split(',').map(s => s.trim()) : req) : []),
+    description: (raw.description as string) ?? '',
+    status: (raw.status as string) ?? 'active',
+    created_at: raw.created_at as string | undefined,
+    company: raw.company as string | undefined,
+  }
+}
+
 export const getJobs = async (filters?: JobFilters): Promise<Job[]> => {
   try {
     const params = new URLSearchParams()
@@ -211,7 +321,8 @@ export const getJobs = async (filters?: JobFilters): Promise<Job[]> => {
     if (filters?.search) params.append('search', filters.search)
     
     const response = await api.get(`/v1/jobs?${params.toString()}`)
-    return response.data.jobs || response.data || []
+    const list = response.data.jobs || response.data || []
+    return Array.isArray(list) ? list.map((j: Record<string, unknown>) => normalizeJob(j)) : []
   } catch (error) {
     console.error('Error fetching jobs:', error)
     throw error
@@ -221,10 +332,77 @@ export const getJobs = async (filters?: JobFilters): Promise<Job[]> => {
 export const getJobById = async (jobId: string): Promise<Job> => {
   try {
     const response = await api.get(`/v1/jobs/${jobId}`)
-    return response.data
+    return normalizeJob(response.data || {})
   } catch (error) {
     console.error('Error fetching job:', error)
     throw error
+  }
+}
+
+/** Search-as-you-type: job suggestions by title/department. Requires auth. */
+export const getJobSuggestions = async (q: string, limit = 10): Promise<{ id: string; title: string; department: string; location?: string }[]> => {
+  const normalizeAutocompleteQuery = (raw: string) =>
+    (raw ?? '')
+      .replace(/[\\/]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const qNorm = normalizeAutocompleteQuery(q)
+  if (!qNorm) return []
+  try {
+    const response = await api.get('/v1/jobs/autocomplete', { params: { q: qNorm, limit } })
+    return response.data?.suggestions ?? []
+  } catch (error) {
+    console.error('Job suggestions error:', error)
+    return []
+  }
+}
+
+/** Search-as-you-type: candidate suggestions by name/email/skills. Requires auth. */
+export const getCandidateSuggestions = async (q: string, limit = 10): Promise<{ id: string; name: string; email: string; technical_skills?: string; location?: string }[]> => {
+  const qNorm = (q ?? '')
+    .replace(/[\\/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!qNorm) return []
+  try {
+    const response = await api.get('/v1/candidates/autocomplete', { params: { q: qNorm, limit } })
+    return response.data?.suggestions ?? []
+  } catch (error) {
+    console.error('Candidate suggestions error:', error)
+    return []
+  }
+}
+
+/** Search-as-you-type: skill suggestions from active jobs' requirements (for candidate browse jobs skills field). */
+export const getJobSkillSuggestions = async (q: string, limit = 15): Promise<{ id: string; label: string }[]> => {
+  const qNorm = (q ?? '')
+    .replace(/[\\/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!qNorm) return []
+  try {
+    const response = await api.get('/v1/jobs/skills/autocomplete', { params: { q: qNorm, limit } })
+    return response.data?.suggestions ?? []
+  } catch (error) {
+    console.error('Job skill suggestions error:', error)
+    return []
+  }
+}
+
+/** Search-as-you-type: location suggestions from active jobs (for candidate browse jobs location field). */
+export const getJobLocationSuggestions = async (q: string, limit = 15): Promise<{ id: string; label: string }[]> => {
+  const qNorm = (q ?? '')
+    .replace(/[\\/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!qNorm) return []
+  try {
+    const response = await api.get('/v1/jobs/locations/autocomplete', { params: { q: qNorm, limit } })
+    return response.data?.suggestions ?? []
+  } catch (error) {
+    console.error('Job location suggestions error:', error)
+    return []
   }
 }
 
@@ -255,7 +433,7 @@ export interface Application {
 export const applyForJob = async (jobId: string, candidateId: string, resumeUrl?: string) => {
   try {
     // Use backend candidate_id if available (integer), otherwise use the provided ID
-    const backendCandidateId = localStorage.getItem('backend_candidate_id') || candidateId
+    const backendCandidateId = authStorage.getItem('backend_candidate_id') || candidateId
     
     const response = await api.post('/v1/candidate/apply', {
       job_id: jobId,
@@ -276,21 +454,35 @@ export const applyForJob = async (jobId: string, candidateId: string, resumeUrl?
 
 export const getCandidateApplications = async (candidateId: string): Promise<Application[]> => {
   try {
-    // Backend expects integer candidate_id, not UUID
-    // If using UUID format, this will fail - return empty for now
+    console.log('Fetching applications for candidate_id:', candidateId)
     const response = await api.get(`/v1/candidate/applications/${candidateId}`)
-    return response.data.applications || response.data || []
+    console.log('Applications API response:', response.data)
+    const applications = response.data.applications || response.data || []
+    console.log('Parsed applications:', applications)
+    return applications
   } catch (error: any) {
-    // Handle 422 error (invalid candidate_id format - UUID vs integer)
+    console.error('Error fetching applications:', error)
+    // Handle 401 (authentication error)
+    if (error?.response?.status === 401) {
+      console.warn('Authentication failed when fetching applications. Token may be expired.')
+      authStorage.removeItem('auth_token')
+      return []
+    }
+    // Handle 403 (forbidden)
+    if (error?.response?.status === 403) {
+      console.warn('Access denied: Cannot view applications')
+      return []
+    }
+    // Handle 422 error (invalid candidate_id format)
     if (error?.response?.status === 422) {
-      console.warn('Applications: Backend expects integer candidate_id, got UUID. Returning empty.')
+      console.warn('Applications: Invalid candidate_id format.')
       return []
     }
     // Handle 404 (no applications found)
     if (error?.response?.status === 404) {
+      console.log('No applications found (404)')
       return []
     }
-    console.error('Error fetching applications:', error)
     return []
   }
 }
@@ -299,14 +491,27 @@ export const getCandidateApplications = async (candidateId: string): Promise<App
 
 export const getCandidateProfile = async (candidateId: string): Promise<CandidateProfile | null> => {
   try {
-    const response = await api.get(`/v1/candidates/${candidateId}`)
-    // Backend returns { candidate: {...} } or { error: "..." }
+    // Use the candidate portal endpoint which accepts JWT tokens
+    const response = await api.get(`/v1/candidate/profile/${candidateId}`)
+    // Backend returns candidate object directly or { error: "..." }
     if (response.data.error) {
       console.warn('Backend returned error:', response.data.error)
       return null
     }
-    return response.data.candidate || response.data
+    // The endpoint returns the candidate object directly (not wrapped in { candidate: {...} })
+    return response.data
   } catch (error: any) {
+    // Handle 401 (authentication error)
+    if (error?.response?.status === 401) {
+      console.warn('Authentication failed. Token may be expired or invalid.')
+      authStorage.removeItem('auth_token')
+      return null
+    }
+    // Handle 403 (forbidden - trying to access another candidate's profile)
+    if (error?.response?.status === 403) {
+      console.warn('Access denied: You can only view your own profile')
+      return null
+    }
     // Handle 422 (UUID vs integer mismatch) or 404 (not found)
     if (error?.response?.status === 422 || error?.response?.status === 404) {
       console.warn('Candidate profile not found or invalid ID format')
@@ -332,13 +537,22 @@ export const updateCandidateProfile = async (candidateId: string, data: Partial<
   }
 }
 
+// Match endpoint: gateway tries agent (default 20s) then fallback; use 70s so we get
+// either AI results or fallback (supports AGENT_MATCH_TIMEOUT=60 when set).
+const MATCH_REQUEST_TIMEOUT_MS = 70_000
+
 export const getCandidatesByJob = async (jobId: string) => {
   try {
-    const response = await api.get(`/v1/match/${jobId}/top`)
+    const response = await api.get(`/v1/match/${jobId}/top`, {
+      timeout: MATCH_REQUEST_TIMEOUT_MS
+    })
     return response.data.matches || response.data || []
   } catch (error) {
-    console.error('Error fetching candidates:', error)
-    throw error
+    // Timeout or agent unreachable: return [] so dashboard still loads; avoid flooding console
+    if (import.meta.env.DEV) {
+      console.warn('Match endpoint failed for job', jobId, '(showing 0 applicants):', (error as Error)?.message || error)
+    }
+    return []
   }
 }
 
@@ -464,8 +678,11 @@ export const getTasks = async (candidateId: string): Promise<Task[]> => {
     return response.data.tasks || response.data || []
   } catch (error: any) {
     // Tasks endpoint doesn't exist on backend - return empty array
+    // Only log in development to reduce console noise
     if (error?.response?.status === 404) {
-      console.warn('Tasks endpoint not available on backend')
+      if (import.meta.env.DEV) {
+        console.warn('Tasks endpoint not available on backend (expected - feature not implemented yet)')
+      }
       return []
     }
     console.error('Error fetching tasks:', error)
@@ -477,7 +694,15 @@ export const submitTask = async (taskId: string, submissionUrl: string) => {
   try {
     const response = await api.put(`/v1/tasks/${taskId}/submit`, { submission_url: submissionUrl })
     return response.data
-  } catch (error) {
+  } catch (error: any) {
+    // Tasks endpoint doesn't exist on backend
+    if (error?.response?.status === 404) {
+      const message = 'Task submission feature is not available yet. Please contact support.'
+      if (import.meta.env.DEV) {
+        console.warn('Tasks submit endpoint not available on backend:', message)
+      }
+      throw new Error(message)
+    }
     console.error('Error submitting task:', error)
     throw error
   }
@@ -642,10 +867,39 @@ export interface MatchingStats {
   low_matches: number
 }
 
+/** Normalize gateway match response to MatchResult (gateway uses name/score, UI expects candidate_name/match_score/matched_skills). */
+function normalizeMatchToResult(m: any): MatchResult {
+  const skillsStr = m.skills_match ?? ''
+  const matchedSkills = Array.isArray(m.matched_skills)
+    ? m.matched_skills
+    : (typeof skillsStr === 'string' ? skillsStr.split(',').map((s: string) => s.trim()).filter(Boolean) : [])
+  const score = typeof m.score === 'number' ? m.score : (typeof m.match_score === 'number' ? m.match_score : 0)
+  const loc = m.location_match
+  const locationPct = typeof loc === 'number' ? loc : (loc === true ? 100 : 0)
+  const exp = m.experience_match
+  const experiencePct = typeof exp === 'number' ? exp : (typeof exp === 'string' && /^\d+/.test(exp) ? parseInt(exp, 10) : 0)
+  const skillsPct = typeof m.skills_match === 'number' ? m.skills_match : (matchedSkills.length ? Math.min(100, matchedSkills.length * 25) : 0)
+  return {
+    candidate_id: m.candidate_id ?? m.id ?? '',
+    candidate_name: m.candidate_name ?? m.name ?? '',
+    email: m.email ?? '',
+    match_score: score,
+    skills_match: skillsPct,
+    experience_match: experiencePct,
+    location_match: locationPct,
+    matched_skills: matchedSkills,
+    missing_skills: Array.isArray(m.missing_skills) ? m.missing_skills : [],
+    recommendation: m.recommendation ?? m.recommendation_strength ?? m.reasoning ?? ''
+  }
+}
+
 export const getTopMatches = async (jobId: string, limit: number = 10): Promise<MatchResult[]> => {
   try {
-    const response = await api.get(`/v1/match/${jobId}/top?limit=${limit}`)
-    return response.data.matches || response.data || []
+    const response = await api.get(`/v1/match/${jobId}/top?limit=${limit}`, {
+      timeout: MATCH_REQUEST_TIMEOUT_MS
+    })
+    const raw = response.data.matches || response.data || []
+    return Array.isArray(raw) ? raw.map(normalizeMatchToResult) : []
   } catch (error) {
     console.error('Error fetching top matches:', error)
     throw error

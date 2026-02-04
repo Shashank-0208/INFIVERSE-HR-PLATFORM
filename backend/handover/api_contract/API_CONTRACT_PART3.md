@@ -1,6 +1,12 @@
-# API Contract — Part 3: Gateway Advanced Features
+# API Contract — Part 3: Gateway Advanced Features (41-50 of 111)
 
 **Continued from:** [API_CONTRACT_PART2.md](./API_CONTRACT_PART2.md)
+
+**Version:** 4.1.0  
+**Last Updated:** January 22, 2026  
+**Total Endpoints:** 111 (80 Gateway + 6 Agent + 25 LangGraph)  
+**Database:** MongoDB Atlas  
+**Analysis Source:** Comprehensive endpoint analysis from services directories
 
 ---
 
@@ -11,6 +17,10 @@
 **Purpose:** AI-powered semantic candidate matching via Agent Service
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/app/main.py` → `get_top_matches()`
+
+**Timeout:** 60s
 
 **Request:**
 ```http
@@ -58,9 +68,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** HR views top candidates for job
 
-**Implemented In:** `services/gateway/app/main.py` → `get_top_matches()`
-
-**Database Impact:** SELECT from candidates, jobs tables
+**Database Impact:** SELECT from candidates, jobs collections
 
 ---
 
@@ -69,6 +77,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Batch AI matching for multiple jobs
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/app/main.py` → `batch_match_jobs()`
+
+**Timeout:** 120s
 
 **Request:**
 ```http
@@ -122,9 +134,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** HR compares candidates across multiple jobs
 
-**Implemented In:** `services/gateway/app/main.py` → `batch_match_jobs()`
-
-**Database Impact:** SELECT from candidates, jobs tables
+**Database Impact:** SELECT from candidates, jobs collections
 
 ---
 
@@ -135,6 +145,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Submit values assessment feedback for candidate
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/app/main.py` → `submit_feedback()`
+
+**Timeout:** 15s
 
 **Request:**
 ```http
@@ -169,7 +183,7 @@ Authorization: Bearer YOUR_API_KEY
     "gratitude": 4
   },
   "average_score": 4.6,
-  "submitted_at": "2024-12-09T13:37:00Z"
+  "submitted_at": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -179,9 +193,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** HR submits post-interview feedback
 
-**Implemented In:** `services/gateway/app/main.py` → `submit_feedback()`
-
-**Database Impact:** INSERT into feedback table
+**Database Impact:** INSERT into feedback collection
 
 ---
 
@@ -190,6 +202,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Get all feedback records with candidate/job details
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/app/main.py` → `get_all_feedback()`
+
+**Timeout:** 15s
 
 **Request:**
 ```http
@@ -214,7 +230,7 @@ Authorization: Bearer YOUR_API_KEY
       },
       "average_score": 4.6,
       "comments": "Excellent candidate with strong values alignment",
-      "created_at": "2024-12-09T13:37:00Z",
+      "created_at": "2026-01-22T13:37:00Z",
       "candidate_name": "John Doe",
       "job_title": "Senior Software Engineer"
     }
@@ -225,9 +241,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** HR reviews feedback history
 
-**Implemented In:** `services/gateway/app/main.py` → `get_all_feedback()`
-
-**Database Impact:** SELECT from feedback, candidates, jobs tables with JOIN
+**Database Impact:** SELECT from feedback, candidates, jobs collections with JOIN
 
 ---
 
@@ -236,6 +250,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Get all scheduled interviews
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/app/main.py` → `get_interviews()`
+
+**Timeout:** 15s
 
 **Request:**
 ```http
@@ -251,7 +269,7 @@ Authorization: Bearer YOUR_API_KEY
       "id": 456,
       "candidate_id": 123,
       "job_id": 45,
-      "interview_date": "2024-12-15T14:00:00Z",
+      "interview_date": "2026-01-29T14:00:00Z",
       "interviewer": "Sarah Johnson",
       "status": "scheduled",
       "candidate_name": "John Doe",
@@ -264,9 +282,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** HR views interview schedule
 
-**Implemented In:** `services/gateway/app/main.py` → `get_interviews()`
-
-**Database Impact:** SELECT from interviews, candidates, jobs tables with JOIN
+**Database Impact:** SELECT from interviews, candidates, jobs collections with JOIN
 
 ---
 
@@ -275,6 +291,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Schedule new interview
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/app/main.py` → `schedule_interview()`
+
+**Timeout:** 20s
 
 **Request:**
 ```http
@@ -285,7 +305,7 @@ Authorization: Bearer YOUR_API_KEY
 {
   "candidate_id": 123,
   "job_id": 45,
-  "interview_date": "2024-12-15T14:00:00Z",
+  "interview_date": "2026-01-29T14:00:00Z",
   "interviewer": "Sarah Johnson",
   "notes": "Technical interview - focus on system design"
 }
@@ -298,14 +318,14 @@ Authorization: Bearer YOUR_API_KEY
   "interview_id": 456,
   "candidate_id": 123,
   "job_id": 45,
-  "interview_date": "2024-12-15T14:00:00Z",
+  "interview_date": "2026-01-29T14:00:00Z",
   "status": "scheduled"
 }
 ```
 
 **Sequence:**
 1. Validate candidate and job exist
-2. Insert into interviews table with status='scheduled'
+2. Insert into interviews collection with status='scheduled'
 3. Trigger interview.scheduled webhook
 4. Send notification to candidate
 
@@ -316,9 +336,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** HR schedules interview
 
-**Implemented In:** `services/gateway/app/main.py` → `schedule_interview()`
-
-**Database Impact:** INSERT into interviews table
+**Database Impact:** INSERT into interviews collection
 
 ---
 
@@ -327,6 +345,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Create job offer for candidate
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/app/main.py` → `create_job_offer()`
+
+**Timeout:** 15s
 
 **Request:**
 ```http
@@ -338,7 +360,7 @@ Authorization: Bearer YOUR_API_KEY
   "candidate_id": 123,
   "job_id": 45,
   "salary": 150000.00,
-  "start_date": "2025-01-15",
+  "start_date": "2026-02-01",
   "terms": "Full-time, remote, benefits included"
 }
 ```
@@ -351,10 +373,10 @@ Authorization: Bearer YOUR_API_KEY
   "candidate_id": 123,
   "job_id": 45,
   "salary": 150000.00,
-  "start_date": "2025-01-15",
+  "start_date": "2026-02-01",
   "terms": "Full-time, remote, benefits included",
   "status": "pending",
-  "created_at": "2024-12-09T13:37:00Z"
+  "created_at": "2026-01-22T13:37:00Z"
 }
 ```
 
@@ -364,9 +386,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** HR extends job offer
 
-**Implemented In:** `services/gateway/app/main.py` → `create_job_offer()`
-
-**Database Impact:** INSERT into offers table
+**Database Impact:** INSERT into offers collection
 
 ---
 
@@ -375,6 +395,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Get all job offers
 
 **Authentication:** Bearer token required
+
+**Implementation:** `services/gateway/app/main.py` → `get_all_offers()`
+
+**Timeout:** 15s
 
 **Request:**
 ```http
@@ -391,10 +415,10 @@ Authorization: Bearer YOUR_API_KEY
       "candidate_id": 123,
       "job_id": 45,
       "salary": 150000.00,
-      "start_date": "2025-01-15",
+      "start_date": "2026-02-01",
       "terms": "Full-time, remote, benefits included",
       "status": "pending",
-      "created_at": "2024-12-09T13:37:00Z",
+      "created_at": "2026-01-22T13:37:00Z",
       "candidate_name": "John Doe",
       "job_title": "Senior Software Engineer"
     }
@@ -405,9 +429,7 @@ Authorization: Bearer YOUR_API_KEY
 
 **When Called:** HR reviews offer status
 
-**Implemented In:** `services/gateway/app/main.py` → `get_all_offers()`
-
-**Database Impact:** SELECT from offers, candidates, jobs tables with JOIN
+**Database Impact:** SELECT from offers, candidates, jobs collections with JOIN
 
 ---
 
@@ -418,6 +440,10 @@ Authorization: Bearer YOUR_API_KEY
 **Purpose:** Register new client company
 
 **Authentication:** None (public registration)
+
+**Implementation:** `services/gateway/app/main.py` → `client_register()`
+
+**Timeout:** 15s
 
 **Request:**
 ```http
@@ -446,7 +472,7 @@ Content-Type: application/json
 1. Check client_id uniqueness
 2. Check email uniqueness
 3. Hash password with bcrypt
-4. Insert into clients table with status='active'
+4. Insert into clients collection with status='active'
 5. Return success confirmation
 
 **Error Responses:**
@@ -455,9 +481,7 @@ Content-Type: application/json
 
 **When Called:** New client signs up
 
-**Implemented In:** `services/gateway/app/main.py` → `client_register()`
-
-**Database Impact:** INSERT into clients table
+**Database Impact:** INSERT into clients collection
 
 ---
 
@@ -466,6 +490,10 @@ Content-Type: application/json
 **Purpose:** Client authentication with JWT token generation
 
 **Authentication:** None (public login)
+
+**Implementation:** `services/gateway/app/main.py` → `client_login()`
+
+**Timeout:** 10s
 
 **Request:**
 ```http
@@ -501,7 +529,7 @@ Content-Type: application/json
 1. Lookup client by client_id
 2. Check account status (active/locked)
 3. Verify password with bcrypt
-4. Generate JWT token (HS256, 24h expiry)
+4. Generate JWT token (HS256, 24h expiry, JWT_SECRET_KEY)
 5. Reset failed login attempts
 6. Return token and permissions
 
@@ -512,28 +540,26 @@ Content-Type: application/json
 
 **When Called:** Client logs into portal
 
-**Implemented In:** `services/gateway/app/main.py` → `client_login()`
-
-**Database Impact:** SELECT from clients table, UPDATE failed_login_attempts
+**Database Impact:** SELECT from clients collection, UPDATE failed_login_attempts
 
 ---
 
 ## Summary Table - Part 3
 
-| Endpoint | Method | Category | Purpose | Auth Required |
-|----------|--------|----------|---------|---------------|
-| /v1/match/{job_id}/top | GET | AI Matching | Get top matches | Yes |
-| /v1/match/batch | POST | AI Matching | Batch matching | Yes |
-| /v1/feedback | POST | Assessment | Submit feedback | Yes |
-| /v1/feedback | GET | Assessment | Get feedback | Yes |
-| /v1/interviews | GET | Workflow | List interviews | Yes |
-| /v1/interviews | POST | Workflow | Schedule interview | Yes |
-| /v1/offers | POST | Workflow | Create offer | Yes |
-| /v1/offers | GET | Workflow | List offers | Yes |
-| /v1/client/register | POST | Client Portal | Register client | No |
-| /v1/client/login | POST | Client Portal | Client login | No |
+| Endpoint | Method | Category | Purpose | Auth Required | Timeout |
+|----------|--------|----------|---------|---------------|---------|
+| /v1/match/{job_id}/top | GET | AI Matching | Get top matches | Yes | 60s |
+| /v1/match/batch | POST | AI Matching | Batch matching | Yes | 120s |
+| /v1/feedback | POST | Assessment | Submit feedback | Yes | 15s |
+| /v1/feedback | GET | Assessment | Get feedback | Yes | 15s |
+| /v1/interviews | GET | Workflow | List interviews | Yes | 15s |
+| /v1/interviews | POST | Workflow | Schedule interview | Yes | 20s |
+| /v1/offers | POST | Workflow | Create offer | Yes | 15s |
+| /v1/offers | GET | Workflow | List offers | Yes | 15s |
+| /v1/client/register | POST | Client Portal | Register client | No | 15s |
+| /v1/client/login | POST | Client Portal | Client login | No | 10s |
 
-**Total Endpoints in Part 3:** 10 (Cumulative: 45 of 111)
+**Total Endpoints in Part 3:** 10 (36-45 of 111)
 
 ---
 

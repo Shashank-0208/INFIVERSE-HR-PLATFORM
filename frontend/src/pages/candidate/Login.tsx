@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { authStorage } from '../../utils/authStorage'
 
 export default function CandidateLogin() {
   const navigate = useNavigate()
@@ -14,8 +15,7 @@ export default function CandidateLogin() {
       return
     }
 
-    // Store in localStorage for demo purposes
-    localStorage.setItem('candidate_id', loginId)
+    authStorage.setItem('candidate_id', loginId)
     toast.success('Login successful!')
     navigate('/candidate/profile')
   }

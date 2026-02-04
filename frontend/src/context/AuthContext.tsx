@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { authStorage, clearAuthStorage } from '../utils/authStorage'
 
 interface User {
   id: string;
@@ -24,29 +25,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Initialize auth from stored JWT token
-    const token = localStorage.getItem('auth_token');
-    const userData = localStorage.getItem('user_data');
+    // Initialize auth from stored JWT token; derive role from token so role is correct on reload
+    const token = authStorage.getItem('auth_token');
+    const userData = authStorage.getItem('user_data');
     
     if (token && userData) {
       try {
-        // Check if token is expired
         const payload = JSON.parse(atob(token.split('.')[1]));
         const currentTime = Math.floor(Date.now() / 1000);
         
         if (payload.exp > currentTime) {
-          // Token is valid, set user data
-          setUser(JSON.parse(userData));
+          const parsed = JSON.parse(userData) as User;
+          const roleFromToken = payload.role;
+          const role = typeof roleFromToken === 'string' && ['candidate', 'recruiter', 'client'].includes(roleFromToken)
+            ? roleFromToken
+            : (parsed.role || authStorage.getItem('user_role') || 'candidate');
+          const userWithRole = { ...parsed, role };
+          setUser(userWithRole);
+          authStorage.setItem('user_role', role);
         } else {
-          // Token is expired, clear stored data
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user_data');
+          clearAuthStorage();
         }
       } catch (error) {
         console.error('Error parsing token or user data:', error);
-        // Clear invalid data
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_data');
+        clearAuthStorage();
       }
     }
     
@@ -55,49 +57,104 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleSignIn = async (email: string, password: string) => {
     try {
-      // Get role from localStorage (stored during signup) to determine login endpoint
-      const storedRole = localStorage.getItem('user_role') || 'candidate';
+      const storedRole = authStorage.getItem('user_role');
+      
+      console.log('🔐 AuthContext: Attempting login with stored role:', storedRole || 'auto-detect');
       
       const authService = (await import('../services/authService')).default;
-      const result = await authService.login(email, password, storedRole);
+      // Pass the stored role to login function
+      // If no role is stored, authService will auto-detect by trying both endpoints
+      const result = await authService.login(email, password, storedRole || undefined);
+      
+      console.log('🔐 AuthContext: Login result:', { 
+        success: result.success, 
+        hasToken: !!result.token, 
+        hasUser: !!result.user,
+        userRole: result.user?.role 
+      });
       
       if (result.success && result.token && result.user) {
-        // Extract role from JWT token (token contains role in payload)
-        try {
-          const payload = JSON.parse(atob(result.token.split('.')[1]));
-          const role = payload.role || result.user.role || 'candidate';
-          
-          // Store the JWT token and user data
-          localStorage.setItem('auth_token', result.token);
-          localStorage.setItem('user_data', JSON.stringify(result.user));
-          localStorage.setItem('user_role', role);  // Store role from token
-          localStorage.setItem('user_email', result.user.email || email);
-          localStorage.setItem('user_name', result.user.name || '');
-          localStorage.setItem('isAuthenticated', 'true');
-          
-          // Update user object with role
-          const userWithRole = { ...result.user, role };
-          setUser(userWithRole);
-        } catch (tokenError) {
-          // If token parsing fails, use role from user object or default
-          const role = result.user.role || 'candidate';
-          localStorage.setItem('auth_token', result.token);
-          localStorage.setItem('user_data', JSON.stringify(result.user));
-          localStorage.setItem('user_role', role);
-          setUser(result.user);
+        const token = result.token;
+        
+        // Validate token is not empty
+        if (!token || token.trim() === '') {
+          console.error('❌ AuthContext: Empty token received!');
+          return { error: 'Invalid token received from server' };
         }
+        
+        // Extract role from JWT token (token contains role in payload)
+        let role = 'candidate';
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          role = payload.role || result.user.role || storedRole || 'candidate';
+          console.log('🔐 AuthContext: Extracted role from token:', role);
+        } catch (tokenError) {
+          console.error('❌ AuthContext: Error parsing token:', tokenError);
+          // If token parsing fails, use role from user object, stored role, or default
+          role = result.user.role || storedRole || 'candidate';
+          console.log('🔐 AuthContext: Using role from user object or stored role:', role);
+        }
+        
+        // Store the JWT token FIRST - this is critical
+        console.log('🔐 AuthContext: Storing auth token for role:', role);
+        console.log('🔐 AuthContext: Token length:', token.length);
+        console.log('🔐 AuthContext: Token first 50 chars:', token.substring(0, 50));
+        
+        // Store token using multiple methods to ensure it's saved
+        try {
+          authStorage.setItem('auth_token', token);
+          const authServiceInstance = (await import('../services/authService')).default;
+          if (authServiceInstance.setAuthToken) {
+            authServiceInstance.setAuthToken(token);
+          }
+          const storedToken = authStorage.getItem('auth_token');
+          if (!storedToken) {
+            console.error('❌ AuthContext: CRITICAL - Failed to store token!');
+            try {
+              authStorage.setItem('auth_token', token);
+              const retryToken = authStorage.getItem('auth_token');
+              if (!retryToken) {
+                return { error: 'Failed to store authentication token. Please check browser settings.' };
+              }
+            } catch (e) {
+              return { error: 'Failed to store authentication token: ' + (e as Error).message };
+            }
+          }
+        } catch (storageError) {
+          console.error('❌ AuthContext: Error storing token:', storageError);
+          return { error: 'Failed to store authentication token: ' + (storageError as Error).message };
+        }
+        
+        authStorage.setItem('user_data', JSON.stringify(result.user));
+        authStorage.setItem('user_role', role);
+        authStorage.setItem('user_email', result.user.email || email);
+        authStorage.setItem('user_name', result.user.name || '');
+        authStorage.setItem('isAuthenticated', 'true');
+        if (role === 'client' && result.user.id) {
+          authStorage.setItem('client_id', result.user.id);
+        } else if ((role === 'candidate' || role === 'recruiter') && result.user.id) {
+          authStorage.setItem('candidate_id', result.user.id);
+          authStorage.setItem('backend_candidate_id', result.user.id);
+        }
+        
+        // Update user object with role
+        const userWithRole = { ...result.user, role };
+        setUser(userWithRole);
         
         // Set the auth token in axios defaults
         const axios = (await import('axios')).default;
-        axios.defaults.headers.common['Authorization'] = `Bearer ${result.token}`;
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         
+        console.log('✅ AuthContext: Login successful for role:', role);
         return { error: null };
       } else {
-        return { error: result.error || 'Login failed' };
+        console.error('❌ AuthContext: Login failed - no token or user in result:', result);
+        const errorMsg = result.error || 'Login failed - no token or user data received';
+        return { error: errorMsg };
       }
     } catch (error) {
-      console.error('Login error:', error);
-      return { error: 'Login failed' };
+      console.error('❌ AuthContext: Login error:', error);
+      return { error: error instanceof Error ? error.message : 'Login failed' };
     }
   };
 
@@ -114,53 +171,104 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (result.success && result.user) {
-        // Store user data and role
+        // Store user data and role temporarily
         const role = userData.role || result.user.role || 'candidate';
-        
-        localStorage.setItem('user_role', role);
-        localStorage.setItem('user_email', email);
-        localStorage.setItem('user_name', userData.name);
-        localStorage.setItem('user_data', JSON.stringify(result.user));
-        
-        // Store client_id for client login (client login uses client_id, not email)
+        authStorage.setItem('user_role', role);
+        authStorage.setItem('user_email', email);
+        authStorage.setItem('user_name', userData.name);
+        authStorage.setItem('user_data', JSON.stringify(result.user));
         if (role === 'client' && result.user.id) {
-          localStorage.setItem('client_id', result.user.id);
+          authStorage.setItem('client_id', result.user.id);
+        }
+        if ((role === 'candidate' || role === 'recruiter') && result.user.id) {
+          authStorage.setItem('backend_candidate_id', String(result.user.id));
+          authStorage.setItem('candidate_id', String(result.user.id));
         }
         
-        // Set user in state
-        setUser(result.user);
+        // Do NOT setUser(result.user) here. Any component observing user could redirect or set
+        // authReady before token is stored and verified. setUser is called only after token
+        // verification (below) so Dashboard and others never see user without a valid token.
         
-        // Don't auto-login - just return success so AuthPage can redirect
-        return { error: null, user: result.user };
+        // IMPORTANT: Auto-login after successful registration to get auth token
+        // Registration doesn't return a token, so we need to log in to get one
+        console.log('🔐 Auto-logging in after successful registration...');
+        const loginResult = await authService.login(email, password, role);
+        
+        if (loginResult.success && loginResult.token && loginResult.user) {
+          const token = loginResult.token;
+          
+          // Validate token is not empty
+          if (!token || token.trim() === '') {
+            console.error('❌ AuthContext: Empty token received after auto-login!');
+            return { error: 'Registration successful but auto-login failed. Please log in manually.' };
+          }
+          
+          // Extract role from JWT token
+          let extractedRole = role;
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            extractedRole = payload.role || role;
+            console.log('🔐 AuthContext: Extracted role from auto-login token:', extractedRole);
+          } catch (tokenError) {
+            console.error('❌ AuthContext: Error parsing auto-login token:', tokenError);
+          }
+          
+          // Store the JWT token
+          authStorage.setItem('auth_token', token);
+          const storedToken = authStorage.getItem('auth_token');
+          if (!storedToken) {
+            return { error: 'Registration successful but failed to store authentication token.' };
+          }
+          authStorage.setItem('user_data', JSON.stringify(loginResult.user));
+          authStorage.setItem('user_role', extractedRole);
+          authStorage.setItem('isAuthenticated', 'true');
+          if (extractedRole === 'client' && loginResult.user.id) {
+            authStorage.setItem('client_id', loginResult.user.id);
+          } else if ((extractedRole === 'candidate' || extractedRole === 'recruiter') && loginResult.user.id) {
+            authStorage.setItem('candidate_id', loginResult.user.id);
+            authStorage.setItem('backend_candidate_id', loginResult.user.id);
+          }
+          const userWithRole = { ...loginResult.user, role: extractedRole };
+          const axios = (await import('axios')).default;
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          const verifyToken = () => authStorage.getItem('auth_token') === token;
+          if (!verifyToken()) {
+            clearAuthStorage();
+            return { error: 'Failed to persist authentication. Please log in manually.' };
+          }
+          await new Promise((r) => setTimeout(r, 0));
+          if (!verifyToken()) {
+            clearAuthStorage();
+            return { error: 'Authentication state lost. Please log in manually.' };
+          }
+          
+          // Only set user after token is verified so consumers never see user without a valid token
+          setUser(userWithRole);
+          
+          console.log('✅ AuthContext: Registration and auto-login successful for role:', extractedRole);
+          return { error: null, user: userWithRole };
+        } else {
+          console.error('❌ AuthContext: Auto-login failed after registration:', loginResult.error);
+          return { error: loginResult.error || 'Registration successful but auto-login failed. Please log in manually.' };
+        }
       } else {
         return { error: result.error || 'Registration failed' };
       }
     } catch (error) {
-      console.error('Registration error:', error);
-      return { error: 'Registration failed' };
+      console.error('❌ AuthContext: Registration error:', error);
+      return { error: error instanceof Error ? error.message : 'Registration failed' };
     }
   };
 
   const handleSignOut = async () => {
-    // Clear all auth-related localStorage items
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
-    localStorage.removeItem('user_role');
-    localStorage.removeItem('user_email');
-    localStorage.removeItem('user_name');
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('candidate_id');
-    localStorage.removeItem('backend_candidate_id');
-    
-    // Remove auth header from axios
+    clearAuthStorage();
     const axios = (await import('axios')).default;
     delete axios.defaults.headers.common['Authorization'];
-    
     setUser(null);
   };
 
-  const userRole = user?.role || localStorage.getItem('user_role');
-  const userName = user?.name || localStorage.getItem('user_name');
+  const userRole = user?.role || authStorage.getItem('user_role');
+  const userName = user?.name || authStorage.getItem('user_name');
 
   return (
     <AuthContext.Provider value={{

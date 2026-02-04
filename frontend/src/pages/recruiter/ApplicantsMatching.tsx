@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { 
   getTopMatches, 
@@ -13,13 +13,19 @@ import {
 } from '../../services/api'
 import Table from '../../components/Table'
 import Loading from '../../components/Loading'
+import AutocompleteSearch from '../../components/AutocompleteSearch'
 
 export default function ApplicantsMatching() {
   const { jobId: urlJobId } = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const [jobId, setJobId] = useState<number>(urlJobId ? parseInt(urlJobId) : 1)
+  const jobIdFromQuery = searchParams.get('jobId')
+  const effectiveJobId = urlJobId || jobIdFromQuery || ''
+
+  const [jobId, setJobId] = useState<string>(effectiveJobId)
+  const [jobSearchInput, setJobSearchInput] = useState('')
   const [job, setJob] = useState<Job | null>(null)
-  const [, setJobs] = useState<any[]>([])
+  const [jobs, setJobs] = useState<Job[]>([])
   const [candidates, setCandidates] = useState<MatchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -28,15 +34,29 @@ export default function ApplicantsMatching() {
   const [algorithmVersion, setAlgorithmVersion] = useState<string>('')
 
   useEffect(() => {
+    setJobId(effectiveJobId)
+  }, [effectiveJobId])
+
+  useEffect(() => {
     loadJobs()
-    if (urlJobId) {
-      loadData()
+  }, [])
+
+  useEffect(() => {
+    if (jobs.length > 0 && !jobId && jobs[0].id) {
+      setJobId(jobs[0].id)
     }
-  }, [urlJobId])
+  }, [jobs, jobId])
 
   useEffect(() => {
     if (jobId) {
       loadJobDetails()
+    }
+  }, [jobId])
+
+  // Load candidates when a job is selected (from URL, query, or dropdown/first job)
+  useEffect(() => {
+    if (jobId) {
+      loadData()
     }
   }, [jobId])
 
@@ -60,25 +80,27 @@ export default function ApplicantsMatching() {
   }
 
   const loadJobDetails = async () => {
+    if (!jobId) return
     try {
-      const jobData = await getJobById(jobId.toString())
+      const jobData = await getJobById(jobId)
       setJob(jobData)
     } catch (error) {
       console.error('Failed to load job:', error)
+      setJob(null)
     }
   }
 
   const loadData = async () => {
     if (!jobId) {
-      toast.error('Please enter a Job ID')
+      toast.error('Please select a job')
       return
     }
 
     try {
       setLoading(true)
       const [jobData, matchResults] = await Promise.all([
-        getJobById(jobId.toString()).catch(() => null),
-        getTopMatches(jobId.toString(), 20).catch(() => [])
+        getJobById(jobId).catch(() => null),
+        getTopMatches(jobId, 20).catch(() => [])
       ])
       setJob(jobData)
       setCandidates(matchResults)
@@ -92,43 +114,25 @@ export default function ApplicantsMatching() {
 
   const handleGenerateShortlist = async () => {
     if (!jobId) {
-      toast.error('Please enter a Job ID')
+      toast.error('Please select a job')
       return
     }
 
     setGenerating(true)
     try {
-      // Call AI matching endpoint via Agent Service
-      const API_KEY = import.meta.env.VITE_API_KEY || 'prod_api_key_XUqM2msdCa4CYIaRywRNXRVc477nlI3AQ-lr6cgTB2o'
-      const agentUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'https://bhiv-hr-agent-cato.onrender.com'
-      
-      const response = await fetch(`${agentUrl}/match`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${API_KEY}`
-        },
-        body: JSON.stringify({ job_id: jobId }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        const candidatesData = data.top_candidates || []
-        setAiAnalysis(data.ai_analysis || '')
-        setAlgorithmVersion(data.algorithm_version || 'v3.0.0')
-        setCandidates(candidatesData)
-        
-        // Also load job details
-        const jobData = await getJobById(jobId.toString()).catch(() => null)
-        setJob(jobData)
-        
-        if (candidatesData.length === 0) {
-          toast('No candidates found for this job. Please upload candidates first.', { icon: '⚠' })
-        } else {
-          toast.success(`Found ${candidatesData.length} matched candidates`)
-        }
+      // Use gateway /v1/match/{jobId}/top (AI or DB fallback) instead of calling agent directly
+      const [jobData, matchResults] = await Promise.all([
+        getJobById(jobId).catch(() => null),
+        getTopMatches(jobId, 20).catch(() => [])
+      ])
+      setJob(jobData)
+      setCandidates(matchResults)
+      setAiAnalysis('Matched via gateway (AI semantic or DB fallback).')
+      setAlgorithmVersion('2.0')
+      if (matchResults.length === 0) {
+        toast('No candidates found for this job. Try uploading candidates or check back later.', { icon: '⚠' })
       } else {
-        throw new Error('Failed to generate shortlist')
+        toast.success(`Found ${matchResults.length} matched candidates`)
       }
     } catch (error) {
       console.error('Generate shortlist error:', error)
@@ -140,7 +144,7 @@ export default function ApplicantsMatching() {
 
   const handleShortlist = async (candidateId: string) => {
     try {
-      await shortlistCandidate(jobId.toString(), candidateId)
+      await shortlistCandidate(jobId, candidateId)
       toast.success('Candidate shortlisted successfully')
       loadData()
     } catch (error) {
@@ -162,7 +166,7 @@ export default function ApplicantsMatching() {
     try {
       await scheduleInterview({
         candidate_id: candidateId,
-        job_id: jobId.toString(),
+        job_id: jobId,
         job_title: job?.title,
         scheduled_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         interview_type: 'video',
@@ -180,16 +184,6 @@ export default function ApplicantsMatching() {
     return 'badge-danger'
   }
 
-  const incrementJobId = () => {
-    setJobId(prev => prev + 1)
-  }
-
-  const decrementJobId = () => {
-    if (jobId > 1) {
-      setJobId(prev => prev - 1)
-    }
-  }
-
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
@@ -203,34 +197,37 @@ export default function ApplicantsMatching() {
         <h2 className="section-title mb-4">Generate AI Shortlist</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {/* Job ID Input */}
+          {/* Job selection - search-as-you-type */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Job ID
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Job
             </label>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={decrementJobId}
-                className="px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
-              >
-                −
-              </button>
-              <input
-                type="number"
-                value={jobId}
-                onChange={(e) => setJobId(parseInt(e.target.value) || 1)}
-                min="1"
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-center"
-              />
-              <button
-                type="button"
-                onClick={incrementJobId}
-                className="px-3 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
-              >
-                +
-              </button>
-            </div>
+            <AutocompleteSearch
+              value={jobId ? (jobs.find((j) => j.id === jobId) ? `${jobs.find((j) => j.id === jobId)?.title} (${jobId})` : jobId) : jobSearchInput}
+              onChange={(v) => {
+                setJobSearchInput(v)
+                if (jobId) setJobId('')
+              }}
+              onSelect={(item) => {
+                setJobId((item as { id: string }).id)
+                setJobSearchInput('')
+              }}
+              fetchSuggestions={async (q) => {
+                const lower = (q || '').toLowerCase()
+                return jobs
+                  .filter((j) => ((j.title || '') + (j.id || '')).toLowerCase().includes(lower))
+                  .slice(0, 15)
+                  .map((j) => ({ id: j.id, title: j.title, department: j.department }))
+              }}
+              getSuggestionLabel={(s) => `${(s as { title?: string }).title || ''} (${(s as { id: string }).id})`}
+              placeholder="Select a job or type to search..."
+              inputClassName="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              minLength={0}
+              debounceMs={150}
+              maxSuggestions={15}
+              emptyOptionLabel="No matching jobs"
+              onEmptySelect={() => toast('No jobs match your search.', { icon: 'ℹ' })}
+            />
           </div>
 
           {/* Generate Button */}

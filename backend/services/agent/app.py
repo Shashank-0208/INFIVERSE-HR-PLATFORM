@@ -25,6 +25,17 @@ except Exception as e:
     print(f"Configuration error: {e}")
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
+# Ensure Hugging Face token is loaded before importing semantic engine
+hf_token = os.getenv("HF_TOKEN")
+if hf_token:
+    os.environ["HF_TOKEN"] = hf_token
+    # Also set other optimization variables
+    os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 # Import Phase 3 engine from shared semantic_engine module
 try:
     from semantic_engine.phase3_engine import (
@@ -59,9 +70,6 @@ else:
 from fastapi.openapi.utils import get_openapi
 
 # Security setup - Use JWT authentication
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'shared'))
-
 try:
     from jwt_auth import (
         security,
@@ -180,6 +188,8 @@ def get_db_connection():
     """Get MongoDB database connection"""
     try:
         db = get_mongo_db()
+        # Test the connection by attempting a simple operation
+        db.command('ping')
         return db
     except Exception as e:
         logger.error(f"Failed to get MongoDB connection: {e}")
@@ -219,7 +229,7 @@ def test_database(auth = Depends(auth_dependency)):
     db = None
     try:
         db = get_db_connection()
-        if not db:
+        if db is None:
             return {"status": "failed", "error": "Connection failed"}
         
         # MongoDB version of candidate count and sample query
@@ -235,8 +245,8 @@ def test_database(auth = Depends(auth_dependency)):
         logger.error(f"Database test failed: {e}")
         return {"status": "failed", "error": str(e)}
 
-@app.post("/match", response_model=MatchResponse, tags=["AI Matching Engine"], summary="AI-Powered Candidate Matching")
-def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
+@app.post("/match", tags=["AI Matching Engine"], summary="AI-Powered Candidate Matching")
+async def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
     """Phase 3 AI-powered candidate matching"""
     start_time = datetime.now()
     logger.info(f"Starting Phase 3 match for job_id: {request.job_id}")
@@ -244,16 +254,19 @@ def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
     
     try:
         db = get_db_connection()
-        if not db:
+        if db is None:
             logger.error("Database connection failed")
-            return MatchResponse(
-                job_id=request.job_id,
-                top_candidates=[],
-                total_candidates=0,
-                processing_time=0.0,
-                algorithm_version="3.0.0-phase3-production",
-                status="database_error"
-            )
+            return {
+                "job_id": request.job_id,
+                "matches": [],
+                "top_candidates": [],
+                "total_candidates": 0,
+                "algorithm_version": "3.0.0-phase3-production",
+                "processing_time": f"{0.0}s",
+                "ai_analysis": "Real AI semantic matching via Agent Service",
+                "agent_status": "disconnected",
+                "status": "database_error"
+            }
         
         logger.info("Database connection successful")
         
@@ -267,14 +280,17 @@ def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
         job_doc = db.jobs.find_one(job_query)
         
         if not job_doc:
-            return MatchResponse(
-                job_id=request.job_id,
-                top_candidates=[],
-                total_candidates=0,
-                processing_time=0.0,
-                algorithm_version="3.0.0-phase3-production",
-                status="job_not_found"
-            )
+            return {
+                "job_id": request.job_id,
+                "matches": [],
+                "top_candidates": [],
+                "total_candidates": 0,
+                "algorithm_version": "3.0.0-phase3-production",
+                "processing_time": f"{0.0}s",
+                "ai_analysis": "Real AI semantic matching via Agent Service",
+                "agent_status": "disconnected",
+                "status": "job_not_found"
+            }
         
         job_title = job_doc.get('title', '')
         job_desc = job_doc.get('description', '')
@@ -291,14 +307,17 @@ def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
         
         if not candidates:
             logger.warning("No candidates found in database")
-            return MatchResponse(
-                job_id=request.job_id,
-                top_candidates=[],
-                total_candidates=0,
-                processing_time=0.0,
-                algorithm_version="3.0.0-phase3-production",
-                status="no_candidates"
-            )
+            return {
+                "job_id": request.job_id,
+                "matches": [],
+                "top_candidates": [],
+                "total_candidates": 0,
+                "algorithm_version": "3.0.0-phase3-production",
+                "processing_time": f"{0.0}s",
+                "ai_analysis": "Real AI semantic matching via Agent Service",
+                "agent_status": "disconnected",
+                "status": "no_candidates"
+            }
         
         # Phase 3: Production AI Semantic Matching
         logger.info("Using Phase 3 Production AI semantic matching")
@@ -403,24 +422,28 @@ def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
             
             reasoning = "; ".join(reasoning_parts) if reasoning_parts else "Phase 3 AI semantic analysis"
             
-            scored_candidates.append(CandidateScore(
-                candidate_id=candidate_data['id'],
-                name=candidate_data['name'],
-                email=candidate_data['email'],
-                score=round(display_score, 1),
-                skills_match=skills_match[:5],
-                experience_match=f"{candidate_data.get('experience_years', 0)}y - Phase 3 matched",
-                location_match=score_breakdown.get('location_match', 0) > 0.5,
-                reasoning=reasoning
-            ))
+            # Add recommendation strength
+            recommendation_strength = "Strong Match" if display_score > 80 else "Good Match"
+            
+            scored_candidates.append({
+                "candidate_id": candidate_data['id'],
+                "name": candidate_data['name'],
+                "email": candidate_data['email'],
+                "score": round(display_score, 1),
+                "skills_match": ", ".join(skills_match[:5]),
+                "experience_match": f"{candidate_data.get('experience_years', 0)}y - Phase 3 matched",
+                "location_match": score_breakdown.get('location_match', 0) > 0.5,
+                "reasoning": reasoning,
+                "recommendation_strength": recommendation_strength
+            })
         
         # Sort by score
-        scored_candidates.sort(key=lambda x: x.score, reverse=True)
+        scored_candidates.sort(key=lambda x: x["score"], reverse=True)
         
         # Apply score differentiation
         for i in range(1, len(scored_candidates)):
-            if scored_candidates[i].score >= scored_candidates[i-1].score:
-                scored_candidates[i].score = round(scored_candidates[i-1].score - 0.8, 1)
+            if scored_candidates[i]["score"] >= scored_candidates[i-1]["score"]:
+                scored_candidates[i]["score"] = round(scored_candidates[i-1]["score"] - 0.8, 1)
         
         # Get top candidates
         top_candidates = scored_candidates[:10]
@@ -429,31 +452,38 @@ def match_candidates(request: MatchRequest, auth = Depends(auth_dependency)):
         
         logger.info(f"Phase 3 matching completed: {len(top_candidates)} top candidates found")
         
-        return MatchResponse(
-            job_id=request.job_id,
-            top_candidates=top_candidates,
-            total_candidates=len(candidates),
-            processing_time=round(processing_time, 3),
-            algorithm_version="3.0.0-phase3-production",
-            status="success"
-        )
+        return {
+            "job_id": request.job_id,
+            "matches": top_candidates,
+            "top_candidates": top_candidates,
+            "total_candidates": len(candidates),
+            "algorithm_version": "3.0.0-phase3-production",
+            "processing_time": f"{round(processing_time, 3)}s",
+            "ai_analysis": "Real AI semantic matching via Agent Service",
+            "agent_status": "connected",
+            "status": "success"
+        }
         
     except Exception as e:
         logger.error(f"Phase 3 matching error: {e}")
-        return MatchResponse(
-            job_id=request.job_id,
-            top_candidates=[],
-            total_candidates=0,
-            processing_time=(datetime.now() - start_time).total_seconds(),
-            algorithm_version="3.0.0-phase3-production",
-            status="error"
-        )
+        processing_time = (datetime.now() - start_time).total_seconds()
+        return {
+            "job_id": request.job_id,
+            "matches": [],
+            "top_candidates": [],
+            "total_candidates": 0,
+            "algorithm_version": "3.0.0-phase3-production",
+            "processing_time": f"{round(processing_time, 3)}s",
+            "ai_analysis": "Real AI semantic matching via Agent Service",
+            "agent_status": "error",
+            "status": "error"
+        }
 
 class BatchMatchRequest(BaseModel):
     job_ids: List[str]
 
 @app.post("/batch-match", tags=["AI Matching Engine"], summary="Batch AI Matching for Multiple Jobs")
-def batch_match_jobs(request: BatchMatchRequest, auth = Depends(auth_dependency)):
+async def batch_match_jobs(request: BatchMatchRequest, auth = Depends(auth_dependency)):
     """Batch AI matching for multiple jobs using Phase 3 semantic engine"""
     
     if not request.job_ids or len(request.job_ids) == 0:
@@ -483,11 +513,12 @@ def batch_match_jobs(request: BatchMatchRequest, auth = Depends(auth_dependency)
         if not jobs_data:
             # Return empty results instead of 404 for better API behavior
             return {
-                "success": True,
-                "message": "No jobs found matching the provided job IDs",
-                "results": [],
-                "total_jobs": 0,
-                "total_candidates": 0
+                "batch_results": {},
+                "total_jobs_processed": 0,
+                "total_candidates_analyzed": 0,
+                "algorithm_version": "3.0.0-phase3-production-batch",
+                "status": "success",
+                "agent_status": "disconnected"
             }
         
         # Get all candidates (MongoDB version)
@@ -522,7 +553,7 @@ def batch_match_jobs(request: BatchMatchRequest, auth = Depends(auth_dependency)
             })
         
         # Process batch matching with detailed candidate information
-        results = {}
+        batch_results = {}
         for job in jobs:
             job_id = job['id']
             job_requirements = (job.get('requirements') or '').lower()
@@ -555,38 +586,52 @@ def batch_match_jobs(request: BatchMatchRequest, auth = Depends(auth_dependency)
                     reasoning_parts.append(f"Location match: {candidate_location}")
                 reasoning_parts.append("Phase 3 AI semantic analysis")
                 
+                # Add recommendation strength
+                recommendation_strength = "Strong Match" if final_score > 80 else "Good Match"
+                
                 job_matches.append({
                     'candidate_id': candidate['id'],
                     'name': candidate['name'],
                     'email': candidate['email'],
                     'score': final_score,
-                    'skills_match': matched_skills,
+                    'skills_match': ", ".join(matched_skills),
                     'experience_match': f"{candidate.get('experience_years', 0)}y - Phase 3 matched",
                     'location_match': location_match,
-                    'reasoning': '; '.join(reasoning_parts)
+                    'reasoning': '; '.join(reasoning_parts),
+                    'recommendation_strength': recommendation_strength
                 })
             
-            results[str(job_id)] = {
+            batch_results[str(job_id)] = {
                 'job_id': job_id,
                 'matches': job_matches,
+                'top_candidates': job_matches,
+                'total_candidates': len(job_matches),
                 'algorithm': 'batch-production',
-                'processing_time': '0.5s'
+                'processing_time': '0.5s',
+                'ai_analysis': 'Real AI semantic matching via Agent Service'
             }
         
         return {
-            "batch_results": results,
+            "batch_results": batch_results,
             "total_jobs_processed": len(jobs),
             "total_candidates_analyzed": len(candidates),
             "algorithm_version": "3.0.0-phase3-production-batch",
             "status": "success",
-            "processing_time": "1.2s"
+            "agent_status": "connected"
         }
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Batch matching error: {e}")
-        raise HTTPException(status_code=500, detail=f"Batch matching failed: {str(e)}")
+        return {
+            "batch_results": {},
+            "total_jobs_processed": 0,
+            "total_candidates_analyzed": 0,
+            "algorithm_version": "3.0.0-phase3-production-batch",
+            "status": "error",
+            "agent_status": "error"
+        }
 
 @app.get("/analyze/{candidate_id}", tags=["Candidate Analysis"], summary="Detailed Candidate Analysis")
 def analyze_candidate(candidate_id: str, auth = Depends(auth_dependency)): 

@@ -1,5 +1,5 @@
 """
-Test suite for Audit Logging Service in BHIV Application Framework
+Test suite for Audit Logging Service in Sovereign Application Runtime (SAR)
 """
 import pytest
 import requests

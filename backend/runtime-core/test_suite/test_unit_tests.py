@@ -1,5 +1,5 @@
 """
-Unit Tests for BHIV Application Framework
+Unit Tests for Sovereign Application Runtime (SAR)
 These tests verify code functionality without requiring a running server
 """
 import sys
@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch, MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 class TestUnitTests:
-    """Unit tests for BHIV Application Framework components"""
+    """Unit tests for Sovereign Application Runtime (SAR) components"""
     
     def test_main_app_import(self):
         """Test that main application can be imported without errors"""

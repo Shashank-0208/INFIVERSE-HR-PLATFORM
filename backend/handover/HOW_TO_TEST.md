@@ -18,7 +18,7 @@ This document provides **one clean walkthrough** for testing the complete BHIV H
 ### **System Status**
 - **Services**: 6/6 operational (Gateway, Agent, LangGraph, 3 Portals)
 - **Endpoints**: 111 total (88 Gateway + 6 Agent + 25 LangGraph)
-- **Database**: PostgreSQL 17 with Schema v4.3.1 (19 tables)
+- **Database**: MongoDB Atlas (3 collections)
 - **Authentication**: Triple auth (API Key + Client JWT + Candidate JWT)
 - **Deployment**: Docker + Render Cloud (production ready)
 - **Docker Local**: ✅ All 7 containers healthy and operational

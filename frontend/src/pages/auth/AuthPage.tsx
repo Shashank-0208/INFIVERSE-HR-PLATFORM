@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage } from '../../utils/authStorage'
 
 type AuthMode = 'login' | 'signup'
 type UserRole = 'candidate' | 'recruiter' | 'client'
@@ -129,7 +130,7 @@ export default function AuthPage() {
         }
         
         // Role is already stored by AuthContext - just verify
-        const storedRole = localStorage.getItem('user_role') || selectedRole
+        const storedRole = authStorage.getItem('user_role') || selectedRole
         
         console.log('✅ Signup successful! Role:', storedRole, 'Redirecting to:', roleConfig[storedRole as UserRole]?.redirectPath)
         toast.success(`Account created successfully as ${roleConfig[storedRole as UserRole]?.title || selectedRole}!`)
@@ -147,21 +148,23 @@ export default function AuthPage() {
         
         // Get user's role from JWT token (stored by AuthContext during login)
         // AuthContext extracts role from token and stores it in localStorage
-        const roleFromStorage = localStorage.getItem('user_role') as UserRole
+        const roleFromStorage = authStorage.getItem('user_role') as UserRole
         const roleFromContext = userRole as UserRole
         
-        // Use role from context (from JWT token) or localStorage, then default to candidate
-        const finalRole: UserRole = (roleFromContext || roleFromStorage || 'candidate') as UserRole
+        // Prioritize role from context (from JWT token), then localStorage
+        // Only default to candidate if neither is available
+        let finalRole: UserRole = (roleFromContext || roleFromStorage) as UserRole
         
         // Ensure role is valid (must be one of the three roles)
-        const validRole: UserRole = (['candidate', 'recruiter', 'client'].includes(finalRole) 
-          ? finalRole 
-          : 'candidate') as UserRole
+        if (!finalRole || !['candidate', 'recruiter', 'client'].includes(finalRole)) {
+          console.warn('⚠️ Invalid or missing role, defaulting to candidate. Role from context:', roleFromContext, 'Role from storage:', roleFromStorage);
+          finalRole = 'candidate';
+        }
         
-        console.log('🚀 Login: User role from token:', validRole, 'Redirecting to:', roleConfig[validRole].redirectPath)
-        toast.success(`Login successful as ${roleConfig[validRole].title}!`)
+        console.log('🚀 Login: User role from token:', finalRole, 'Redirecting to:', roleConfig[finalRole].redirectPath)
+        toast.success(`Login successful as ${roleConfig[finalRole].title}!`)
         setIsLoading(false)
-        navigate(roleConfig[validRole].redirectPath)
+        navigate(roleConfig[finalRole].redirectPath)
       }
     } catch (err: any) {
       toast.error(err.message || 'An error occurred')

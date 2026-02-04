@@ -10,14 +10,12 @@ import {
   type Interview 
 } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage } from '../../utils/authStorage'
 
 export default function CandidateDashboard() {
   const navigate = useNavigate()
-  const { user, userName: authUserName } = useAuth()
-  const userName = authUserName || localStorage.getItem('user_name') || 'Candidate'
-  // Get backend candidate ID (integer) for API calls
-  const backendCandidateId = localStorage.getItem('backend_candidate_id')
-  const candidateId = backendCandidateId || user?.id || localStorage.getItem('candidate_id') || ''
+  const { userName: authUserName } = useAuth()
+  const userName = authUserName || authStorage.getItem('user_name') || 'Candidate'
 
   const [stats, setStats] = useState<DashboardStats>({
     total_applications: 0,
@@ -29,13 +27,23 @@ export default function CandidateDashboard() {
   const [recentApplications, setRecentApplications] = useState<Application[]>([])
   const [upcomingInterviews, setUpcomingInterviews] = useState<Interview[]>([])
   const [loading, setLoading] = useState(true)
+  // Only trust token that was present at mount; do not set authReady from user updates,
+  // since AuthContext may set user before token verification completes during signup.
+  const [authReady] = useState(() => !!authStorage.getItem('auth_token'))
 
   useEffect(() => {
+    const currentBackendId = authStorage.getItem('backend_candidate_id')
+    if (!authReady || !currentBackendId) {
+      setLoading(false)
+      return
+    }
     loadDashboardData()
-  }, [])
+  }, [authReady])
 
   const loadDashboardData = async () => {
-    if (!candidateId) {
+    const token = authStorage.getItem('auth_token')
+    const currentBackendId = authStorage.getItem('backend_candidate_id')
+    if (!currentBackendId || !token) {
       setLoading(false)
       return
     }
@@ -43,9 +51,9 @@ export default function CandidateDashboard() {
     try {
       setLoading(true)
       const [statsData, applicationsData, interviewsData] = await Promise.all([
-        getCandidateDashboardStats(candidateId),
-        getCandidateApplications(candidateId),
-        getInterviews(candidateId)
+        getCandidateDashboardStats(currentBackendId),
+        getCandidateApplications(currentBackendId),
+        getInterviews(currentBackendId)
       ])
       
       setStats(statsData)

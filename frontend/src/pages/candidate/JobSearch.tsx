@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { getJobs, applyForJob, getOrCreateBackendCandidateId, getCandidateApplications, type Job, type JobFilters } from '../../services/api'
+import { getJobs, getJobSuggestions, getJobSkillSuggestions, getJobLocationSuggestions, applyForJob, getOrCreateBackendCandidateId, getCandidateApplications, type Job, type JobFilters } from '../../services/api'
+import AutocompleteSearch from '../../components/AutocompleteSearch'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage } from '../../utils/authStorage'
 
 export default function JobSearch() {
   const { user } = useAuth()
@@ -21,8 +23,18 @@ export default function JobSearch() {
   })
 
   // Get backend candidate ID (integer) for API calls
-  const backendCandidateId = localStorage.getItem('backend_candidate_id')
-  const candidateId = backendCandidateId || user?.id || localStorage.getItem('candidate_id') || ''
+  const backendCandidateId = authStorage.getItem('backend_candidate_id')
+  const candidateId = backendCandidateId || user?.id || authStorage.getItem('candidate_id') || ''
+
+  /** For display values like "Title – Department", use only the title for API queries so backend can match. */
+  const jobSearchQueryFromDisplay = (displayValue: string): string => {
+    const v = (displayValue ?? '').trim()
+    if (!v) return ''
+    const enDash = v.indexOf(' – ')
+    const hyphen = v.indexOf(' - ')
+    const splitAt = enDash >= 0 ? enDash : (hyphen >= 0 ? hyphen : -1)
+    return splitAt >= 0 ? v.slice(0, splitAt).trim() : v
+  }
 
   useEffect(() => {
     fetchJobs()
@@ -30,10 +42,17 @@ export default function JobSearch() {
   }, [backendCandidateId])
 
   const fetchAppliedJobs = async () => {
-    if (!backendCandidateId) return
+    const currentBackendId = authStorage.getItem('backend_candidate_id')
+    if (!currentBackendId) {
+      console.log('No backend_candidate_id found, skipping fetch')
+      return
+    }
     try {
-      const applications = await getCandidateApplications(backendCandidateId)
+      console.log('Fetching applied jobs for candidate:', currentBackendId)
+      const applications = await getCandidateApplications(currentBackendId)
+      console.log('Fetched applications:', applications)
       const appliedIds = new Set(applications.map(app => app.job_id))
+      console.log('Applied job IDs:', Array.from(appliedIds))
       setAppliedJobIds(appliedIds)
     } catch (error) {
       console.error('Error fetching applied jobs:', error)
@@ -44,11 +63,12 @@ export default function JobSearch() {
     setLoading(true)
     try {
       const activeFilters: JobFilters = {}
-      if (filters.skills) activeFilters.skills = filters.skills
-      if (filters.location) activeFilters.location = filters.location
-      if (filters.experience) activeFilters.experience = filters.experience
-      if (filters.job_type) activeFilters.job_type = filters.job_type
-      if (filters.search) activeFilters.search = filters.search
+      if (filters.skills?.trim()) activeFilters.skills = filters.skills.trim()
+      if (filters.location?.trim()) activeFilters.location = filters.location.trim()
+      if (filters.experience?.trim()) activeFilters.experience = filters.experience.trim()
+      if (filters.job_type?.trim()) activeFilters.job_type = filters.job_type.trim()
+      const searchQuery = jobSearchQueryFromDisplay(filters.search ?? '')
+      if (searchQuery) activeFilters.search = searchQuery
 
       const data = await getJobs(Object.keys(activeFilters).length > 0 ? activeFilters : undefined)
       setJobs(data)
@@ -80,25 +100,62 @@ export default function JobSearch() {
     setApplying(job.id)
     try {
       // Ensure we have a backend candidate ID before applying
-      let actualCandidateId = localStorage.getItem('backend_candidate_id')
-      if (user && !actualCandidateId) {
+      let actualCandidateId = authStorage.getItem('backend_candidate_id')
+      
+      if (!actualCandidateId) {
+        // Try to get or create backend candidate ID
         actualCandidateId = await getOrCreateBackendCandidateId()
+        
         if (!actualCandidateId) {
-          toast.error('Please complete your profile setup before applying')
+          // If still no candidate ID, redirect to profile
+          toast.error('Please complete your profile setup before applying for jobs', {
+            duration: 4000,
+            icon: '⚠️',
+          })
+          // Optionally navigate to profile page
+          setTimeout(() => {
+            window.location.href = '/candidate/profile'
+          }, 2000)
           setApplying(null)
           return
         }
       }
       
-      await applyForJob(job.id, actualCandidateId || candidateId)
-      toast.success(`Successfully applied for ${job.title}!`)
+      console.log('Applying for job:', job.id, 'with candidate_id:', actualCandidateId)
+      const response = await applyForJob(job.id, actualCandidateId)
+      console.log('Apply response:', response)
       
-      // Add to applied jobs immediately
-      setAppliedJobIds(prev => new Set([...prev, job.id]))
-      setSelectedJob(null)
+      // Check if application was successful
+      if (response?.success !== false && !response?.error) {
+        toast.success(`Successfully applied for ${job.title}!`)
+        
+        // Add to applied jobs immediately
+        setAppliedJobIds(prev => new Set([...prev, job.id]))
+        setSelectedJob(null)
+        
+        // Refresh applied jobs list after a short delay to ensure backend has processed
+        setTimeout(() => {
+          fetchAppliedJobs()
+        }, 500)
+      } else {
+        throw new Error(response?.error || 'Failed to apply for job')
+      }
     } catch (error: any) {
       console.error('Error applying for job:', error)
-      toast.error(error?.message || 'Failed to apply for job')
+      
+      // Provide more specific error messages
+      if (error?.response?.status === 422) {
+        toast.error('Please complete your profile setup before applying. Redirecting to profile...', {
+          duration: 4000,
+        })
+        setTimeout(() => {
+          window.location.href = '/candidate/profile'
+        }, 2000)
+      } else if (error?.response?.status === 401) {
+        toast.error('Please login again to apply for jobs')
+      } else {
+        toast.error(error?.message || 'Failed to apply for job. Please try again.')
+      }
     } finally {
       setApplying(null)
     }
@@ -112,9 +169,19 @@ export default function JobSearch() {
       job_type: '',
       search: ''
     })
+    setLoading(true)
+    getJobs()
+      .then((data) => {
+        setJobs(data)
+        toast.success('Filters cleared. Showing all jobs.')
+      })
+      .catch((err) => {
+        console.error('Error fetching jobs after clear:', err)
+        toast.error('Failed to load jobs')
+      })
+      .finally(() => setLoading(false))
   }
 
-  const locations = ['Remote', 'Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Chennai', 'Pune']
   const experienceLevels = ['0-1', '1-3', '3-5', '5-8', '8+']
   const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Remote']
 
@@ -129,47 +196,62 @@ export default function JobSearch() {
       {/* Search & Filters */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700">
         <form onSubmit={handleSearch} className="space-y-4">
-          {/* Search Bar */}
+          {/* Search Bar - search-as-you-type suggestions */}
           <div className="relative">
-            <input
-              type="text"
-              placeholder="Search jobs by title, skills, or company..."
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="w-full px-4 py-3 pl-12 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 z-10 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
+            <AutocompleteSearch
+              value={filters.search ?? ''}
+              onChange={(v) => setFilters({ ...filters, search: v })}
+              fetchSuggestions={(q) => getJobSuggestions(jobSearchQueryFromDisplay(q))}
+              getSuggestionLabel={(s) => `${(s as { title?: string }).title || ''}${(s as { department?: string }).department ? ` – ${(s as { department?: string }).department}` : ''}`}
+              placeholder="Search jobs by title, skills, or company..."
+              inputClassName="w-full px-4 py-3 pl-12 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              minLength={1}
+              debounceMs={250}
+              maxSuggestions={10}
+              emptyOptionLabel="No matching jobs"
+              onEmptySelect={() => toast('No jobs match your search. Try different terms.', { icon: 'ℹ' })}
+            />
           </div>
 
           {/* Filter Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Skills Filter */}
+            {/* Skills Filter - autocomplete from job requirements */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Skills</label>
-              <input
-                type="text"
+              <AutocompleteSearch
+                value={filters.skills ?? ''}
+                onChange={(v) => setFilters({ ...filters, skills: v })}
+                fetchSuggestions={getJobSkillSuggestions}
+                getSuggestionLabel={(s) => (s as { label?: string }).label ?? (s as { id: string }).id}
                 placeholder="e.g., React, Python"
-                value={filters.skills}
-                onChange={(e) => setFilters({ ...filters, skills: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                inputClassName="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                minLength={1}
+                debounceMs={250}
+                maxSuggestions={15}
+                emptyOptionLabel="No matching skills"
+                onEmptySelect={() => toast('No skills found in jobs for this term. You can still search with it.', { icon: 'ℹ' })}
               />
             </div>
 
-            {/* Location Filter */}
+            {/* Location Filter - autocomplete from job locations */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location</label>
-              <select
-                value={filters.location}
-                onChange={(e) => setFilters({ ...filters, location: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Locations</option>
-                {locations.map(loc => (
-                  <option key={loc} value={loc}>{loc}</option>
-                ))}
-              </select>
+              <AutocompleteSearch
+                value={filters.location ?? ''}
+                onChange={(v) => setFilters({ ...filters, location: v })}
+                fetchSuggestions={getJobLocationSuggestions}
+                getSuggestionLabel={(s) => (s as { label?: string }).label ?? (s as { id: string }).id}
+                placeholder="e.g., Mumbai, Remote"
+                inputClassName="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                minLength={1}
+                debounceMs={250}
+                maxSuggestions={15}
+                emptyOptionLabel="No matching locations"
+                onEmptySelect={() => toast('No locations found in jobs for this term. You can still search with it.', { icon: 'ℹ' })}
+              />
             </div>
 
             {/* Experience Filter */}
@@ -382,35 +464,41 @@ export default function JobSearch() {
             </div>
             
             <div className="p-6 space-y-6">
-              {/* Job Info */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Job Info - same card pattern for all fields including Salary */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                 <div className="text-center p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
                   <p className="text-xs text-gray-500 dark:text-gray-400">Location</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.location}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.location || '—'}</p>
                 </div>
                 <div className="text-center p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
                   <p className="text-xs text-gray-500 dark:text-gray-400">Job Type</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.job_type}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.job_type || '—'}</p>
                 </div>
                 <div className="text-center p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
                   <p className="text-xs text-gray-500 dark:text-gray-400">Experience</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.experience_required}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.experience_required || '—'}</p>
                 </div>
                 <div className="text-center p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
                   <p className="text-xs text-gray-500 dark:text-gray-400">Department</p>
                   <p className="font-semibold text-gray-900 dark:text-white">{selectedJob.department || 'N/A'}</p>
                 </div>
-              </div>
-
-              {/* Salary */}
-              {(selectedJob.salary_min || selectedJob.salary_max) && (
-                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400">Salary Range</p>
-                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-                    ₹{selectedJob.salary_min?.toLocaleString()} - ₹{selectedJob.salary_max?.toLocaleString()}
+                <div className="text-center p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Salary Range (INR)</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {selectedJob.salary_min != null || selectedJob.salary_max != null
+                      ? (() => {
+                          const min = selectedJob.salary_min != null ? Number(selectedJob.salary_min) : null
+                          const max = selectedJob.salary_max != null ? Number(selectedJob.salary_max) : null
+                          const fmt = (n: number) => n.toLocaleString('en-IN')
+                          if (min != null && max != null) return `₹${fmt(min)} – ₹${fmt(max)}`
+                          if (min != null) return `₹${fmt(min)}+`
+                          if (max != null) return `Up to ₹${fmt(max)}`
+                          return 'Not mentioned'
+                        })()
+                      : 'Not mentioned'}
                   </p>
                 </div>
-              )}
+              </div>
 
               {/* Skills Required */}
               {selectedJob.skills_required && (Array.isArray(selectedJob.skills_required) ? selectedJob.skills_required.length > 0 : selectedJob.skills_required.length > 0) && (

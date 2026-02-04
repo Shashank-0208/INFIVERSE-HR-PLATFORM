@@ -1,5 +1,5 @@
 """
-Test suite for Tenant Service in BHIV Application Framework
+Test suite for Tenant Service in Sovereign Application Runtime (SAR)
 """
 import pytest
 import requests

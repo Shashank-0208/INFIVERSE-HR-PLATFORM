@@ -19,19 +19,47 @@ from pymongo import MongoClient
 logger = logging.getLogger(__name__)
 
 class Phase3SemanticEngine:
-    """Production Phase 3 Semantic Engine with advanced AI capabilities"""
+    """Production Phase 3 Semantic Engine with advanced AI capabilities (Singleton Pattern)"""
+    
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
     
     def __init__(self):
+        # Only initialize once
+        if Phase3SemanticEngine._initialized:
+            return
+            
         self.model = None
         self.company_preferences = defaultdict(dict)
         self.cache = {}
         self.executor = ThreadPoolExecutor(max_workers=4)
         self._initialize()
+        Phase3SemanticEngine._initialized = True
     
     def _initialize(self):
         """Initialize semantic model and learning components"""
         try:
             logger.info("Initializing Phase 3 Semantic Engine...")
+            
+            # Set Hugging Face token if available
+            hf_token = os.getenv("HF_TOKEN")
+            if hf_token:
+                logger.info("Using authenticated Hugging Face access with token")
+                # Set the token for the current process
+                os.environ["HF_TOKEN"] = hf_token
+            
+            # Initialize model with v4-compatible token usage
+            # Set token in environment (v4 approach)
+            if hf_token:
+                os.environ["HF_TOKEN"] = hf_token
+                logger.info("HF_TOKEN set in environment for v4 compatibility")
+            
+            # Load model without deprecated use_auth_token parameter
             self.model = SentenceTransformer('all-MiniLM-L6-v2')
             self._load_company_preferences()
             logger.info("Phase 3 Semantic Engine initialized successfully")

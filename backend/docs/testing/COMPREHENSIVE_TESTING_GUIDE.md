@@ -1,10 +1,10 @@
 # 🧪 BHIV HR Platform - Comprehensive Testing Guide
 
 **Enterprise Testing Framework & Strategy**  
-**Updated**: December 9, 2025  
+**Updated**: January 22, 2026  
 **Status**: ✅ Production Ready  
 **Test Coverage**: 111 endpoints (100% pass rate)  
-**Services**: 6 microservices with complete test automation
+**Services**: 3 microservices with complete test automation
 
 ---
 
@@ -80,10 +80,9 @@ tests/
 - **Input Validation**: XSS, SQL injection, and data sanitization
 
 #### **2. Service-Specific Testing**
-- **Gateway Tests (15 files)**: 80 endpoint validation with service integration
+- **Gateway Tests (15 files)**: 77 endpoint validation with service integration
 - **AI Agent Tests (8 files)**: 6 endpoint testing with Phase 3 semantic engine
 - **LangGraph Tests (18 files)**: 25 workflow endpoint automation testing
-- **Portal Tests (6 files)**: UI integration and authentication flows
 
 #### **3. Integration Testing (8 Files)**
 - **Client Portal Integration**: Complete enterprise client workflows

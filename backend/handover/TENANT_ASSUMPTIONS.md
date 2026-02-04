@@ -1,7 +1,9 @@
 # TENANT_ASSUMPTIONS.md
 **BHIV HR Platform - Tenant Architecture & Assumptions**  
 **Version**: 4.3.1  
-**Generated**: December 22, 2025  
+**Updated**: January 22, 2026  
+**Database**: MongoDB Atlas (migrated from PostgreSQL)  
+**Architecture**: Microservices with 111 endpoints  
 **Status**: Multi-Tenant Ready - Zero Dependency Handover  
 
 ---
@@ -23,17 +25,17 @@
 ### **1. CLIENT TENANT STRUCTURE**
 
 #### **Tenant Definition**
-```sql
--- Each client is a separate tenant
-CREATE TABLE clients (
-    id SERIAL PRIMARY KEY,
-    client_id VARCHAR(100) UNIQUE NOT NULL,  -- Tenant identifier
-    company_name VARCHAR(255) NOT NULL,      -- Tenant display name
-    password_hash VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE,
-    status VARCHAR(50) DEFAULT 'active',     -- Tenant status
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+```javascript
+// Each client is a separate tenant in MongoDB Atlas
+db.clients.insertOne({
+    _id: ObjectId(),           // MongoDB generated ID
+    client_id: "STRING",       // Tenant identifier
+    company_name: "STRING",    // Tenant display name
+    password_hash: "STRING",   // Bcrypt hashed password
+    email: "STRING",           // Contact email
+    status: "active",          // Tenant status
+    created_at: ISODate()      // Creation timestamp
+});
 ```
 
 #### **Current Tenant Data**
@@ -46,25 +48,25 @@ ENTERPRISE01 - Enterprise Solutions Corp (Active)
 ### **2. DATA ISOLATION ASSUMPTIONS**
 
 #### **Tenant-Aware Tables**
-```sql
--- Jobs are tenant-scoped
+```javascript
+// Jobs are tenant-scoped
 jobs.client_id → clients.client_id
 
--- Candidates are shared across tenants (job seekers)
+// Candidates are shared across tenants (job seekers)
 candidates.* → Global pool, accessible by all tenants
 
--- Applications link candidates to tenant jobs
-job_applications.job_id → jobs.id (tenant-scoped)
-job_applications.candidate_id → candidates.id (global)
+// Applications link candidates to tenant jobs
+applications.job_id → jobs._id (tenant-scoped)
+applications.candidate_id → candidates._id (global)
 
--- Feedback is tenant-scoped through job relationship
-feedback.job_id → jobs.id (tenant-scoped)
+// Feedback is tenant-scoped through job relationship
+feedback.job_id → jobs._id (tenant-scoped)
 
--- Interviews are tenant-scoped through job relationship
-interviews.job_id → jobs.id (tenant-scoped)
+// Interviews are tenant-scoped through job relationship
+interviews.job_id → jobs._id (tenant-scoped)
 
--- Offers are tenant-scoped through job relationship
-offers.job_id → jobs.id (tenant-scoped)
+// Offers are tenant-scoped through job relationship
+offers.job_id → jobs._id (tenant-scoped)
 ```
 
 #### **Shared vs Tenant-Scoped Data**
@@ -110,19 +112,20 @@ offers.job_id → jobs.id (tenant-scoped)
 #### **Query Filtering Assumptions**
 
 **Automatic Tenant Filtering**
-```sql
--- Jobs query (tenant-scoped)
-SELECT * FROM jobs WHERE client_id = :client_id AND status = 'active'
+```javascript
+// Jobs query (tenant-scoped)
+db.jobs.find({ client_id: "CLIENT_ID", status: "active" })
 
--- Applications query (tenant-scoped via job)
-SELECT ja.*, c.name 
-FROM job_applications ja
-JOIN jobs j ON ja.job_id = j.id
-JOIN candidates c ON ja.candidate_id = c.id
-WHERE j.client_id = :client_id
+// Applications query (tenant-scoped via job)
+db.applications.aggregate([
+  { $lookup: { from: "jobs", localField: "job_id", foreignField: "_id", as: "job" } },
+  { $lookup: { from: "candidates", localField: "candidate_id", foreignField: "_id", as: "candidate" } },
+  { $match: { "job.client_id": "CLIENT_ID" } },
+  { $project: { "candidate.name": 1, "job": 1, "status": 1, "applied_at": 1 } }
+])
 
--- Candidates query (shared - no filtering)
-SELECT * FROM candidates WHERE status = 'active'
+// Candidates query (shared - no filtering)
+db.candidates.find({ status: "active" })
 ```
 
 ---
@@ -207,11 +210,10 @@ EXAMPLE: Missing WHERE client_id = :client_id in job queries
 **Critical Code Patterns**
 ```python
 # CORRECT - Tenant-aware job query
-query = text("SELECT * FROM jobs WHERE client_id = :client_id AND status = 'active'")
-result = connection.execute(query, {"client_id": client_id})
+job_doc = await db.jobs.find_one({"client_id": client_id, "status": "active"})
 
 # INCORRECT - Could leak cross-tenant data
-query = text("SELECT * FROM jobs WHERE status = 'active'")  # Missing client_id filter
+db.jobs.find_one({"status": "active"})  # Missing client_id filter
 ```
 
 ### **3. CLIENT JWT TRUST ASSUMPTION**
@@ -228,6 +230,11 @@ RISK: Compromised JWT could access wrong tenant data
 # Current implementation trusts JWT client_id
 payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
 client_id = payload.get("client_id")  # Used for tenant context
+
+# Triple authentication system
+# - API Key authentication (system level)
+# - Client JWT (client authentication)
+# - Candidate JWT (candidate authentication)
 ```
 
 ### **4. NO CROSS-TENANT VALIDATION ASSUMPTION**
@@ -254,11 +261,24 @@ CANDIDATE_JWT_SECRET_KEY=<candidate_jwt_secret>
 ```
 
 ### **Database Configuration**
-```sql
--- No tenant-specific database settings
--- All tenants use same connection pool
--- No per-tenant resource limits
+```yaml
+# MongoDB Atlas configuration
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DB_NAME=bhiv_hr
+# Tenant context included in all documents
+# Shared connection pool with automatic scaling
+# Per-tenant read/write optimization via Atlas
+# Collection-level security policies
+# Triple authentication system: API Key + Client JWT + Candidate JWT
+# 111 operational endpoints across 6 services
+# Production-ready single-tenant system with multi-tenant framework ready
 ```
+
+### **MongoDB Atlas Integration**
+- **Shared Cluster**: All tenants use same Atlas cluster
+- **Tenant Context**: `client_id` field in relevant documents
+- **Query Optimization**: Tenant-aware indexing and aggregation
+- **Performance**: Atlas handles connection pooling and optimization
 
 ### **Service Configuration**
 ```yaml
@@ -272,16 +292,19 @@ CANDIDATE_JWT_SECRET_KEY=<candidate_jwt_secret>
 ## 📊 **TENANT DATA PATTERNS**
 
 ### **Current Tenant Usage**
-```sql
--- Tenant job distribution
-SELECT client_id, COUNT(*) as job_count 
-FROM jobs 
-GROUP BY client_id;
+```javascript
+// Tenant job distribution in MongoDB
+db.jobs.aggregate([
+  { $group: { _id: "$client_id", job_count: { $sum: 1 } } }
+])
 
--- Expected results:
--- TECH001: 2-3 jobs
--- STARTUP01: 1-2 jobs  
--- ENTERPRISE01: 1-2 jobs
+// Expected results:
+// TECH001: 2-3 jobs
+// STARTUP01: 1-2 jobs  
+// ENTERPRISE01: 1-2 jobs
+
+// MongoDB Atlas metrics via dashboard
+// Real-time monitoring of tenant resource usage
 ```
 
 ### **Tenant Relationship Mapping**

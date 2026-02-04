@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useSidebar } from '../../context/SidebarContext'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage, clearAuthStorage } from '../../utils/authStorage'
 
 interface RoleNavbarProps {
   role: 'candidate' | 'recruiter' | 'client'
@@ -52,27 +53,13 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
 
   const handleLogout = async () => {
     try {
-      // Sign out and clear auth tokens
       await signOut()
-      
-      // Clear all localStorage items
-      localStorage.removeItem('user_role')
-      localStorage.removeItem('user_email')
-      localStorage.removeItem('user_name')
-      localStorage.removeItem('isAuthenticated')
-      localStorage.removeItem('candidate_id')
-      localStorage.removeItem('backend_candidate_id')
-      localStorage.removeItem('auth_token')
-      
-      // Navigate to home page
+      clearAuthStorage()
       navigate('/', { replace: true })
-      
-      // Force page reload to clear all state
       window.location.href = '/'
     } catch (error) {
       console.error('Logout error:', error)
-      // Even if signOut fails, clear localStorage and navigate
-      localStorage.clear()
+      clearAuthStorage()
       navigate('/', { replace: true })
       window.location.href = '/'
     }
@@ -129,20 +116,6 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
         
         {/* Right Side Actions */}
         <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-3">
-          {/* Search Bar - Desktop Only */}
-          <div className="hidden xl:flex items-center">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-64 px-4 py-2 pl-10 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-              />
-              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-          </div>
-
           {/* Theme Toggle */}
           <button 
             onClick={toggleTheme}
@@ -177,12 +150,12 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
             >
               <div className={`w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br ${config.gradient} rounded-full flex items-center justify-center shadow-md`}>
                 <span className="text-white font-semibold text-xs sm:text-sm">
-                  {userName?.charAt(0).toUpperCase() || localStorage.getItem('user_name')?.charAt(0).toUpperCase() || role.charAt(0).toUpperCase()}
+                  {userName?.charAt(0).toUpperCase() || authStorage.getItem('user_name')?.charAt(0).toUpperCase() || role.charAt(0).toUpperCase()}
                 </span>
               </div>
               <div className="hidden lg:block text-left">
                 <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {userName || localStorage.getItem('user_name') || role.charAt(0).toUpperCase() + role.slice(1)}
+                  {userName || authStorage.getItem('user_name') || role.charAt(0).toUpperCase() + role.slice(1)}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {config.title}

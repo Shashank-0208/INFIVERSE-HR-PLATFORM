@@ -1,4 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, Security, Response, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+import json
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -20,7 +23,7 @@ from app.database import get_mongo_db, get_mongo_client
 from app.db_helpers import find_one_by_field, find_many, count_documents, insert_one, update_one, delete_one, convert_objectid_to_str
 from bson import ObjectId
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field, model_validator
 import time
 import psutil
 
@@ -35,12 +38,7 @@ except ImportError:
 except Exception as e:
     print(f"Configuration error: {e}")
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-try:
-    from routes.auth import router as auth_router
-except ImportError:
-    # Fallback if auth routes not available
-    from fastapi import APIRouter
-    auth_router = APIRouter()
+# Auth routes import removed - using /v1/auth/ endpoints instead
 try:
     import sys
     import os
@@ -48,6 +46,15 @@ try:
     gateway_dir = os.path.dirname(os.path.dirname(__file__))
     sys.path.insert(0, gateway_dir)
     from monitoring import monitor, log_resume_processing, log_matching_performance, log_user_activity, log_error
+    # Import proper JWT authentication functions and security scheme
+    from jwt_auth import (
+        get_auth as jwt_get_auth, 
+        get_api_key as jwt_get_api_key, 
+        validate_api_key as jwt_validate_api_key,
+        security as jwt_security,
+        get_recruiter_auth as jwt_get_recruiter_auth,
+        require_role as jwt_require_role
+    )
 except ImportError:
     # Fallback if monitoring module is not available
     class MockMonitor:
@@ -62,14 +69,62 @@ except ImportError:
     def log_matching_performance(*args, **kwargs): pass
     def log_user_activity(*args, **kwargs): pass
     def log_error(*args, **kwargs): pass
+    
+    # Fallback: try to import jwt_auth from parent directory
+    try:
+        import sys
+        import os
+        gateway_dir = os.path.dirname(os.path.dirname(__file__))
+        sys.path.insert(0, gateway_dir)
+        from jwt_auth import (
+            get_auth as jwt_get_auth, 
+            get_api_key as jwt_get_api_key, 
+            validate_api_key as jwt_validate_api_key,
+            security as jwt_security,
+            get_recruiter_auth as jwt_get_recruiter_auth,
+            require_role as jwt_require_role
+        )
+    except ImportError:
+        jwt_get_auth = None
+        jwt_get_api_key = None
+        jwt_validate_api_key = None
+        jwt_security = None
+        jwt_get_recruiter_auth = None
+        jwt_require_role = None
 
-security = HTTPBearer()
+# Use security scheme from jwt_auth.py (with auto_error=False) if available
+# Otherwise create a fallback with auto_error=False to allow credentials to be None
+if jwt_security is not None:
+    security = jwt_security
+else:
+    security = HTTPBearer(auto_error=False)
 
 app = FastAPI(
     title="BHIV HR Platform API Gateway",
     version="4.2.0",
     description="Enterprise HR Platform with Advanced Security Features"
 )
+
+# Exception handler for validation errors
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Custom handler for validation errors to provide detailed error messages"""
+    errors = []
+    for error in exc.errors():
+        field = ".".join(str(loc) for loc in error["loc"])
+        errors.append({
+            "field": field,
+            "message": error["msg"],
+            "type": error["type"]
+        })
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": errors,
+            "message": "Validation error: Please check the request data",
+            "errors": errors
+        }
+    )
 
 # CORS Configuration - Allow Vercel frontend and all origins for flexibility
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
@@ -87,8 +142,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include auth routes
-app.include_router(auth_router)
+# Auth routes removed - using /v1/auth/ endpoints instead
 
 # Include AI integration routes
 try:
@@ -212,11 +266,60 @@ class JobCreate(BaseModel):
     title: str
     department: str  # Required: e.g., "Engineering", "Marketing", "Sales"
     location: str
-    experience_level: str  # Required: "entry", "mid", "senior", "lead"
+    experience_level: str  # Required: "entry", "mid", "senior", "lead" (case-insensitive)
     requirements: str
     description: str
     client_id: Optional[int] = 1
     employment_type: Optional[str] = "Full-time"
+    salary_min: Optional[float] = None  # Optional salary range (INR)
+    salary_max: Optional[float] = None
+    # Support frontend field name aliases for flexibility
+    experience_required: Optional[str] = Field(None, alias='experience_required', exclude=True)
+    job_type: Optional[str] = Field(None, alias='job_type', exclude=True)
+    skills_required: Optional[str] = Field(None, alias='skills_required', exclude=True)
+    
+    @model_validator(mode='before')
+    @classmethod
+    def map_frontend_fields(cls, data: Any) -> Any:
+        """Map frontend field names to backend field names for compatibility"""
+        if isinstance(data, dict):
+            # Map experience_required to experience_level if experience_level not provided
+            if 'experience_required' in data and 'experience_level' not in data:
+                data['experience_level'] = data.pop('experience_required')
+            # Map job_type to employment_type if employment_type not provided
+            if 'job_type' in data and 'employment_type' not in data:
+                data['employment_type'] = data.pop('job_type')
+            # Map skills_required to requirements if requirements not provided
+            if 'skills_required' in data and 'requirements' not in data:
+                skills = data['skills_required']
+                if isinstance(skills, list):
+                    data['requirements'] = ', '.join(str(s) for s in skills)
+                else:
+                    data['requirements'] = str(skills)
+                data.pop('skills_required')
+        return data
+    
+    @field_validator('experience_level', mode='before')
+    @classmethod
+    def normalize_experience_level(cls, v) -> str:
+        """Normalize experience_level to lowercase for consistency"""
+        if v is None:
+            raise ValueError('experience_level is required')
+        if not isinstance(v, str):
+            v = str(v)
+        if not v.strip():
+            raise ValueError('experience_level cannot be empty')
+        normalized = v.lower().strip()
+        # Map common variations to standard values
+        mapping = {
+            'entry': 'entry',
+            'mid': 'mid',
+            'middle': 'mid',
+            'senior': 'senior',
+            'lead': 'lead',
+            'leadership': 'lead'
+        }
+        return mapping.get(normalized, normalized)
     
     model_config = {
         "json_schema_extra": {
@@ -260,14 +363,18 @@ class JobOffer(BaseModel):
     terms: str
 
 class ClientLogin(BaseModel):
-    client_id: str
+    client_id: Optional[str] = None
+    email: Optional[str] = None
     password: str
+
+import uuid
 
 class ClientRegister(BaseModel):
     client_id: str
     company_name: str
     contact_email: str
     password: str
+    client_code: str = None  # Optional, will be generated if not provided
 
 class TwoFASetup(BaseModel):
     user_id: str
@@ -334,6 +441,7 @@ class CandidateRegister(BaseModel):
     technical_skills: Optional[str] = None
     education_level: Optional[str] = None
     seniority_level: Optional[str] = None
+    role: Optional[str] = "candidate"  # Support recruiter role registration
 
 class CandidateLogin(BaseModel):
     email: str
@@ -357,41 +465,52 @@ class JobApplication(BaseModel):
 # MongoDB connection is handled by app.database module
 # Use: db = await get_mongo_db() for async database access
 
-def validate_api_key(api_key: str) -> bool:
-    expected_key = os.getenv("API_KEY_SECRET")
-    return api_key == expected_key
+# Use proper JWT authentication from jwt_auth.py module
+# If import failed, define fallback functions
+if jwt_get_auth is not None:
+    # Use the proper authentication functions from jwt_auth.py
+    get_auth = jwt_get_auth
+    get_api_key = jwt_get_api_key
+    validate_api_key = jwt_validate_api_key
+else:
+    # Fallback: define basic functions if import failed
+    def validate_api_key(api_key: str) -> bool:
+        expected_key = os.getenv("API_KEY_SECRET")
+        return api_key == expected_key
 
-def get_api_key(credentials: HTTPAuthorizationCredentials = Security(security)):
-    if not credentials or not validate_api_key(credentials.credentials):
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    return credentials.credentials
+    def get_api_key(credentials: HTTPAuthorizationCredentials = Security(security)):
+        if not credentials or not validate_api_key(credentials.credentials):
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        return credentials.credentials
 
-def get_auth(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Dual authentication: API key or client JWT token"""
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    
-    # Try API key first
-    if validate_api_key(credentials.credentials):
-        return {"type": "api_key", "credentials": credentials.credentials}
-    
-    # Try client JWT token
-    try:
-        jwt_secret = os.getenv("JWT_SECRET_KEY")
-        payload = jwt.decode(credentials.credentials, jwt_secret, algorithms=["HS256"])
-        return {"type": "client_token", "client_id": payload.get("client_id")}
-    except:
-        pass
-    
-    # Try candidate JWT token
-    try:
-        candidate_jwt_secret = os.getenv("CANDIDATE_JWT_SECRET_KEY")
-        payload = jwt.decode(credentials.credentials, candidate_jwt_secret, algorithms=["HS256"])
-        return {"type": "candidate_token", "candidate_id": payload.get("candidate_id")}
-    except:
-        pass
-    
-    raise HTTPException(status_code=401, detail="Invalid authentication")
+    def get_auth(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)):
+        """Dual authentication: API key or client JWT token"""
+        if not credentials:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        # Try API key first
+        if validate_api_key(credentials.credentials):
+            return {"type": "api_key", "credentials": credentials.credentials}
+        
+        # Try client JWT token
+        try:
+            jwt_secret = os.getenv("JWT_SECRET_KEY")
+            if jwt_secret:
+                payload = jwt.decode(credentials.credentials, jwt_secret, algorithms=["HS256"])
+                return {"type": "client_token", "client_id": payload.get("client_id")}
+        except Exception as e:
+            pass
+        
+        # Try candidate JWT token
+        try:
+            candidate_jwt_secret = os.getenv("CANDIDATE_JWT_SECRET_KEY")
+            if candidate_jwt_secret:
+                payload = jwt.decode(credentials.credentials, candidate_jwt_secret, algorithms=["HS256"])
+                return {"type": "candidate_token", "candidate_id": payload.get("candidate_id")}
+        except Exception as e:
+            pass
+        
+        raise HTTPException(status_code=401, detail="Invalid authentication")
 
 # Core API Endpoints (5 endpoints)
 @app.get("/openapi.json", tags=["Core API Endpoints"])
@@ -460,7 +579,7 @@ async def test_candidates_db(api_key: str = Depends(get_api_key)):
 
 # Job Management (2 endpoints)
 @app.post("/v1/jobs", tags=["Job Management"])
-async def create_job(job: JobCreate, auth = Depends(get_auth)):
+async def create_job(job: JobCreate, auth: dict = Depends(get_auth)):
     """Create New Job Posting
     
     **Required Fields:**
@@ -471,8 +590,21 @@ async def create_job(job: JobCreate, auth = Depends(get_auth)):
     - requirements: Job requirements
     - description: Job description
     
-    **Authentication:** Bearer token required
+    **Authentication:** Bearer token required (API key, recruiter, or client JWT token)
     """
+    # Check if user has permission to create jobs
+    # API keys have full access
+    if auth.get("type") == "api_key":
+        pass  # API keys have full access
+    else:
+        # For JWT tokens, check role
+        user_role = auth.get("role", "")
+        if user_role not in ["recruiter", "client", "admin"]:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access denied. Job creation requires recruiter, client, or admin role. Current role: {user_role}"
+            )
+    
     try:
         db = await get_mongo_db()
         document = {
@@ -485,6 +617,16 @@ async def create_job(job: JobCreate, auth = Depends(get_auth)):
             "status": "active",
             "created_at": datetime.now(timezone.utc)
         }
+        # Add optional fields if provided
+        if job.employment_type:
+            document["employment_type"] = job.employment_type
+        if job.client_id:
+            document["client_id"] = job.client_id
+        if job.salary_min is not None:
+            document["salary_min"] = float(job.salary_min)
+        if job.salary_max is not None:
+            document["salary_max"] = float(job.salary_max)
+        
         result = await db.jobs.insert_one(document)
         job_id = str(result.inserted_id)
         
@@ -494,22 +636,93 @@ async def create_job(job: JobCreate, auth = Depends(get_auth)):
             "created_at": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
-        return {
-            "message": "Job creation failed",
-            "error": str(e),
-            "status": "failed"
-        }
+        raise HTTPException(
+            status_code=500,
+            detail=f"Job creation failed: {str(e)}"
+        )
+
+
+def _job_salary_from_doc(doc: Dict[str, Any]) -> tuple:
+    """Derive (salary_min, salary_max) from a job document for backward compatibility.
+    Supports: salary_min/salary_max (current), salary_range (string, e.g. seed data),
+    and salary (single number). Returns (min, max) with None where not available."""
+    try:
+        smin = doc.get("salary_min")
+        smax = doc.get("salary_max")
+        if smin is not None and smax is not None:
+            return (float(smin) if smin != "" else None, float(smax) if smax != "" else None)
+        if smin is not None:
+            return (float(smin) if smin != "" else None, float(smax) if smax and smax != "" else None)
+        if smax is not None:
+            return (float(smin) if smin and smin != "" else None, float(smax) if smax != "" else None)
+    except (TypeError, ValueError):
+        pass
+    # Legacy: salary_range string (e.g. "$120,000 - $150,000" or "500000-800000")
+    salary_range = doc.get("salary_range")
+    if salary_range and isinstance(salary_range, str):
+        s = salary_range.strip()
+        # Remove common prefixes and split on dash
+        s_clean = re.sub(r"[$€£,\s]", "", s)
+        parts = re.split(r"[-–—]", s_clean, maxsplit=1)
+        if len(parts) >= 2:
+            try:
+                low = float(parts[0].strip())
+                high = float(parts[1].strip())
+                if low <= high:
+                    return (low, high)
+                return (high, low)
+            except (TypeError, ValueError):
+                pass
+        try:
+            single = float(s_clean)
+            return (single, single)
+        except (TypeError, ValueError):
+            pass
+    # Legacy: single salary number
+    salary = doc.get("salary")
+    if salary is not None and salary != "":
+        try:
+            v = float(salary)
+            if v >= 0:
+                return (v, v)
+        except (TypeError, ValueError):
+            pass
+    return (None, None)
+
 
 @app.get("/v1/jobs", tags=["Job Management"])
-async def list_jobs():
-    """List All Active Jobs (Public Endpoint)"""
+async def list_jobs(
+    search: Optional[str] = None,
+    skills: Optional[str] = None,
+    location: Optional[str] = None,
+    experience: Optional[str] = None,
+    job_type: Optional[str] = None,
+):
+    """List Active Jobs with optional search and filters (Public Endpoint)."""
     try:
         db = await get_mongo_db()
-        cursor = db.jobs.find({"status": "active"}).sort("created_at", -1).limit(100)
+        query = {"status": "active"}
+        if search and search.strip():
+            q = re.escape(search.strip())[:100]
+            query["$or"] = [
+                {"title": {"$regex": q, "$options": "i"}},
+                {"department": {"$regex": q, "$options": "i"}},
+                {"requirements": {"$regex": q, "$options": "i"}},
+                {"description": {"$regex": q, "$options": "i"}},
+            ]
+        if skills and skills.strip():
+            query["requirements"] = {"$regex": re.escape(skills.strip())[:200], "$options": "i"}
+        if location and location.strip():
+            query["location"] = {"$regex": re.escape(location.strip())[:100], "$options": "i"}
+        if experience and experience.strip():
+            query["experience_level"] = {"$regex": re.escape(experience.strip())[:50], "$options": "i"}
+        if job_type and job_type.strip():
+            query["job_type"] = {"$regex": re.escape(job_type.strip())[:50], "$options": "i"}
+        cursor = db.jobs.find(query).sort("created_at", -1).limit(100)
         jobs_list = await cursor.to_list(length=100)
-        
         jobs = []
         for doc in jobs_list:
+            salary_min, salary_max = _job_salary_from_doc(doc)
             jobs.append({
                 "id": str(doc["_id"]),
                 "title": doc.get("title"),
@@ -518,16 +731,215 @@ async def list_jobs():
                 "experience_level": doc.get("experience_level"),
                 "requirements": doc.get("requirements"),
                 "description": doc.get("description"),
+                "job_type": doc.get("job_type") or doc.get("employment_type"),
+                "employment_type": doc.get("employment_type"),
+                "salary_min": salary_min,
+                "salary_max": salary_max,
                 "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
             })
-        
         return {"jobs": jobs, "count": len(jobs)}
     except Exception as e:
         return {"jobs": [], "count": 0, "error": str(e)}
 
+
+@app.get("/v1/jobs/autocomplete", tags=["Job Management"])
+async def jobs_autocomplete(q: Optional[str] = None, limit: int = 10):
+    """Search-as-you-type: return job suggestions by title or department (public for candidate job search)."""
+    def _normalize_autocomplete_query(raw: str) -> str:
+        """Normalize user query for autocomplete matching.
+        - Removes/normalizes special characters (/, \\, -, etc.) into spaces
+        - Keeps only letters/numbers/spaces for fuzzy matching
+        """
+        if raw is None:
+            return ""
+        s = str(raw).strip()
+        if not s:
+            return ""
+        # Convert common separators/symbols into spaces, then strip any remaining non-alphanumerics.
+        s = re.sub(r"[\\/]+", " ", s)
+        s = re.sub(r"[^A-Za-z0-9]+", " ", s)
+        s = re.sub(r"\s+", " ", s).strip()
+        return s[:50]
+
+    def _fuzzy_regex_from_query(norm: str) -> Optional[str]:
+        """Build a fuzzy regex that matches tokens with any non-word separators between them.
+        Example: 'AR VR Engineer' -> 'AR[\\s\\W_]*VR[\\s\\W_]*Engineer'
+        """
+        tokens = [t for t in (norm or "").split(" ") if t]
+        if not tokens:
+            return None
+        return r"[\s\W_]*".join(re.escape(t) for t in tokens)[:200]
+
+    if not q or not str(q).strip():
+        return {"suggestions": []}
+    q_norm = _normalize_autocomplete_query(q)
+    if not q_norm:
+        return {"suggestions": []}
+    limit = max(1, min(limit, 20))
+    try:
+        db = await get_mongo_db()
+        regex_pat = _fuzzy_regex_from_query(q_norm) or re.escape(q_norm)
+        regex = {"$regex": regex_pat, "$options": "i"}
+        cursor = db.jobs.find({
+            "status": "active",
+            "$or": [{"title": regex}, {"department": regex}]
+        }).sort("created_at", -1).limit(limit)
+        jobs_list = await cursor.to_list(length=limit)
+        suggestions = []
+        for doc in jobs_list:
+            suggestions.append({
+                "id": str(doc["_id"]),
+                "title": doc.get("title") or "",
+                "department": doc.get("department") or "",
+                "location": doc.get("location") or "",
+            })
+        return {"suggestions": suggestions}
+    except Exception as e:
+        return {"suggestions": [], "error": str(e)}
+
+
+def _extract_skills_from_requirements(requirements: str) -> set:
+    """Extract skill-like tokens from job requirements string (comma/space separated)."""
+    if not requirements or not isinstance(requirements, str):
+        return set()
+    seen = set()
+    for part in re.split(r"[,/\n;|]+", requirements):
+        for token in part.split():
+            token = token.strip()
+            if len(token) >= 2 and re.match(r"^[A-Za-z0-9.+_-]+$", token):
+                seen.add(token)
+    return seen
+
+
+@app.get("/v1/jobs/skills/autocomplete", tags=["Job Management"])
+async def job_skills_autocomplete(q: Optional[str] = None, limit: int = 15):
+    """Search-as-you-type: return skill suggestions from active jobs' requirements (public for candidate browse jobs)."""
+    if not q or not str(q).strip():
+        return {"suggestions": []}
+    q = str(q).strip()[:50]
+    # Normalize query to handle special characters like C/C++, AR/VR, etc.
+    q_norm = re.sub(r"[\\/]+", " ", q)
+    q_norm = re.sub(r"[^A-Za-z0-9]+", " ", q_norm)
+    q_norm = re.sub(r"\s+", " ", q_norm).strip().lower()
+    if not q_norm:
+        return {"suggestions": []}
+    limit = max(1, min(limit, 25))
+    try:
+        db = await get_mongo_db()
+        cursor = db.jobs.find({"status": "active"}, {"requirements": 1})
+        jobs_list = await cursor.to_list(length=500)
+        all_skills = set()
+        for doc in jobs_list:
+            req = doc.get("requirements") or ""
+            all_skills.update(_extract_skills_from_requirements(req))
+        def _norm_token(s: str) -> str:
+            return re.sub(r"[^a-z0-9]+", "", (s or "").lower())
+
+        q_key = _norm_token(q_norm)
+        matching = sorted(
+            s for s in all_skills
+            if q_key and q_key in _norm_token(s)
+        )[:limit]
+        return {"suggestions": [{"id": s, "label": s} for s in matching]}
+    except Exception as e:
+        return {"suggestions": [], "error": str(e)}
+
+
+@app.get("/v1/jobs/locations/autocomplete", tags=["Job Management"])
+async def job_locations_autocomplete(q: Optional[str] = None, limit: int = 15):
+    """Search-as-you-type: return location suggestions from active jobs (public for candidate browse jobs)."""
+    if not q or not str(q).strip():
+        return {"suggestions": []}
+    q = str(q).strip()[:50]
+    q_norm = re.sub(r"[\\/]+", " ", q)
+    q_norm = re.sub(r"[^A-Za-z0-9]+", " ", q_norm)
+    q_norm = re.sub(r"\s+", " ", q_norm).strip()
+    if not q_norm:
+        return {"suggestions": []}
+    limit = max(1, min(limit, 25))
+    try:
+        db = await get_mongo_db()
+        regex_pat = r"[\s\W_]*".join(re.escape(t) for t in q_norm.split(" ") if t)[:200]
+        regex = {"$regex": regex_pat, "$options": "i"}
+        cursor = db.jobs.find({"status": "active", "location": regex}, {"location": 1})
+        jobs_list = await cursor.to_list(length=500)
+        seen = set()
+        for doc in jobs_list:
+            loc = doc.get("location")
+            if loc and isinstance(loc, str) and loc.strip():
+                seen.add(loc.strip())
+        matching = sorted(seen)[:limit]
+        return {"suggestions": [{"id": s, "label": s} for s in matching]}
+    except Exception as e:
+        return {"suggestions": [], "error": str(e)}
+
+
+@app.get("/v1/jobs/{job_id}", tags=["Job Management"])
+async def get_job_by_id(job_id: str):
+    """Get a single job by ID (MongoDB ObjectId string or legacy id)."""
+    if not job_id:
+        raise HTTPException(status_code=400, detail="Job ID is required")
+    try:
+        db = await get_mongo_db()
+        try:
+            doc = await db.jobs.find_one({"_id": ObjectId(job_id)})
+        except Exception:
+            doc = await db.jobs.find_one({"id": job_id})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Job not found")
+        salary_min, salary_max = _job_salary_from_doc(doc)
+        return {
+            "id": str(doc["_id"]),
+            "title": doc.get("title"),
+            "department": doc.get("department"),
+            "location": doc.get("location"),
+            "experience_level": doc.get("experience_level"),
+            "requirements": doc.get("requirements"),
+            "description": doc.get("description"),
+            "job_type": doc.get("job_type") or doc.get("employment_type"),
+            "employment_type": doc.get("employment_type"),
+            "salary_min": salary_min,
+            "salary_max": salary_max,
+            "status": doc.get("status"),
+            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ShortlistRequest(BaseModel):
+    candidate_id: str
+
+@app.post("/v1/jobs/{job_id}/shortlist", tags=["Job Management"])
+async def shortlist_candidate_for_job(job_id: str, body: ShortlistRequest, auth=Depends(get_auth)):
+    """Mark a candidate as shortlisted for a job (upsert job_application with status shortlisted)."""
+    if not job_id or not body.candidate_id:
+        raise HTTPException(status_code=400, detail="job_id and candidate_id are required")
+    try:
+        db = await get_mongo_db()
+        now = datetime.now(timezone.utc)
+        existing = await db.job_applications.find_one({"job_id": job_id, "candidate_id": body.candidate_id})
+        if existing:
+            await db.job_applications.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {"status": "shortlisted", "updated_at": now}}
+            )
+        else:
+            await db.job_applications.insert_one({
+                "job_id": job_id,
+                "candidate_id": body.candidate_id,
+                "status": "shortlisted",
+                "created_at": now,
+                "updated_at": now,
+            })
+        return {"message": "Candidate shortlisted", "job_id": job_id, "candidate_id": body.candidate_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Candidate Management (5 endpoints)
 @app.get("/v1/candidates", tags=["Candidate Management"])
-async def get_all_candidates(limit: int = 50, offset: int = 0, api_key: str = Depends(get_api_key)):
+async def get_all_candidates(limit: int = 50, offset: int = 0, auth=Depends(get_auth)):
     """Get All Candidates with Pagination"""
     try:
         db = await get_mongo_db()
@@ -563,7 +975,7 @@ async def get_all_candidates(limit: int = 50, offset: int = 0, api_key: str = De
 
 # Analytics & Statistics - Move stats endpoint before parameterized routes
 @app.get("/v1/candidates/stats", tags=["Analytics & Statistics"])
-async def get_candidate_stats(api_key: str = Depends(get_api_key)):
+async def get_candidate_stats(auth=Depends(get_auth)):
     """Dynamic Candidate Statistics for HR Dashboard Analytics
     
     **Authentication:** Bearer token required
@@ -646,14 +1058,63 @@ async def get_candidate_stats(api_key: str = Depends(get_api_key)):
             "dashboard_ready": False
         }
 
+
+@app.get("/v1/candidates/autocomplete", tags=["Candidate Management"])
+async def candidates_autocomplete(q: Optional[str] = None, limit: int = 10, auth=Depends(get_auth)):
+    """Search-as-you-type: return candidate suggestions by name, email, or skills. Min 1 character."""
+    if not q or not str(q).strip():
+        return {"suggestions": []}
+    q = str(q).strip()[:50]
+    # Normalize special characters so users can search names/skills containing symbols.
+    # Keep @ and . for email searches, but treat slashes as separators.
+    q_norm = re.sub(r"[\\/]+", " ", q)
+    q_norm = re.sub(r"\s+", " ", q_norm).strip()
+    # If query is only symbols/spaces, bail out.
+    if not re.search(r"[A-Za-z0-9@.]", q_norm):
+        return {"suggestions": []}
+    limit = max(1, min(limit, 20))
+    try:
+        db = await get_mongo_db()
+        # Fuzzy token match for non-email queries; for email-ish input keep a direct escaped regex.
+        if "@" in q_norm or "." in q_norm:
+            regex_pat = re.escape(q_norm)
+        else:
+            tokens = [t for t in re.sub(r"[^A-Za-z0-9]+", " ", q_norm).split(" ") if t]
+            regex_pat = r"[\s\W_]*".join(re.escape(t) for t in tokens)[:200] if tokens else re.escape(q_norm)
+        regex = {"$regex": regex_pat, "$options": "i"}
+        cursor = db.candidates.find({
+            "$or": [
+                {"name": regex},
+                {"email": regex},
+                {"technical_skills": regex},
+            ]
+        }).sort("created_at", -1).limit(limit)
+        candidates_list = await cursor.to_list(length=limit)
+        suggestions = []
+        for doc in candidates_list:
+            suggestions.append({
+                "id": str(doc["_id"]),
+                "name": doc.get("name") or "",
+                "email": doc.get("email") or "",
+                "technical_skills": doc.get("technical_skills") or "",
+                "location": doc.get("location") or "",
+            })
+        return {"suggestions": suggestions}
+    except Exception as e:
+        return {"suggestions": [], "error": str(e)}
+
+
 @app.get("/v1/candidates/search", tags=["Candidate Management"])
 async def search_candidates(
-    skills: Optional[str] = None, 
-    location: Optional[str] = None, 
-    experience_min: Optional[int] = None, 
-    api_key: str = Depends(get_api_key)
+    search: Optional[str] = None,
+    query: Optional[str] = None,
+    skills: Optional[str] = None,
+    location: Optional[str] = None,
+    experience_min: Optional[int] = None,
+    auth=Depends(get_auth)
 ):
-    """Search & Filter Candidates"""
+    """Search & Filter Candidates. Use search or query for name/skills/email free text."""
+    q_text = (search or query or "").strip()[:100]
     if skills:
         if len(skills) > 200:
             raise HTTPException(status_code=400, detail="Skills filter too long (max 200 characters).")
@@ -666,21 +1127,23 @@ async def search_candidates(
             raise HTTPException(status_code=400, detail="Invalid characters in location filter.")
     if experience_min is not None and experience_min < 0:
         raise HTTPException(status_code=400, detail="experience_min must be non-negative.")
-    
+
     try:
         db = await get_mongo_db()
         query = {}
-        
+        if q_text:
+            query["$or"] = [
+                {"name": {"$regex": re.escape(q_text), "$options": "i"}},
+                {"email": {"$regex": re.escape(q_text), "$options": "i"}},
+                {"technical_skills": {"$regex": re.escape(q_text), "$options": "i"}},
+            ]
         if skills:
-            # Case-insensitive regex search for skills
             query["technical_skills"] = {"$regex": skills, "$options": "i"}
-        
         if location:
             query["location"] = {"$regex": location, "$options": "i"}
-        
         if experience_min is not None:
             query["experience_years"] = {"$gte": experience_min}
-        
+
         cursor = db.candidates.find(query).limit(50)
         candidates_list = await cursor.to_list(length=50)
         
@@ -738,7 +1201,7 @@ async def get_candidates_by_job(job_id: str, api_key: str = Depends(get_api_key)
         return {"candidates": [], "job_id": job_id, "count": 0, "error": str(e)}
 
 @app.get("/v1/candidates/{candidate_id}", tags=["Candidate Management"])
-async def get_candidate_by_id(candidate_id: str, api_key: str = Depends(get_api_key)):
+async def get_candidate_by_id(candidate_id: str, auth=Depends(get_auth)):
     """Get Specific Candidate by ID"""
     try:
         db = await get_mongo_db()
@@ -832,7 +1295,7 @@ async def bulk_upload_candidates(candidates: CandidateBulk, api_key: str = Depen
 
 # AI Matching Engine (2 endpoints)
 @app.get("/v1/match/{job_id}/top", tags=["AI Matching Engine"])
-async def get_top_matches(job_id: str, limit: int = 10, api_key: str = Depends(get_api_key)):  # Changed from int to str for MongoDB ObjectId
+async def get_top_matches(job_id: str, limit: int = 10, auth = Depends(get_auth)):  # Accept JWT tokens or API keys
     """AI-powered semantic candidate matching via Agent Service"""
     if limit < 1 or limit > 50:
         raise HTTPException(status_code=400, detail="Invalid limit parameter (must be 1-50)")
@@ -840,9 +1303,9 @@ async def get_top_matches(job_id: str, limit: int = 10, api_key: str = Depends(g
     try:
         import httpx
         agent_url = os.getenv("AGENT_SERVICE_URL")
-        
-        # Call agent service for AI matching
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # 60s default for AI shortlist: allows full AI/ML time; fallback to DB on timeout/failure.
+        agent_timeout = float(os.getenv("AGENT_MATCH_TIMEOUT", "60"))
+        async with httpx.AsyncClient(timeout=agent_timeout) as client:
             response = await client.post(
                 f"{agent_url}/match",
                 json={"job_id": job_id, "candidate_ids": []},
@@ -1117,9 +1580,16 @@ async def batch_match_jobs(
 
 # Assessment & Workflow (5 endpoints)
 @app.post("/v1/feedback", tags=["Assessment & Workflow"])
-async def submit_feedback(feedback: FeedbackSubmission, api_key: str = Depends(get_api_key)):
-    """Values Assessment"""
+async def submit_feedback(feedback: FeedbackSubmission, auth = Depends(get_auth)):
+    """Values Assessment (JWT authenticated)"""
     try:
+        # Verify the candidate_id matches the authenticated user (if using JWT token)
+        auth_info = auth
+        if auth_info.get("type") == "jwt_token" and auth_info.get("role") == "candidate":
+            token_candidate_id = str(auth_info.get("user_id", ""))
+            if token_candidate_id and token_candidate_id != str(feedback.candidate_id):
+                raise HTTPException(status_code=403, detail="You can only submit feedback for yourself")
+        
         db = await get_mongo_db()
         avg_score = (feedback.integrity + feedback.honesty + feedback.discipline + 
                     feedback.hard_work + feedback.gratitude) / 5
@@ -1163,13 +1633,24 @@ async def submit_feedback(feedback: FeedbackSubmission, api_key: str = Depends(g
         }
 
 @app.get("/v1/feedback", tags=["Assessment & Workflow"])
-async def get_all_feedback(api_key: str = Depends(get_api_key)):
-    """Get All Feedback Records"""
+async def get_all_feedback(candidate_id: Optional[str] = None, auth = Depends(get_auth)):
+    """Get All Feedback Records (supports filtering by candidate_id)"""
     try:
         db = await get_mongo_db()
         
+        # Build match filter - support candidate_id filtering
+        match_filter = {}
+        if candidate_id:
+            # If JWT auth, verify candidate_id matches authenticated user
+            if auth.get("type") == "jwt_token" and auth.get("role") == "candidate":
+                token_candidate_id = str(auth.get("user_id", ""))
+                if token_candidate_id and token_candidate_id != str(candidate_id):
+                    raise HTTPException(status_code=403, detail="You can only view your own feedback")
+            match_filter["candidate_id"] = candidate_id
+        
         # Use aggregation pipeline for JOIN-like behavior
         pipeline = [
+            {"$match": match_filter} if match_filter else {"$match": {}},
             {"$lookup": {
                 "from": "candidates",
                 "localField": "candidate_id",
@@ -1205,22 +1686,33 @@ async def get_all_feedback(api_key: str = Depends(get_api_key)):
         
         feedback_records = []
         for doc in feedback_list:
+            values_scores = {
+                "integrity": doc.get("integrity", 0),
+                "honesty": doc.get("honesty", 0),
+                "discipline": doc.get("discipline", 0),
+                "hard_work": doc.get("hard_work", 0),
+                "gratitude": doc.get("gratitude", 0)
+            }
             feedback_records.append({
                 "id": doc.get("id"),
                 "candidate_id": doc.get("candidate_id"),
                 "job_id": doc.get("job_id"),
-                "values_scores": {
-                    "integrity": doc.get("integrity"),
-                    "honesty": doc.get("honesty"),
-                    "discipline": doc.get("discipline"),
-                    "hard_work": doc.get("hard_work"),
-                    "gratitude": doc.get("gratitude")
+                "values_scores": values_scores,  # Keep for backward compatibility
+                "values_assessment": {  # Frontend expects this field name
+                    "integrity": values_scores["integrity"],
+                    "honesty": values_scores["honesty"],
+                    "discipline": values_scores["discipline"],
+                    "hardWork": values_scores["hard_work"],  # Frontend uses camelCase
+                    "gratitude": values_scores["gratitude"]
                 },
                 "average_score": float(doc.get("average_score", 0)) if doc.get("average_score") else 0,
-                "comments": doc.get("comments"),
+                "comments": doc.get("comments"),  # Keep for backward compatibility
+                "feedback_text": doc.get("comments", ""),  # Frontend expects this field name
+                "rating": int(doc.get("average_score", 0)) if doc.get("average_score") else 0,  # Frontend expects rating
                 "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
                 "candidate_name": doc.get("candidate_name"),
-                "job_title": doc.get("job_title")
+                "job_title": doc.get("job_title"),
+                "interviewer_name": None  # Frontend expects this (optional)
             })
         
         return {"feedback": feedback_records, "count": len(feedback_records)}
@@ -1230,12 +1722,23 @@ async def get_all_feedback(api_key: str = Depends(get_api_key)):
 
 
 @app.get("/v1/interviews", tags=["Assessment & Workflow"])
-async def get_interviews(api_key: str = Depends(get_api_key)):
-    """Get All Interviews"""
+async def get_interviews(candidate_id: Optional[str] = None, auth = Depends(get_auth)):
+    """Get All Interviews (supports filtering by candidate_id)"""
     try:
         db = await get_mongo_db()
         
+        # Build match filter - support candidate_id filtering
+        match_filter = {}
+        if candidate_id:
+            # If JWT auth, verify candidate_id matches authenticated user
+            if auth.get("type") == "jwt_token" and auth.get("role") == "candidate":
+                token_candidate_id = str(auth.get("user_id", ""))
+                if token_candidate_id and token_candidate_id != str(candidate_id):
+                    raise HTTPException(status_code=403, detail="You can only view your own interviews")
+            match_filter["candidate_id"] = candidate_id
+        
         pipeline = [
+            {"$match": match_filter} if match_filter else {"$match": {}},
             {"$lookup": {
                 "from": "candidates",
                 "localField": "candidate_id",
@@ -1266,15 +1769,23 @@ async def get_interviews(api_key: str = Depends(get_api_key)):
         
         interviews = []
         for doc in interviews_list:
+            interview_date = doc.get("interview_date")
+            interview_date_str = interview_date.isoformat() if interview_date else None
             interviews.append({
                 "id": doc.get("id"),
                 "candidate_id": doc.get("candidate_id"),
                 "job_id": doc.get("job_id"),
-                "interview_date": doc.get("interview_date").isoformat() if doc.get("interview_date") else None,
+                "interview_date": interview_date_str,  # Keep for backward compatibility
+                "scheduled_date": interview_date_str,  # Frontend expects this field name
+                "scheduled_time": None,  # Frontend expects this (can be extracted from date if needed)
+                "interview_type": "technical",  # Default value for frontend
                 "interviewer": doc.get("interviewer"),
-                "status": doc.get("status"),
+                "status": doc.get("status") or "scheduled",
                 "candidate_name": doc.get("candidate_name"),
-                "job_title": doc.get("job_title")
+                "job_title": doc.get("job_title"),
+                "company": None,  # Frontend expects this (can be added from job lookup if needed)
+                "meeting_link": None,  # Frontend expects this
+                "notes": None  # Frontend expects this
             })
         
         return {"interviews": interviews, "count": len(interviews)}
@@ -1348,12 +1859,23 @@ async def create_job_offer(offer: JobOffer, api_key: str = Depends(get_api_key))
         }
 
 @app.get("/v1/offers", tags=["Assessment & Workflow"])
-async def get_all_offers(api_key: str = Depends(get_api_key)):
-    """Get All Job Offers"""
+async def get_all_offers(candidate_id: Optional[str] = None, auth = Depends(get_auth)):
+    """Get All Job Offers (supports filtering by candidate_id)"""
     try:
         db = await get_mongo_db()
         
+        # Build match filter - support candidate_id filtering
+        match_filter = {}
+        if candidate_id:
+            # If JWT auth, verify candidate_id matches authenticated user
+            if auth.get("type") == "jwt_token" and auth.get("role") == "candidate":
+                token_candidate_id = str(auth.get("user_id", ""))
+                if token_candidate_id and token_candidate_id != str(candidate_id):
+                    raise HTTPException(status_code=403, detail="You can only view your own offers")
+            match_filter["candidate_id"] = candidate_id
+        
         pipeline = [
+            {"$match": match_filter} if match_filter else {"$match": {}},
             {"$lookup": {
                 "from": "candidates",
                 "localField": "candidate_id",
@@ -1386,17 +1908,22 @@ async def get_all_offers(api_key: str = Depends(get_api_key)):
         
         offers = []
         for doc in offers_list:
+            start_date = doc.get("start_date")
+            start_date_str = start_date.isoformat() if start_date else None
             offers.append({
                 "id": doc.get("id"),
                 "candidate_id": doc.get("candidate_id"),
                 "job_id": doc.get("job_id"),
-                "salary": float(doc.get("salary", 0)) if doc.get("salary") else 0,
-                "start_date": doc.get("start_date").isoformat() if doc.get("start_date") else None,
+                "salary": float(doc.get("salary", 0)) if doc.get("salary") else 0,  # Keep for backward compatibility
+                "salary_offered": float(doc.get("salary", 0)) if doc.get("salary") else 0,  # Frontend expects this field name
+                "start_date": start_date_str,  # Keep for backward compatibility
+                "joining_date": start_date_str,  # Frontend expects this field name
                 "terms": doc.get("terms"),
-                "status": doc.get("status"),
+                "status": doc.get("status") or "pending",
                 "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
                 "candidate_name": doc.get("candidate_name"),
-                "job_title": doc.get("job_title")
+                "job_title": doc.get("job_title"),
+                "company": None  # Frontend expects this (can be added from job lookup if needed)
             })
         
         return {"offers": offers, "count": len(offers)}
@@ -1466,27 +1993,37 @@ async def export_job_report(job_id: str, api_key: str = Depends(get_api_key)):  
 @app.post("/v1/client/register", tags=["Client Portal API"])
 async def client_register(client_data: ClientRegister):
     """Client Registration"""
+    from fastapi import status
     try:
         db = await get_mongo_db()
-        
+
         # Check if client_id already exists
         existing_client = await db.clients.find_one({"client_id": client_data.client_id})
         if existing_client:
-            return {"success": False, "error": "Client ID already exists"}
-        
+            raise HTTPException(status_code=400, detail="Client ID already exists")
+
         # Check if email already exists
         existing_email = await db.clients.find_one({"email": client_data.contact_email})
         if existing_email:
-            return {"success": False, "error": "Email already registered"}
-        
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Generate unique client_code if not provided
+        client_code = client_data.client_code or str(uuid.uuid4())
+
+        # Check if client_code already exists (should be unique)
+        existing_code = await db.clients.find_one({"client_code": client_code})
+        if existing_code:
+            raise HTTPException(status_code=400, detail="Client code already exists. Please try again.")
+
         # Hash password
         password_hash = bcrypt.hashpw(client_data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        
+
         # Insert client
         document = {
             "client_id": client_data.client_id,
             "company_name": client_data.company_name,
             "email": client_data.contact_email,
+            "client_code": client_code,
             "password_hash": password_hash,
             "status": "active",
             "failed_login_attempts": 0,
@@ -1494,24 +2031,42 @@ async def client_register(client_data: ClientRegister):
             "created_at": datetime.now(timezone.utc)
         }
         await db.clients.insert_one(document)
-        
-        return {
-            "success": True,
-            "message": "Client registration successful",
-            "client_id": client_data.client_id,
-            "company_name": client_data.company_name
-        }
+
+        from fastapi import Response
+        return Response(
+            content=json.dumps({
+                "success": True,
+                "message": "Client registration successful",
+                "client_id": client_data.client_id,
+                "company_name": client_data.company_name,
+                "client_code": client_code
+            }),
+            status_code=status.HTTP_201_CREATED,
+            media_type="application/json"
+        )
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/v1/client/login", tags=["Client Portal API"])
 async def client_login(login_data: ClientLogin):
-    """Client Authentication with Database Integration"""
+    """Client Authentication with Database Integration - Supports both client_id and email"""
     try:
         db = await get_mongo_db()
         
-        # Get client by client_id from clients collection
-        client = await db.clients.find_one({"client_id": login_data.client_id})
+        # Support both client_id and email-based login
+        if not login_data.client_id and not login_data.email:
+            return {"success": False, "error": "Either client_id or email is required"}
+        
+        # Try to find client by client_id first, then by email
+        client = None
+        if login_data.client_id:
+            client = await db.clients.find_one({"client_id": login_data.client_id})
+        
+        if not client and login_data.email:
+            # Try finding by email (stored as 'email' field in clients collection)
+            client = await db.clients.find_one({"email": login_data.email})
         
         if not client:
             return {"success": False, "error": "Invalid credentials"}
@@ -1533,8 +2088,9 @@ async def client_login(login_data: ClientLogin):
                 if new_attempts >= 5:
                     locked_until = datetime.now(timezone.utc) + timedelta(minutes=30)
                 
+                # Use the actual client_id from the found client (works for both client_id and email login)
                 await db.clients.update_one(
-                    {"client_id": login_data.client_id},
+                    {"client_id": client.get("client_id")},
                     {"$set": {
                         "failed_login_attempts": new_attempts,
                         "locked_until": locked_until
@@ -1548,19 +2104,26 @@ async def client_login(login_data: ClientLogin):
         
         # Generate JWT token using JWT_SECRET_KEY
         jwt_secret = os.getenv("JWT_SECRET_KEY")
+        client_id = client.get("client_id")
         token_payload = {
-            "client_id": client.get("client_id"),
+            "sub": client_id,  # Standard JWT claim for subject/user ID
+            "client_id": client_id,  # Keep for backward compatibility
+            "user_id": client_id,  # Also include user_id for jwt_auth.py compatibility
+            "email": client.get("contact_email", ""),
             "company_name": client.get("company_name"),
+            "role": "client",  # Explicit role for jwt_auth.py
             "exp": int(datetime.now(timezone.utc).timestamp()) + 86400  # 24 hours
         }
         access_token = jwt.encode(token_payload, jwt_secret, algorithm="HS256")
         
         # Reset failed attempts and update last login
+        # Use the actual client_id from the found client (works for both client_id and email login)
         await db.clients.update_one(
-            {"client_id": login_data.client_id},
+            {"client_id": client.get("client_id")},
             {"$set": {
                 "failed_login_attempts": 0,
-                "locked_until": None
+                "locked_until": None,
+                "last_login": datetime.now(timezone.utc)
             }}
         )
         
@@ -2146,7 +2709,12 @@ async def candidate_register(candidate_data: CandidateRegister):
         # Hash password
         password_hash = bcrypt.hashpw(candidate_data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         
-        # Insert candidate with password hash
+        # Get role from request (for recruiters) or default to candidate
+        user_role = candidate_data.role or "candidate"
+        if user_role not in ["candidate", "recruiter"]:
+            user_role = "candidate"  # Ensure valid role
+        
+        # Insert candidate with password hash and role
         document = {
             "name": candidate_data.name,
             "email": candidate_data.email,
@@ -2157,6 +2725,7 @@ async def candidate_register(candidate_data: CandidateRegister):
             "education_level": candidate_data.education_level,
             "seniority_level": candidate_data.seniority_level,
             "password_hash": password_hash,
+            "role": user_role,  # Store role in database (for recruiters)
             "status": "applied",
             "created_at": datetime.now(timezone.utc)
         }
@@ -2191,9 +2760,21 @@ async def candidate_login(login_data: CandidateLogin):
         
         # Generate JWT token
         jwt_secret = os.getenv("CANDIDATE_JWT_SECRET_KEY")
+        candidate_id_str = str(candidate["_id"])
+        
+        # Get role from database (for recruiters) or default to candidate
+        # Recruiters are stored as candidates but have role field set to "recruiter"
+        user_role = candidate.get("role", "candidate")
+        if user_role not in ["candidate", "recruiter"]:
+            user_role = "candidate"  # Ensure valid role
+        
         token_payload = {
-            "candidate_id": str(candidate["_id"]),
+            "sub": candidate_id_str,  # Standard JWT claim for subject/user ID
+            "candidate_id": candidate_id_str,  # Keep for backward compatibility
+            "user_id": candidate_id_str,  # Also include user_id for jwt_auth.py compatibility
             "email": candidate.get("email"),
+            "name": candidate.get("name", ""),
+            "role": user_role,  # Use role from database (supports recruiter)
             "exp": int(datetime.now(timezone.utc).timestamp()) + 86400  # 24 hours
         }
         token = jwt.encode(token_payload, jwt_secret, algorithm="HS256")
@@ -2202,6 +2783,7 @@ async def candidate_login(login_data: CandidateLogin):
             "success": True,
             "message": "Login successful",
             "token": token,
+            "candidate_id": candidate_id_str,  # Add candidate_id at top level for frontend compatibility
             "candidate": {
                 "id": str(candidate["_id"]),
                 "name": candidate.get("name"),
@@ -2217,6 +2799,67 @@ async def candidate_login(login_data: CandidateLogin):
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.get("/v1/candidate/profile/{candidate_id}", tags=["Candidate Portal"])
+async def get_candidate_profile(candidate_id: str, auth = Depends(get_auth)):
+    """Get Candidate Profile (JWT authenticated)"""
+    try:
+        db = await get_mongo_db()
+        
+        # Verify the candidate_id matches the authenticated user (if using JWT token)
+        auth_info = auth
+        # Support both old format (candidate_token) and new format (jwt_token with role)
+        if auth_info.get("type") in ["candidate_token", "jwt_token"]:
+            # Get candidate_id from token - try both old and new formats
+            token_candidate_id = None
+            if auth_info.get("type") == "candidate_token":
+                # Old format
+                token_candidate_id = str(auth_info.get("candidate_id", ""))
+            elif auth_info.get("type") == "jwt_token" and auth_info.get("role") == "candidate":
+                # New format from jwt_auth.py
+                token_candidate_id = str(auth_info.get("user_id", ""))
+            
+            # Compare as strings to handle ObjectId vs string differences
+            if token_candidate_id and token_candidate_id != str(candidate_id):
+                # Also try ObjectId comparison
+                try:
+                    if ObjectId(token_candidate_id) != ObjectId(candidate_id):
+                        raise HTTPException(status_code=403, detail="You can only view your own profile")
+                except:
+                    # If ObjectId conversion fails, use string comparison
+                    if token_candidate_id != str(candidate_id):
+                        raise HTTPException(status_code=403, detail="You can only view your own profile")
+        
+        # Try to convert to ObjectId if valid, otherwise search by string id
+        try:
+            doc = await db.candidates.find_one({"_id": ObjectId(candidate_id)})
+        except:
+            doc = await db.candidates.find_one({"id": candidate_id})
+        
+        if not doc:
+            return {"error": "Candidate not found", "candidate_id": candidate_id}
+        
+        candidate = {
+            "id": str(doc["_id"]),
+            "name": doc.get("name"),
+            "email": doc.get("email"),
+            "phone": doc.get("phone"),
+            "location": doc.get("location"),
+            "experience_years": doc.get("experience_years"),
+            "technical_skills": doc.get("technical_skills"),
+            "seniority_level": doc.get("seniority_level"),
+            "education_level": doc.get("education_level"),
+            "resume_path": doc.get("resume_path"),
+            "resume_url": doc.get("resume_path"),  # Alias for frontend compatibility
+            "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+            "updated_at": doc.get("updated_at").isoformat() if doc.get("updated_at") else None
+        }
+        
+        return candidate
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"error": str(e), "candidate_id": candidate_id}
 
 @app.put("/v1/candidate/profile/{candidate_id}", tags=["Candidate Portal"])
 async def update_candidate_profile(candidate_id: str, profile_data: CandidateProfileUpdate, auth = Depends(get_auth)):
@@ -2274,25 +2917,49 @@ async def apply_for_job(application: JobApplication, auth = Depends(get_auth)):
     try:
         db = await get_mongo_db()
         
-        # Check if already applied
-        existing = await db.job_applications.find_one({
-            "candidate_id": application.candidate_id,
-            "job_id": application.job_id
-        })
+        # Normalize candidate_id to string for consistency
+        candidate_id_str = str(application.candidate_id)
+        job_id_str = str(application.job_id)
+        
+        print(f"Applying for job - candidate_id: {candidate_id_str}, job_id: {job_id_str}")
+        
+        # Check if already applied - try multiple formats
+        existing = None
+        try:
+            # Try string match first
+            existing = await db.job_applications.find_one({
+                "candidate_id": candidate_id_str,
+                "job_id": job_id_str
+            })
+            
+            # If not found, try ObjectId match
+            if not existing:
+                try:
+                    candidate_obj_id = ObjectId(candidate_id_str)
+                    existing = await db.job_applications.find_one({
+                        "candidate_id": str(candidate_obj_id),
+                        "job_id": job_id_str
+                    })
+                except:
+                    pass
+        except Exception as e:
+            print(f"Error checking existing application: {e}")
         
         if existing:
             return {"success": False, "error": "Already applied for this job"}
         
-        # Insert application
+        # Insert application with normalized IDs
         document = {
-            "candidate_id": application.candidate_id,
-            "job_id": application.job_id,
+            "candidate_id": candidate_id_str,  # Store as string for consistency
+            "job_id": job_id_str,
             "cover_letter": application.cover_letter,
             "status": "applied",
             "applied_date": datetime.now(timezone.utc)
         }
         result = await db.job_applications.insert_one(document)
         application_id = str(result.inserted_id)
+        
+        print(f"Application inserted successfully - application_id: {application_id}")
         
         return {
             "success": True,
@@ -2302,20 +2969,153 @@ async def apply_for_job(application: JobApplication, auth = Depends(get_auth)):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.get("/v1/candidate/stats/{candidate_id}", tags=["Candidate Portal"])
+async def get_candidate_stats(candidate_id: str, auth = Depends(get_auth)):
+    """Get Candidate Dashboard Statistics"""
+    try:
+        db = await get_mongo_db()
+        
+        # Verify the candidate_id matches the authenticated user (if using JWT token)
+        auth_info = auth
+        if auth_info.get("type") == "jwt_token" and auth_info.get("role") == "candidate":
+            token_candidate_id = str(auth_info.get("user_id", ""))
+            if token_candidate_id and token_candidate_id != str(candidate_id):
+                raise HTTPException(status_code=403, detail="You can only view your own stats")
+        
+        # Get applications count
+        applications_count = await db.job_applications.count_documents({"candidate_id": candidate_id})
+        
+        # Get shortlisted count
+        shortlisted_count = await db.job_applications.count_documents({
+            "candidate_id": candidate_id,
+            "status": "shortlisted"
+        })
+        
+        # Get interviews scheduled count
+        interviews_scheduled = await db.interviews.count_documents({
+            "candidate_id": candidate_id,
+            "status": "scheduled"
+        })
+        
+        # Get offers received count
+        offers_received = await db.offers.count_documents({
+            "candidate_id": candidate_id
+        })
+        
+        return {
+            "total_applications": applications_count,
+            "shortlisted": shortlisted_count,
+            "interviews_scheduled": interviews_scheduled,
+            "offers_received": offers_received,
+            "profile_views": 0  # Placeholder - can be implemented later
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "total_applications": 0,
+            "shortlisted": 0,
+            "interviews_scheduled": 0,
+            "offers_received": 0,
+            "profile_views": 0,
+            "error": str(e)
+        }
+
+@app.get("/v1/recruiter/stats", tags=["Recruiter Portal"])
+async def get_recruiter_stats(auth = Depends(get_auth)):
+    """Get Recruiter Dashboard Statistics"""
+    try:
+        db = await get_mongo_db()
+        
+        # Verify the user is a recruiter
+        auth_info = auth
+        if auth_info.get("type") != "jwt_token" or auth_info.get("role") != "recruiter":
+            raise HTTPException(status_code=403, detail="This endpoint is only available for recruiters")
+        
+        recruiter_id = str(auth_info.get("user_id", ""))
+        
+        # Get total active jobs
+        active_jobs = await db.jobs.count_documents({"status": "active"})
+        
+        # Get total candidates (recruiters can see all candidates)
+        total_candidates = await db.candidates.count_documents({})
+        
+        # Get interviews scheduled (all interviews, not just for specific candidate)
+        interviews_scheduled = await db.interviews.count_documents({
+            "status": "scheduled"
+        })
+        
+        # Get offers made (all offers)
+        offers_made = await db.offers.count_documents({})
+        
+        # Get applications count (all applications)
+        total_applications = await db.job_applications.count_documents({})
+        
+        # Get shortlisted candidates
+        shortlisted_count = await db.job_applications.count_documents({
+            "status": "shortlisted"
+        })
+        
+        return {
+            "active_jobs": active_jobs,
+            "total_candidates": total_candidates,
+            "interviews_scheduled": interviews_scheduled,
+            "offers_made": offers_made,
+            "total_applications": total_applications,
+            "shortlisted_candidates": shortlisted_count,
+            "recruiter_id": recruiter_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "active_jobs": 0,
+            "total_candidates": 0,
+            "interviews_scheduled": 0,
+            "offers_made": 0,
+            "total_applications": 0,
+            "shortlisted_candidates": 0,
+            "error": str(e)
+        }
+
 @app.get("/v1/candidate/applications/{candidate_id}", tags=["Candidate Portal"])
 async def get_candidate_applications(candidate_id: str, auth = Depends(get_auth)):
     """Get Candidate Applications"""
     try:
         db = await get_mongo_db()
         
-        # Use aggregation for JOIN-like query
-        pipeline = [
-            {"$match": {"candidate_id": candidate_id}},
-            {"$sort": {"applied_date": -1}}
-        ]
+        # Try multiple query strategies to find applications
+        applications_list = []
         
-        cursor = db.job_applications.aggregate(pipeline)
-        applications_list = await cursor.to_list(length=None)
+        # Strategy 1: Direct string match
+        try:
+            cursor = db.job_applications.find({"candidate_id": candidate_id}).sort("applied_date", -1)
+            applications_list = await cursor.to_list(length=None)
+            print(f"Found {len(applications_list)} applications with string match for candidate_id: {candidate_id}")
+        except Exception as e:
+            print(f"String match error: {e}")
+        
+        # Strategy 2: Try ObjectId conversion and match
+        if not applications_list:
+            try:
+                candidate_object_id = ObjectId(candidate_id)
+                # Try matching with ObjectId as string
+                cursor = db.job_applications.find({"candidate_id": str(candidate_object_id)}).sort("applied_date", -1)
+                applications_list = await cursor.to_list(length=None)
+                print(f"Found {len(applications_list)} applications with ObjectId string match")
+            except Exception as e:
+                print(f"ObjectId match error: {e}")
+        
+        # Strategy 3: Try all variations (for debugging)
+        if not applications_list:
+            # Get all applications and filter manually (fallback)
+            all_apps = await db.job_applications.find({}).to_list(length=100)
+            print(f"Total applications in DB: {len(all_apps)}")
+            for app in all_apps:
+                app_candidate_id = str(app.get("candidate_id", ""))
+                if app_candidate_id == candidate_id or app_candidate_id == str(candidate_id):
+                    applications_list.append(app)
+            print(f"Found {len(applications_list)} applications with manual filter")
         
         applications = []
         for doc in applications_list:

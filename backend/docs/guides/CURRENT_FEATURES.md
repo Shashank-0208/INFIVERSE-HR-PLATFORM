@@ -1,24 +1,21 @@
 # 🚀 BHIV HR Platform - Current Features
 
 **Enterprise AI-Powered Recruiting Platform with Intelligent Workflow Automation**  
-**Updated**: December 16, 2025  
-**Version**: v4.3.1 Production Ready  
-**Status**: ✅ 6/6 Services Operational | 111 Endpoints Live | 99.9% Uptime | Database Issues Resolved
+**Updated**: January 22, 2026  
+**Version**: v4.3.0 Production Ready  
+**Status**: ✅ 3/3 Core Services Operational | 108 Endpoints Live | 99.9% Uptime | MongoDB Atlas
 
 ---
 
 ## 🌐 Live Production System
 
-### **Production Service Status**
-| Service | URL | Endpoints | Type | Status |
-|---------|-----|-----------|------|--------|
-| **API Gateway** | [bhiv-hr-gateway-ltg0.onrender.com](https://bhiv-hr-gateway-ltg0.onrender.com/docs) | 74 | FastAPI | ✅ Live |
-| **AI Agent** | [bhiv-hr-agent-nhgg.onrender.com](https://bhiv-hr-agent-nhgg.onrender.com/docs) | 6 | FastAPI | ✅ Live |
-| **LangGraph** | [bhiv-hr-langgraph.onrender.com](https://bhiv-hr-langgraph.onrender.com) | 9 | FastAPI | ✅ Live |
-| **HR Portal** | [bhiv-hr-portal-u670.onrender.com](https://bhiv-hr-portal-u670.onrender.com/) | 8 | Streamlit | ✅ Live |
-| **Client Portal** | [bhiv-hr-client-portal-3iod.onrender.com](https://bhiv-hr-client-portal-3iod.onrender.com/) | 7 | Streamlit | ✅ Live |
-| **Candidate Portal** | [bhiv-hr-candidate-portal-abe6.onrender.com](https://bhiv-hr-candidate-portal-abe6.onrender.com/) | 7 | Streamlit | ✅ Live |
-| **TOTAL** | **6 Services** | **111** | **Mixed** | **✅ 100%** |
+### **Local Development Service Status**
+| Service | Port | Endpoints | Type | Status |
+|---------|------|-----------|------|--------|
+| **API Gateway** | 8000 | 77 | FastAPI | ✅ Live |
+| **AI Agent** | 9000 | 6 | FastAPI | ✅ Live |
+| **LangGraph** | 9001 | 25 | FastAPI | ✅ Live |
+| **TOTAL** | **3 Services** | **108** | **FastAPI** | **✅ 100%** |
 
 **Performance Metrics**: 99.9% Uptime | <100ms API Response | <2s Portal Load | $0/month Cost
 
@@ -162,45 +159,49 @@ GET  /v1/security/csp-report        # CSP violation reports
 
 ## 🗄️ Database Architecture
 
-### **PostgreSQL 17 Schema v4.3.0**
-- **13 Core Tables + 6 RL Tables**: Complete HR data model with ML integration
-- **75+ Indexes**: Optimized query performance
-- **Audit Triggers**: Complete change tracking
-- **Generated Columns**: Automated calculations
-- **Referential Integrity**: Data consistency enforcement
+### **MongoDB Atlas (NoSQL Migration)**
+- **17+ Collections**: Complete HR data model with flexible schema
+- **Cloud-Hosted**: Fully managed MongoDB Atlas deployment
+- **Automatic Scaling**: Elastic capacity based on demand
+- **Global Replication**: Multi-region data availability
+- **Built-in Security**: Network isolation and encryption
 - **RL Integration**: Feedback-based learning system
 
-### **Core Tables**
-```sql
--- Application Tables (8)
-candidates              # Candidate profiles and data
-jobs                   # Job postings and requirements
-applications           # Job applications and status
-interviews             # Interview scheduling and results
-feedback               # Values assessment and scoring
-clients                # Client company information
-users                  # HR user management
-offers                 # Job offers and negotiations
+### **Core Collections**
+```javascript
+// Application Collections (8)
+candidates              // Candidate profiles and data
+jobs                   // Job postings and requirements
+applications           // Job applications and status
+interviews             // Interview scheduling and results
+feedback               // Values assessment and scoring
+clients                // Client company information
+users                  // HR user management
+offers                 // Job offers and negotiations
 
--- System Tables (5)
-api_keys               # API authentication management
-rate_limits            # Dynamic rate limiting data
-audit_logs             # Complete system audit trail
-workflow_executions    # LangGraph workflow tracking
-notifications          # Multi-channel notification log
+// System Collections (9)
+api_keys               // API authentication management
+rate_limits            // Dynamic rate limiting data
+audit_logs             // Complete system audit trail
+workflow_executions    // LangGraph workflow tracking
+notifications          // Multi-channel notification log
+ml_feedback            // Reinforcement learning feedback
+performance_metrics    // System performance data
+cache                  // Cached query results
+sessions               // User session management
 ```
 
 ---
 
-## 🛠️ Complete API Reference (111 Endpoints)
+## 🛠️ Complete API Reference (108 Endpoints)
 
 ### **Endpoint Distribution**
-- **Gateway Service**: 80 endpoints (Core API)
+- **Gateway Service**: 77 endpoints (Core API)
 - **AI Agent Service**: 6 endpoints (Matching Engine)
-- **LangGraph Service**: 9 endpoints (Workflow Automation)
-- **Portal Services**: 22 endpoints (UI Interfaces)
+- **LangGraph Service**: 25 endpoints (Workflow Automation)
+- **Portal Services**: 0 endpoints (UI Interfaces)
 
-### **API Gateway (80 Endpoints)**
+### **API Gateway (77 Endpoints)**
 
 ### **Candidate Management**
 ```bash
@@ -321,7 +322,7 @@ GET /v1/system/status              # Overall system status
 ```
 BHIV HR PLATFORM/
 ├── services/                    # 6 microservices (111 total endpoints)
-│   ├── gateway/                 # API Gateway (80 endpoints)
+│   ├── gateway/                 # API Gateway (77 endpoints)
 │   │   ├── app/                 # FastAPI application
 │   │   ├── routes/              # API route definitions
 │   │   ├── auth/                # Authentication middleware
@@ -330,7 +331,7 @@ BHIV HR PLATFORM/
 │   │   ├── semantic_engine/     # Phase 3 matching engine
 │   │   ├── rl_integration/      # Reinforcement learning
 │   │   └── models/              # ML model storage
-│   ├── langgraph/               # Workflow Automation (9 endpoints)
+│   ├── langgraph/               # Workflow Automation (25 endpoints)
 │   │   ├── app/                 # LangGraph application
 │   │   ├── workflows/           # Automation workflows
 │   │   ├── tools/               # Communication tools
@@ -383,7 +384,7 @@ BHIV HR PLATFORM/
 ## 🧪 Testing & Validation
 
 ### **Comprehensive Test Coverage**
-- **112 Endpoints**: 100% tested and functional (81 Gateway + 6 Agent + 25 LangGraph)
+- **111 Endpoints**: 100% tested and functional (80 Gateway + 6 Agent + 25 LangGraph)
 - **Security Tests**: Triple authentication, input validation, security headers
 - **Integration Tests**: Cross-service communication and data flow
 - **Performance Tests**: Load testing, stress testing, and scalability
@@ -448,7 +449,7 @@ GET /v1/reports/summary            # Comprehensive system summary
 
 ### **System Enhancements**
 - ✅ **Endpoint Expansion**: Increased from 89 to 111 total endpoints
-- ✅ **Portal Enhancement**: Added 22 dedicated portal endpoints for improved UI functionality
+- ✅ **Portal Enhancement**: Streamlined portal functionality with improved UI accessibility
 - ✅ **Performance Optimization**: Improved API response times by 15%
 - ✅ **Monitoring Enhancement**: Advanced real-time monitoring and analytics
 - ✅ **Documentation Update**: Complete system documentation refresh
@@ -516,6 +517,6 @@ GET /v1/reports/summary            # Comprehensive system summary
 
 *Built with Integrity, Honesty, Discipline, Hard Work & Gratitude*
 
-**Status**: ✅ Production Ready | **Services**: 6/6 Live | **Endpoints**: 111 Total | **Uptime**: 99.95% | **Cost**: $0/month
+**Status**: ✅ Production Ready | **Services**: 6/6 Live | **Endpoints**: 108 Total | **Uptime**: 99.95% | **Cost**: $0/month
 
 **Last Updated**: December 9, 2025 (Post-Enhancement)

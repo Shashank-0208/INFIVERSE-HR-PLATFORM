@@ -28,7 +28,7 @@
 sequenceDiagram
     participant Client as Client/HR Portal
     participant Gateway as API Gateway<br/>(Port 8000)
-    participant DB as PostgreSQL<br/>Database
+    participant DB as MongoDB Atlas<br/>Database
     participant Agent as AI Agent Service<br/>(Port 8001)
     participant Cache as Matching Cache
 
@@ -69,7 +69,7 @@ sequenceDiagram
 **Request Flow**:
 1. Client sends match request to Gateway with job_id
 2. Gateway validates authentication (API key or JWT)
-3. Gateway fetches job and candidate data from PostgreSQL
+3. Gateway fetches job and candidate data from MongoDB Atlas
 4. Gateway calls Agent service `/match` endpoint
 5. Agent loads sentence transformer model (all-MiniLM-L6-v2)
 6. Agent encodes job requirements and candidate profiles
@@ -135,7 +135,7 @@ graph TB
     end
     
     subgraph "Database"
-        DB[(PostgreSQL)]
+        DB[(MongoDB Atlas)]
         WFT[workflows table]
         AUDIT[audit_logs table]
     end
@@ -267,7 +267,7 @@ sequenceDiagram
     participant User as User/Client/Candidate
     participant Portal as Portal UI<br/>(Streamlit)
     participant Gateway as API Gateway<br/>(Port 8000)
-    participant DB as PostgreSQL<br/>Database
+    participant DB as MongoDB Atlas<br/>Database
     participant Auth as Auth Manager<br/>(auth_manager.py)
 
     Note over User,Auth: Three Authentication Flows
@@ -824,15 +824,15 @@ graph TD
 |--------------|------------|----------|----------------|---------|
 | Gateway | AI Agent | HTTP REST | API Key | Semantic matching |
 | Gateway | LangGraph | HTTP REST | API Key | Workflow automation |
-| Gateway | PostgreSQL | TCP/SQL | Password | Data persistence |
+| Gateway | MongoDB Atlas | TCP/MongoDB | Password | Data persistence |
 | LangGraph | Gmail SMTP | SMTP | App Password | Email notifications |
 | LangGraph | Twilio API | HTTPS | Auth Token | WhatsApp notifications |
 | LangGraph | Telegram API | HTTPS | Bot Token | Telegram notifications |
 | HR Portal | Gateway | HTTP REST | Session | HR operations |
 | Client Portal | Gateway | HTTP REST | JWT | Client operations |
 | Candidate Portal | Gateway | HTTP REST | JWT | Candidate operations |
-| AI Agent | PostgreSQL | TCP/SQL | Password | Fetch candidates/jobs |
-| LangGraph | PostgreSQL | TCP/SQL | Password | Workflow tracking |
+| AI Agent | MongoDB Atlas | TCP/MongoDB | Password | Fetch candidates/jobs |
+| LangGraph | MongoDB Atlas | TCP/MongoDB | Password | Workflow tracking |
 
 ### Service Endpoints Summary
 
@@ -869,7 +869,7 @@ graph TD
 - `/status/{workflow_id}` - Get workflow status
 - `/workflows` - List workflows
 - `/tools/send-notification` - Send notification
-- `/rl/*` - RL integration endpoints (20 endpoints)
+- `/rl/*` - RL integration endpoints (8 endpoints)
 
 ### Data Flow Patterns
 
@@ -925,7 +925,7 @@ graph TD
 
 **Gateway Service**:
 ```
-DATABASE_URL=postgresql://user:pass@host:5432/db
+DATABASE_URL=mongodb+srv://user:pass@cluster.mongodb.net/db
 API_KEY_SECRET=<secret>
 JWT_SECRET_KEY=<secret>
 CANDIDATE_JWT_SECRET_KEY=<secret>
@@ -935,14 +935,14 @@ LANGGRAPH_SERVICE_URL=http://localhost:8003
 
 **AI Agent Service**:
 ```
-DATABASE_URL=postgresql://user:pass@host:5432/db
+DATABASE_URL=mongodb+srv://user:pass@cluster.mongodb.net/db
 API_KEY_SECRET=<secret>
 MODEL_PATH=/models/sentence-transformer
 ```
 
 **LangGraph Service**:
 ```
-DATABASE_URL=postgresql://user:pass@host:5432/db
+DATABASE_URL=mongodb+srv://user:pass@cluster.mongodb.net/db
 API_KEY_SECRET=<secret>
 GMAIL_USER=<email>
 GMAIL_APP_PASSWORD=<password>
@@ -968,7 +968,7 @@ Production Environment (Render Platform)
 ├── HR Portal (bhiv-hr-portal-u670.onrender.com)
 ├── Client Portal (bhiv-hr-client-portal-3iod.onrender.com)
 ├── Candidate Portal (bhiv-hr-candidate-portal-abe6.onrender.com)
-└── PostgreSQL Database (Render PostgreSQL instance)
+└── MongoDB Atlas Database (MongoDB Atlas instance)
 ```
 
 **Network Configuration**:

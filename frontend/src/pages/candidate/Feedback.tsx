@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { getCandidateFeedback, type Feedback } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage } from '../../utils/authStorage'
 
 export default function CandidateFeedback() {
   const { user } = useAuth()
@@ -9,9 +10,6 @@ export default function CandidateFeedback() {
   const [loading, setLoading] = useState(true)
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null)
 
-  // Get backend candidate ID (integer) for API calls
-  const backendCandidateId = localStorage.getItem('backend_candidate_id')
-  const candidateId = backendCandidateId || user?.id || localStorage.getItem('candidate_id') || ''
 
   useEffect(() => {
     loadFeedback()
@@ -19,7 +17,7 @@ export default function CandidateFeedback() {
 
   const loadFeedback = async () => {
     // Check authentication first
-    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true' || !!user
+    const isAuthenticated = authStorage.getItem('isAuthenticated') === 'true' || !!user
     
     if (!isAuthenticated) {
       toast.error('Please login to view feedback')
@@ -27,8 +25,10 @@ export default function CandidateFeedback() {
       return
     }
 
+    const currentBackendId = authStorage.getItem('backend_candidate_id')
+    
     // If authenticated but no candidate ID, show empty state
-    if (!candidateId) {
+    if (!currentBackendId) {
       setFeedbacks([])
       setLoading(false)
       return
@@ -36,7 +36,7 @@ export default function CandidateFeedback() {
 
     try {
       setLoading(true)
-      const data = await getCandidateFeedback(candidateId).catch(() => [])
+      const data = await getCandidateFeedback(currentBackendId).catch(() => [])
       setFeedbacks(data)
     } catch (error) {
       console.error('Failed to load feedback:', error)

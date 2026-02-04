@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { getCandidateApplications, type Application } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import { authStorage } from '../../utils/authStorage'
 
 type StatusFilter = 'all' | 'applied' | 'screening' | 'shortlisted' | 'interview' | 'offer' | 'rejected' | 'hired'
 
@@ -12,17 +13,9 @@ export default function AppliedJobs() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
 
-  // Get backend candidate ID (integer) for API calls, fallback to user ID
-  const backendCandidateId = localStorage.getItem('backend_candidate_id')
-  const candidateId = backendCandidateId || user?.id || localStorage.getItem('candidate_id') || ''
-
-  useEffect(() => {
-    loadApplications()
-  }, [backendCandidateId])
-
-  const loadApplications = async () => {
+  const loadApplications = useCallback(async () => {
     // Check authentication first
-    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true' || !!user
+    const isAuthenticated = authStorage.getItem('isAuthenticated') === 'true' || !!user
     
     if (!isAuthenticated) {
       toast.error('Please login to view your applications')
@@ -30,8 +23,10 @@ export default function AppliedJobs() {
       return
     }
 
+    const currentBackendId = authStorage.getItem('backend_candidate_id')
+    
     // If authenticated but no candidate ID, show empty state
-    if (!candidateId || !backendCandidateId) {
+    if (!currentBackendId) {
       setApplications([])
       setLoading(false)
       return
@@ -39,15 +34,43 @@ export default function AppliedJobs() {
 
     try {
       setLoading(true)
-      const data = await getCandidateApplications(candidateId)
-      setApplications(data)
+      console.log('Loading applications for candidate:', currentBackendId)
+      // Use backend_candidate_id (ObjectId string) for applications
+      const data = await getCandidateApplications(currentBackendId)
+      console.log('Loaded applications:', data)
+      setApplications(data || [])
     } catch (error) {
       console.error('Failed to load applications:', error)
       setApplications([])
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    loadApplications()
+  }, [loadApplications])
+
+  // Reload applications when component becomes visible or tab is focused
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadApplications()
+      }
+    }
+
+    const handleFocus = () => {
+      loadApplications()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [loadApplications])
 
   const getStatusConfig = (status: string) => {
     const configs: Record<string, { color: string; label: string }> = {

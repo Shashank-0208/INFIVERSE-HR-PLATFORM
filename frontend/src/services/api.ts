@@ -5,7 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://bhiv-hr-gatew
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000, // Increased timeout for Render cold starts (30 seconds)
   headers: {
     'Content-Type': 'application/json',
   },

@@ -24,14 +24,15 @@ export default function ClientJobPosting() {
     setLoading(true)
 
     try {
+      // Map frontend fields to backend API format
       const jobData: Partial<Job> = {
         title: formData.title,
         department: formData.department,
         location: formData.location,
-        experience_required: formData.experience_level,
-        job_type: formData.employment_type,
+        experience_level: formData.experience_level.toLowerCase(), // Backend expects: "entry", "mid", "senior", "lead"
+        requirements: formData.required_skills || formData.description, // Backend requires 'requirements' field
         description: formData.description,
-        skills_required: formData.required_skills,
+        employment_type: formData.employment_type, // Optional field
         status: 'active',
       }
 

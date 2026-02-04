@@ -460,7 +460,7 @@ async def test_candidates_db(api_key: str = Depends(get_api_key)):
 
 # Job Management (2 endpoints)
 @app.post("/v1/jobs", tags=["Job Management"])
-async def create_job(job: JobCreate, api_key: str = Depends(get_api_key)):
+async def create_job(job: JobCreate, auth = Depends(get_auth)):
     """Create New Job Posting
     
     **Required Fields:**

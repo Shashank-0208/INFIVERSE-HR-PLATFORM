@@ -134,7 +134,7 @@ export default function BatchOperations() {
         return
       }
 
-      await bulkUploadCandidates(candidates)
+      await bulkUploadCandidates(candidates, String(selectedJobId))
       toast.success(`Successfully uploaded ${candidates.length} candidates!`)
       setFile(null)
       setPreview([])

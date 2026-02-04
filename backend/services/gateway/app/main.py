@@ -1659,31 +1659,71 @@ async def bulk_upload_candidates(candidates: CandidateBulk, auth=Depends(get_aut
 # AI Matching Engine (2 endpoints)
 @app.get("/v1/match/{job_id}/top", tags=["AI Matching Engine"])
 async def get_top_matches(job_id: str, limit: int = 10, auth = Depends(get_auth)):  # Accept JWT tokens or API keys
-    """AI-powered semantic candidate matching via Agent Service"""
+    """AI-powered semantic candidate matching via Agent Service. When caller is a recruiter, only candidates who applied to that recruiter's jobs are considered."""
     if limit < 1 or limit > 50:
         raise HTTPException(status_code=400, detail="Invalid limit parameter (must be 1-50)")
     
+    # Recruiter scope: only candidates who applied to this recruiter's jobs (same pool as dashboard "Total Applicants")
+    candidate_ids_scope: Optional[List[str]] = None
+    if auth.get("type") == "jwt_token" and auth.get("role") == "recruiter":
+        recruiter_id = str(auth.get("user_id", ""))
+        if recruiter_id:
+            db = await get_mongo_db()
+            cursor = db.jobs.find({"status": "active", "recruiter_id": recruiter_id}, {"_id": 1})
+            recruiter_jobs = await cursor.to_list(length=500)
+            job_ids = [str(doc["_id"]) for doc in recruiter_jobs]
+            if job_ids:
+                pipeline = [{"$match": {"job_id": {"$in": job_ids}}}, {"$group": {"_id": "$candidate_id"}}]
+                candidate_ids_scope = []
+                async for agg_doc in db.job_applications.aggregate(pipeline):
+                    cid = agg_doc.get("_id")
+                    if cid:
+                        candidate_ids_scope.append(str(cid))
+            else:
+                candidate_ids_scope = []
+        else:
+            candidate_ids_scope = []
+
+    # Recruiter with no applicants: return empty without calling agent
+    if candidate_ids_scope is not None and len(candidate_ids_scope) == 0:
+        return {
+            "matches": [],
+            "top_candidates": [],
+            "job_id": job_id,
+            "limit": limit,
+            "total_candidates": 0,
+            "algorithm_version": "2.0.0-gateway-scoped",
+            "ai_analysis": "No applicants in recruiter scope (matches dashboard Total Applicants)",
+            "agent_status": "scoped"
+        }
+
     try:
         import httpx
         agent_url = os.getenv("AGENT_SERVICE_URL")
-        # 60s default for AI shortlist: allows full AI/ML time; fallback to DB on timeout/failure.
-        agent_timeout = float(os.getenv("AGENT_MATCH_TIMEOUT", "60"))
+        agent_timeout = float(os.getenv("AGENT_MATCH_TIMEOUT", "90"))
+        payload = {"job_id": job_id, "candidate_ids": candidate_ids_scope if candidate_ids_scope else []}
         async with httpx.AsyncClient(timeout=agent_timeout) as client:
             response = await client.post(
                 f"{agent_url}/match",
-                json={"job_id": job_id, "candidate_ids": []},
+                json=payload,
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {os.getenv('API_KEY_SECRET')}"
                 }
             )
-            
             if response.status_code == 200:
                 agent_result = response.json()
-                
-                # Transform agent response to gateway format
+                raw_candidates = agent_result.get("top_candidates", [])
+                scope_set = set(candidate_ids_scope) if candidate_ids_scope else None
+                if scope_set is not None:
+                    raw_candidates = [c for c in raw_candidates if str(c.get("candidate_id") or "") in scope_set]
+                    raw_candidates.sort(key=lambda c: (c.get("score") or 0), reverse=True)
+                    cap = min(limit, len(scope_set))
+                    raw_candidates = raw_candidates[:cap]
+                else:
+                    raw_candidates = raw_candidates[:limit]
                 matches = []
-                for candidate in agent_result.get("top_candidates", [])[:limit]:
+                for candidate in raw_candidates:
                     matches.append({
                         "candidate_id": candidate.get("candidate_id"),
                         "name": candidate.get("name"),
@@ -1695,26 +1735,23 @@ async def get_top_matches(job_id: str, limit: int = 10, auth = Depends(get_auth)
                         "reasoning": candidate.get("reasoning"),
                         "recommendation_strength": "Strong Match" if candidate.get("score", 0) > 80 else "Good Match"
                     })
-                
                 return {
                     "matches": matches,
                     "top_candidates": matches,
                     "job_id": job_id,
                     "limit": limit,
-                    "total_candidates": agent_result.get("total_candidates", 0),
+                    "total_candidates": len(matches),
                     "algorithm_version": agent_result.get("algorithm_version", "2.0.0-phase2-ai"),
                     "processing_time": f"{agent_result.get('processing_time', 0)}s",
-                    "ai_analysis": "Real AI semantic matching via Agent Service",
+                    "ai_analysis": "Real AI semantic matching via Agent Service" + (" (scoped to recruiter applicants)" if scope_set else ""),
                     "agent_status": "connected"
                 }
             else:
-                # Fallback to database matching if agent service fails
-                return await fallback_matching(job_id, limit)
-                
+                # 503 (engine loading), 5xx, or other non-200: use fallback matching
+                return await fallback_matching(job_id, limit, candidate_ids_scope=candidate_ids_scope)
     except Exception as e:
         log_error("agent_service_error", str(e), {"job_id": job_id})
-        # Fallback to database matching
-        return await fallback_matching(job_id, limit)
+        return await fallback_matching(job_id, limit, candidate_ids_scope=candidate_ids_scope)
 
 
 def _job_skill_tokens(text: str) -> set:
@@ -1730,17 +1767,14 @@ def _job_skill_tokens(text: str) -> set:
     return tokens
 
 
-async def fallback_matching(job_id: str, limit: int):
-    """Fallback matching when agent service is unavailable. Scores candidates by job JD/requirements/skills/experience/location, returns top N (not first N from DB)."""
+async def fallback_matching(job_id: str, limit: int, candidate_ids_scope: Optional[List[str]] = None):
+    """Fallback matching when agent service is unavailable. If candidate_ids_scope is set (recruiter), only those candidates are considered; else all candidates."""
     try:
         db = await get_mongo_db()
-        
-        # Get job requirements for better matching
         try:
             job_doc = await db.jobs.find_one({"_id": ObjectId(job_id)})
-        except:
+        except Exception:
             job_doc = await db.jobs.find_one({"id": job_id})
-        
         if not job_doc:
             return {"matches": [], "job_id": job_id, "limit": limit, "error": "Job not found", "agent_status": "error"}
         job_req_text = ((job_doc.get("requirements") or "") + " " + (job_doc.get("description") or "")).lower()
@@ -1750,7 +1784,18 @@ async def fallback_matching(job_id: str, limit: int):
         for m in re.finditer(r"(\d+)\s*[\+\-]?\s*(?:years?\s*(?:of\s*)?(?:experience|exp\.?)|y\.?o\.?e\.?|yrs?)", job_req_text, re.I):
             job_exp_years = int(m.group(1))
             break
-        cursor = db.candidates.find({})
+        if candidate_ids_scope:
+            object_ids = []
+            for cid in candidate_ids_scope:
+                try:
+                    object_ids.append(ObjectId(cid))
+                except Exception:
+                    pass
+            if not object_ids:
+                return {"matches": [], "job_id": job_id, "limit": limit, "total_candidates": 0, "algorithm_version": "2.0.0-gateway-fallback", "ai_analysis": "No applicants in recruiter scope", "agent_status": "disconnected"}
+            cursor = db.candidates.find({"_id": {"$in": object_ids}})
+        else:
+            cursor = db.candidates.find({})
         candidates_list = await cursor.to_list(length=2000)
         scored = []
         for doc in candidates_list:

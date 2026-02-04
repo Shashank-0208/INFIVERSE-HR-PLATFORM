@@ -70,7 +70,24 @@ export default function ApplicantsMatching() {
     }
   }
 
-  // Called only when user clicks Refresh: reload jobs list and current job + candidates (no auto-trigger)
+  // Refresh button: only reload jobs list and current job details. Do NOT call the match endpoint.
+  const handleRefresh = async () => {
+    try {
+      setLoading(true)
+      await loadJobs()
+      if (jobId) {
+        const jobData = await getJobById(jobId).catch(() => null)
+        setJob(jobData)
+      }
+    } catch (error) {
+      console.error('Failed to refresh:', error)
+      toast.error('Failed to refresh page data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Full reload including match results (used after shortlist/reject to update the list)
   const loadData = async () => {
     if (!jobId) {
       toast.error('Please select a job')
@@ -230,10 +247,10 @@ export default function ApplicantsMatching() {
             </button>
           </div>
 
-          {/* Refresh Button */}
+          {/* Refresh Button - only refreshes jobs and job details, does not trigger AI shortlist */}
           <div className="flex items-end">
             <button
-              onClick={loadData}
+              onClick={handleRefresh}
               disabled={loading || generating}
               className="w-full px-4 py-2.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
             >

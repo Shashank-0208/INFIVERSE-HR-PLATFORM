@@ -10,7 +10,8 @@ import json
 import sys
 import logging
 import jwt
-from typing import List, Dict, Any
+import threading
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 # Import configuration
@@ -143,27 +144,55 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# Initialize Phase 3 production engine if available
+# Lazy-loaded Phase 3 engines (avoid blocking startup: SentenceTransformer load can take 60s+)
 phase3_engine = None
 advanced_matcher = None
 batch_matcher = None
 learning_engine = None
+_phase3_init_lock = threading.Lock()
+_phase3_init_done = False
+_phase3_init_failed = False
 
-if PHASE3_AVAILABLE and Phase3SemanticEngine:
-    try:
-        phase3_engine = Phase3SemanticEngine()
-        advanced_matcher = AdvancedSemanticMatcher()
-        batch_matcher = BatchMatcher()
-        learning_engine = LearningEngine()
-        print("SUCCESS: Phase 3 Production Engine initialized")
-    except Exception as e:
-        logger.error(f"Failed to initialize Phase 3 engine: {e}")
-        PHASE3_AVAILABLE = False
-else:
-    print("INFO: Running in fallback mode without Phase 3 engine")
+
+def _ensure_phase3_engine():
+    """Initialize Phase 3 engines once, in background or on first use. Does not block /health."""
+    global phase3_engine, advanced_matcher, batch_matcher, learning_engine, _phase3_init_done, _phase3_init_failed
+    if _phase3_init_done or _phase3_init_failed:
+        return
+    with _phase3_init_lock:
+        if _phase3_init_done or _phase3_init_failed:
+            return
+        if not PHASE3_AVAILABLE or not Phase3SemanticEngine:
+            _phase3_init_failed = True
+            return
+        try:
+            logger.info("Phase 3 engine initializing (lazy load)...")
+            phase3_engine = Phase3SemanticEngine()
+            advanced_matcher = AdvancedSemanticMatcher()
+            batch_matcher = BatchMatcher()
+            learning_engine = LearningEngine()
+            _phase3_init_done = True
+            logger.info("SUCCESS: Phase 3 Production Engine initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize Phase 3 engine: {e}")
+            _phase3_init_failed = True
+
+
+@app.on_event("startup")
+def _startup_phase3_background():
+    """Start Phase 3 engine load in background so /health responds immediately."""
+    def _run():
+        try:
+            _ensure_phase3_engine()
+        except Exception as e:
+            logger.error(f"Background Phase 3 init error: {e}")
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    logger.info("Agent started; Phase 3 engine will load in background.")
 
 class MatchRequest(BaseModel):
     job_id: str
+    candidate_ids: Optional[List[str]] = None
 
 class CandidateScore(BaseModel):
     candidate_id: str
@@ -300,8 +329,18 @@ async def match_candidates(request: MatchRequest, auth = Depends(auth_dependency
         job_requirements = job_doc.get('requirements', '')
         logger.info(f"Processing job: {job_title}")
         
-        # Get all candidates (MongoDB version)
-        candidates_cursor = db.candidates.find({}).sort('created_at', -1)
+        # Get candidates: scope to candidate_ids when provided (e.g. recruiter applicants)
+        if request.candidate_ids:
+            object_ids = []
+            for cid in request.candidate_ids:
+                try:
+                    object_ids.append(ObjectId(cid))
+                except Exception:
+                    pass
+            query = {"_id": {"$in": object_ids}} if object_ids else {}
+        else:
+            query = {}
+        candidates_cursor = db.candidates.find(query).sort('created_at', -1)
         candidates = list(candidates_cursor)
         logger.info(f"Found {len(candidates)} candidates for Phase 3 matching")
         
@@ -319,7 +358,8 @@ async def match_candidates(request: MatchRequest, auth = Depends(auth_dependency
                 "status": "no_candidates"
             }
         
-        # Phase 3: Production AI Semantic Matching
+        # Phase 3: Production AI Semantic Matching (may block on first request while engine loads)
+        _ensure_phase3_engine()
         logger.info("Using Phase 3 Production AI semantic matching")
         
         job_data_dict = {
@@ -346,7 +386,6 @@ async def match_candidates(request: MatchRequest, auth = Depends(auth_dependency
                 'education_level': cand.get('education_level', '')
             })
         
-        # Use Phase 3 semantic matching if available, otherwise fallback
         if PHASE3_AVAILABLE and advanced_matcher:
             semantic_results = advanced_matcher.advanced_match(job_data_dict, candidates_dict)
             

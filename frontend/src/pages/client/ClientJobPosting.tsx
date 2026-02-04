@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createJob, Job } from '../../services/api'
+import { createJob } from '../../services/api'
 import { toast } from 'react-hot-toast'
 
 export default function ClientJobPosting() {

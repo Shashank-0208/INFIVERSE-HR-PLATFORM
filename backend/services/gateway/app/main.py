@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Security, Response, Request
+from fastapi import FastAPI, HTTPException, Depends, Security, Response, Request, File, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import json
@@ -1240,9 +1240,74 @@ async def get_candidate_by_id(candidate_id: str, auth=Depends(get_auth)):
         return {"error": str(e), "candidate_id": candidate_id}
 
 
+def _normalize_header(h: str) -> str:
+    """Map common header names to canonical field names for candidate rows."""
+    h = (h or "").strip().lower().replace(" ", "_")
+    if h in ("name", "full_name", "candidate_name"):
+        return "name"
+    if h in ("email", "e-mail", "email_address"):
+        return "email"
+    if h in ("cv_url", "resume_url", "resume", "cv", "resume_path"):
+        return "cv_url"
+    if h in ("phone", "phone_number", "mobile", "contact"):
+        return "phone"
+    if h in ("experience_years", "experience", "years_of_experience", "exp"):
+        return "experience_years"
+    if h in ("status", "application_status"):
+        return "status"
+    if h in ("location", "city", "address"):
+        return "location"
+    if h in ("skills", "technical_skills", "tech_skills"):
+        return "technical_skills"
+    if h in ("designation", "title", "seniority_level", "level"):
+        return "designation"
+    if h in ("education", "education_level", "qualification"):
+        return "education_level"
+    return h
+
+
+@app.post("/v1/candidates/parse-pdf", tags=["Candidate Management"])
+async def parse_pdf_candidates(file: UploadFile = File(...), auth=Depends(get_auth)):
+    """Parse a PDF file and extract candidate-like rows (text lines split by comma/tab)."""
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+    try:
+        import PyPDF2
+        content = await file.read()
+        if len(content) > 50 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="PDF must be under 50MB")
+        reader = PyPDF2.PdfReader(io.BytesIO(content))
+        lines = []
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                lines.extend(text.splitlines())
+        # Parse lines: split by comma or tab, first line may be header
+        rows = []
+        headers = []
+        for i, line in enumerate(lines):
+            line = (line or "").strip()
+            if not line:
+                continue
+            parts = re.split(r"[\t,]+", line, maxsplit=9)
+            parts = [p.strip() for p in parts]
+            if i == 0 and len(parts) >= 2:
+                headers = [_normalize_header(p) for p in parts]
+                continue
+            if len(parts) >= 2:
+                row = {}
+                for j, val in enumerate(parts):
+                    key = headers[j] if j < len(headers) else f"col_{j}"
+                    row[key] = val
+                rows.append(row)
+        return {"rows": rows, "count": len(rows)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse PDF: {str(e)[:200]}")
+
+
 @app.post("/v1/candidates/bulk", tags=["Candidate Management"])
-async def bulk_upload_candidates(candidates: CandidateBulk, api_key: str = Depends(get_api_key)):
-    """Bulk Upload Candidates"""
+async def bulk_upload_candidates(candidates: CandidateBulk, auth=Depends(get_auth)):
+    """Bulk Upload Candidates (recruiter JWT or API key)."""
     try:
         db = await get_mongo_db()
         inserted_count = 0

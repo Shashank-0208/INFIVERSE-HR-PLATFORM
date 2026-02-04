@@ -41,3 +41,6 @@ redis>=5.0.1,<6.0.0
 # Standard library modules - Compatible versions
 typing-extensions>=4.8.0,<5.0.0
 collections-extended>=2.0.2,<3.0.0
+
+# PDF parsing for bulk candidate upload
+PyPDF2>=3.0.0,<4.0.0

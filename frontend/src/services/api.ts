@@ -1090,6 +1090,17 @@ export interface BulkCandidate {
   education_level?: string
 }
 
+/** Parse a PDF file on the server and return candidate-like rows for editable preview. */
+export const parsePdfCandidates = async (file: File): Promise<{ rows: Record<string, string>[] }> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await api.post('/v1/candidates/parse-pdf', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000
+  })
+  return { rows: response.data?.rows ?? [] }
+}
+
 export const bulkUploadCandidates = async (candidates: BulkCandidate[]) => {
   try {
     const response = await api.post('/v1/candidates/bulk', { candidates })

@@ -1083,7 +1083,6 @@ export interface BulkCandidate {
   phone?: string
   experience_years?: number
   status?: string
-  job_id: number
   location?: string
   technical_skills?: string
   designation?: string
@@ -1101,9 +1100,10 @@ export const parsePdfCandidates = async (file: File): Promise<{ rows: Record<str
   return { rows: response.data?.rows ?? [] }
 }
 
-export const bulkUploadCandidates = async (candidates: BulkCandidate[]) => {
+/** Bulk upload candidates for a job. job_id links applicants to the job so dashboard stats stay in sync. */
+export const bulkUploadCandidates = async (candidates: BulkCandidate[], jobId: string) => {
   try {
-    const response = await api.post('/v1/candidates/bulk', { candidates })
+    const response = await api.post('/v1/candidates/bulk', { candidates, job_id: jobId })
     return response.data
   } catch (error) {
     console.error('Error uploading candidates:', error)

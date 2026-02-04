@@ -337,6 +337,7 @@ class JobCreate(BaseModel):
 
 class CandidateBulk(BaseModel):
     candidates: List[Dict[str, Any]]
+    job_id: Optional[str] = None  # If set, each inserted candidate is linked as applicant for this job (dashboard sync)
 
 class FeedbackSubmission(BaseModel):
     candidate_id: str
@@ -1562,26 +1563,47 @@ async def parse_pdf_candidates(file: UploadFile = File(...), auth=Depends(get_au
 
 @app.post("/v1/candidates/bulk", tags=["Candidate Management"])
 async def bulk_upload_candidates(candidates: CandidateBulk, auth=Depends(get_auth)):
-    """Bulk Upload Candidates (recruiter JWT or API key)."""
+    """Bulk Upload Candidates (recruiter JWT or API key). Inserts into candidates and, when job_id is provided, creates job_applications so dashboard stats stay in sync."""
     try:
         db = await get_mongo_db()
         inserted_count = 0
         errors = []
-        
+        job_id_str = (candidates.job_id or "").strip()
+        # Validate job exists when job_id is provided (so we can link applicants for dashboard)
+        if job_id_str:
+            try:
+                job_doc = await db.jobs.find_one({"_id": ObjectId(job_id_str)})
+            except Exception:
+                job_doc = await db.jobs.find_one({"id": job_id_str})
+            if not job_doc:
+                raise HTTPException(status_code=400, detail="Invalid or unknown job_id for bulk upload")
+        now = datetime.now(timezone.utc)
+
         for i, candidate in enumerate(candidates.candidates):
             try:
                 email = candidate.get("email", "")
                 if not email:
                     errors.append(f"Candidate {i+1}: Email is required")
                     continue
-                
+
                 # Check email uniqueness
                 existing = await db.candidates.find_one({"email": email})
                 if existing:
+                    # Still link existing candidate to this job for dashboard applicant count
+                    if job_id_str:
+                        candidate_id_str = str(existing["_id"])
+                        app_existing = await db.job_applications.find_one({"job_id": job_id_str, "candidate_id": candidate_id_str})
+                        if not app_existing:
+                            await db.job_applications.insert_one({
+                                "job_id": job_id_str,
+                                "candidate_id": candidate_id_str,
+                                "status": "applied",
+                                "applied_date": now
+                            })
                     errors.append(f"Candidate {i+1}: Email {email} already exists")
                     continue
-                
-                # Insert with proper error handling
+
+                # Insert candidate
                 document = {
                     "name": candidate.get("name", "Unknown"),
                     "email": email,
@@ -1593,14 +1615,28 @@ async def bulk_upload_candidates(candidates: CandidateBulk, auth=Depends(get_aut
                     "education_level": candidate.get("education_level", ""),
                     "resume_path": candidate.get("cv_url", candidate.get("resume_path", "")),
                     "status": candidate.get("status", "applied"),
-                    "created_at": datetime.now(timezone.utc)
+                    "created_at": now
                 }
-                await db.candidates.insert_one(document)
+                result = await db.candidates.insert_one(document)
                 inserted_count += 1
+
+                # Link to job so recruiter dashboard "Total Applicants" and per-job counts stay in sync
+                if job_id_str and result.inserted_id:
+                    candidate_id_str = str(result.inserted_id)
+                    app_existing = await db.job_applications.find_one({"job_id": job_id_str, "candidate_id": candidate_id_str})
+                    if not app_existing:
+                        await db.job_applications.insert_one({
+                            "job_id": job_id_str,
+                            "candidate_id": candidate_id_str,
+                            "status": "applied",
+                            "applied_date": now
+                        })
+            except HTTPException:
+                raise
             except Exception as e:
                 errors.append(f"Candidate {i+1}: {str(e)[:100]}")
                 continue
-        
+
         return {
             "message": "Bulk upload completed",
             "candidates_received": len(candidates.candidates),
@@ -1609,6 +1645,8 @@ async def bulk_upload_candidates(candidates: CandidateBulk, auth=Depends(get_aut
             "total_errors": len(errors),
             "status": "success" if inserted_count > 0 else "failed"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         return {
             "message": "Bulk upload failed",

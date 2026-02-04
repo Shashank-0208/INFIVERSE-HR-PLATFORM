@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 import { getRecruiterJobs, bulkUploadCandidates, parsePdfCandidates, type Job } from '../../services/api'
@@ -272,7 +273,6 @@ export default function BatchUpload() {
     setValidationErrors([])
     setUploading(true)
     try {
-      const jobIdNum = parseInt(jobId, 10) || 0
       const candidates = rowsToSubmit.map((row) => ({
         name: (row.name || '').trim(),
         email: (row.email || '').trim(),
@@ -280,15 +280,14 @@ export default function BatchUpload() {
         phone: (row.phone || '').trim() || undefined,
         experience_years: (row.experience_years || '').trim() ? parseInt(row.experience_years, 10) || 0 : 0,
         status: (row.status || '').trim() || 'applied',
-        job_id: jobIdNum,
         location: (row.location || '').trim() || undefined,
         technical_skills: (row.technical_skills || '').trim() || undefined,
         designation: (row.designation || '').trim() || undefined,
         education_level: (row.education_level || '').trim() || undefined
       }))
-      const result = await bulkUploadCandidates(candidates)
+      const result = await bulkUploadCandidates(candidates, jobId)
       const inserted = result?.candidates_inserted ?? candidates.length
-      toast.success(`Uploaded ${inserted} candidate(s) for this job.`)
+      toast.success(`Uploaded ${inserted} candidate(s) for this job. Dashboard counts are updated.`)
       setFiles([])
       setEditableRows([])
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -311,10 +310,23 @@ export default function BatchUpload() {
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="p-6 rounded-2xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 dark:from-green-500/10 dark:to-emerald-500/10 backdrop-blur-xl border border-green-300/20 dark:border-green-500/20">
-        <h1 className="page-title">Bulk Candidate Upload</h1>
-        <p className="page-subtitle">
-          Upload candidates from CSV, Excel (XLS/XLSX), or PDF. Edit the preview table below, then upload.
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <h1 className="page-title">Bulk Candidate Upload</h1>
+            <p className="page-subtitle">
+              Upload candidates from CSV, Excel (XLS/XLSX), or PDF. Edit the preview table below, then upload. Applicant counts sync to the dashboard.
+            </p>
+          </div>
+          <Link
+            to="/recruiter"
+            className="inline-flex items-center gap-1.5 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-semibold text-sm shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Dashboard overview
+          </Link>
+        </div>
       </div>
 
       <div className="card">

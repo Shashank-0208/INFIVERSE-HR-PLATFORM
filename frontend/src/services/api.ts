@@ -542,9 +542,8 @@ export const updateCandidateProfile = async (candidateId: string, data: Partial<
   }
 }
 
-// Match endpoint: gateway tries agent (default 20s) then fallback; use 70s so we get
-// either AI results or fallback (supports AGENT_MATCH_TIMEOUT=60 when set).
-const MATCH_REQUEST_TIMEOUT_MS = 70_000
+// Match endpoint: 60s timeout for AI shortlist (gateway uses AGENT_MATCH_TIMEOUT=60).
+const MATCH_REQUEST_TIMEOUT_MS = 60_000
 
 export const getCandidatesByJob = async (jobId: string) => {
   try {

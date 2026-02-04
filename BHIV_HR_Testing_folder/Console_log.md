@@ -1,11 +1,307 @@
-(5) ['69806fc49d05cbefd0ff8080', '69809bc766a686d9083b5571', '69809de866a686d9083b5573', '6981deaa204ce143ba476276', '6967a392cd9e396edeeacdfe']
-4api.ts:36 ✅ Adding Authorization header for request: /v1/jobs/autocomplete
-2api.ts:36 ✅ Adding Authorization header for request: /v1/jobs/skills/autocomplete
-api.ts:36 ✅ Adding Authorization header for request: /v1/jobs?skills=React&search=DevOps+Engineer+%E2%80%93+Infrastructure
-api.ts:36 ✅ Adding Authorization header for request: /v1/jobs/skills/autocomplete
-2api.ts:36 ✅ Adding Authorization header for request: /v1/jobs?search=DevOps+Engineer+%E2%80%93+Infrastructure
-4api.ts:36 ✅ Adding Authorization header for request: /v1/jobs/autocomplete
-api.ts:36 ✅ Adding Authorization header for request: /v1/jobs?search=senior+software+engineer+%E2%80%93+Engineering
-api.ts:36 ✅ Adding Authorization header for request: /v1/jobs?
-4api.ts:36 ✅ Adding Authorization header for request: /v1/jobs/autocomplete
-api.ts:36 ✅ Adding Authorization header for request: /v1/jobs?search=DevOps+Engineer+%E2%80%93+Engineering
+[CursorBrowser] Native dialog overrides installed - dialogs are now non-blocking
+index-B7ne_OmU.js:186 Theme changed to: light
+index-B7ne_OmU.js:188  POST https://bhiv-hr-gateway-l0xp.onrender.com/v1/candidates/parse-pdf 405 (Method Not Allowed)
+(anonymous) @ index-B7ne_OmU.js:188
+xhr @ index-B7ne_OmU.js:188
+Bi @ index-B7ne_OmU.js:190
+Promise.then
+_request @ index-B7ne_OmU.js:191
+request @ index-B7ne_OmU.js:190
+(anonymous) @ index-B7ne_OmU.js:191
+(anonymous) @ index-B7ne_OmU.js:186
+rh @ index-B7ne_OmU.js:191
+E @ index-B7ne_OmU.js:228
+I @ index-B7ne_OmU.js:228
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:191 API Error: 405 - /v1/candidates/parse-pdf
+(anonymous) @ index-B7ne_OmU.js:191
+Promise.then
+_request @ index-B7ne_OmU.js:191
+request @ index-B7ne_OmU.js:190
+(anonymous) @ index-B7ne_OmU.js:191
+(anonymous) @ index-B7ne_OmU.js:186
+rh @ index-B7ne_OmU.js:191
+E @ index-B7ne_OmU.js:228
+I @ index-B7ne_OmU.js:228
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:228 Parse error: ye {message: 'Request failed with status code 405', name: 'AxiosError', code: 'ERR_BAD_REQUEST', config: {…}, request: XMLHttpRequest, …}
+I @ index-B7ne_OmU.js:228
+await in I
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:188  POST https://bhiv-hr-gateway-l0xp.onrender.com/v1/candidates/parse-pdf 405 (Method Not Allowed)
+(anonymous) @ index-B7ne_OmU.js:188
+xhr @ index-B7ne_OmU.js:188
+Bi @ index-B7ne_OmU.js:190
+Promise.then
+_request @ index-B7ne_OmU.js:191
+request @ index-B7ne_OmU.js:190
+(anonymous) @ index-B7ne_OmU.js:191
+(anonymous) @ index-B7ne_OmU.js:186
+rh @ index-B7ne_OmU.js:191
+E @ index-B7ne_OmU.js:228
+I @ index-B7ne_OmU.js:228
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:191 API Error: 405 - /v1/candidates/parse-pdf
+(anonymous) @ index-B7ne_OmU.js:191
+Promise.then
+_request @ index-B7ne_OmU.js:191
+request @ index-B7ne_OmU.js:190
+(anonymous) @ index-B7ne_OmU.js:191
+(anonymous) @ index-B7ne_OmU.js:186
+rh @ index-B7ne_OmU.js:191
+E @ index-B7ne_OmU.js:228
+I @ index-B7ne_OmU.js:228
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:228 Parse error: ye {message: 'Request failed with status code 405', name: 'AxiosError', code: 'ERR_BAD_REQUEST', config: {…}, request: XMLHttpRequest, …}
+I @ index-B7ne_OmU.js:228
+await in I
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:188  POST https://bhiv-hr-gateway-l0xp.onrender.com/v1/candidates/parse-pdf 405 (Method Not Allowed)
+(anonymous) @ index-B7ne_OmU.js:188
+xhr @ index-B7ne_OmU.js:188
+Bi @ index-B7ne_OmU.js:190
+Promise.then
+_request @ index-B7ne_OmU.js:191
+request @ index-B7ne_OmU.js:190
+(anonymous) @ index-B7ne_OmU.js:191
+(anonymous) @ index-B7ne_OmU.js:186
+rh @ index-B7ne_OmU.js:191
+E @ index-B7ne_OmU.js:228
+I @ index-B7ne_OmU.js:228
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:191 API Error: 405 - /v1/candidates/parse-pdf
+(anonymous) @ index-B7ne_OmU.js:191
+Promise.then
+_request @ index-B7ne_OmU.js:191
+request @ index-B7ne_OmU.js:190
+(anonymous) @ index-B7ne_OmU.js:191
+(anonymous) @ index-B7ne_OmU.js:186
+rh @ index-B7ne_OmU.js:191
+E @ index-B7ne_OmU.js:228
+I @ index-B7ne_OmU.js:228
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:228 Parse error: ye {message: 'Request failed with status code 405', name: 'AxiosError', code: 'ERR_BAD_REQUEST', config: {…}, request: XMLHttpRequest, …}
+I @ index-B7ne_OmU.js:228
+await in I
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:188  POST https://bhiv-hr-gateway-l0xp.onrender.com/v1/candidates/parse-pdf 405 (Method Not Allowed)
+(anonymous) @ index-B7ne_OmU.js:188
+xhr @ index-B7ne_OmU.js:188
+Bi @ index-B7ne_OmU.js:190
+Promise.then
+_request @ index-B7ne_OmU.js:191
+request @ index-B7ne_OmU.js:190
+(anonymous) @ index-B7ne_OmU.js:191
+(anonymous) @ index-B7ne_OmU.js:186
+rh @ index-B7ne_OmU.js:191
+E @ index-B7ne_OmU.js:228
+I @ index-B7ne_OmU.js:228
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:191 API Error: 405 - /v1/candidates/parse-pdf
+(anonymous) @ index-B7ne_OmU.js:191
+Promise.then
+_request @ index-B7ne_OmU.js:191
+request @ index-B7ne_OmU.js:190
+(anonymous) @ index-B7ne_OmU.js:191
+(anonymous) @ index-B7ne_OmU.js:186
+rh @ index-B7ne_OmU.js:191
+E @ index-B7ne_OmU.js:228
+I @ index-B7ne_OmU.js:228
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:228 Parse error: ye {message: 'Request failed with status code 405', name: 'AxiosError', code: 'ERR_BAD_REQUEST', config: {…}, request: XMLHttpRequest, …}
+I @ index-B7ne_OmU.js:228
+await in I
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:188  POST https://bhiv-hr-gateway-l0xp.onrender.com/v1/candidates/parse-pdf 405 (Method Not Allowed)
+(anonymous) @ index-B7ne_OmU.js:188
+xhr @ index-B7ne_OmU.js:188
+Bi @ index-B7ne_OmU.js:190
+Promise.then
+_request @ index-B7ne_OmU.js:191
+request @ index-B7ne_OmU.js:190
+(anonymous) @ index-B7ne_OmU.js:191
+(anonymous) @ index-B7ne_OmU.js:186
+rh @ index-B7ne_OmU.js:191
+E @ index-B7ne_OmU.js:228
+I @ index-B7ne_OmU.js:228
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:191 API Error: 405 - /v1/candidates/parse-pdf
+(anonymous) @ index-B7ne_OmU.js:191
+Promise.then
+_request @ index-B7ne_OmU.js:191
+request @ index-B7ne_OmU.js:190
+(anonymous) @ index-B7ne_OmU.js:191
+(anonymous) @ index-B7ne_OmU.js:186
+rh @ index-B7ne_OmU.js:191
+E @ index-B7ne_OmU.js:228
+I @ index-B7ne_OmU.js:228
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29
+index-B7ne_OmU.js:228 Parse error: ye {message: 'Request failed with status code 405', name: 'AxiosError', code: 'ERR_BAD_REQUEST', config: {…}, request: XMLHttpRequest, …}
+I @ index-B7ne_OmU.js:228
+await in I
+R @ index-B7ne_OmU.js:228
+hf @ vendor-Bu_GNBCQ.js:29
+vf @ vendor-Bu_GNBCQ.js:29
+yf @ vendor-Bu_GNBCQ.js:29
+zo @ vendor-Bu_GNBCQ.js:29
+ks @ vendor-Bu_GNBCQ.js:29
+(anonymous) @ vendor-Bu_GNBCQ.js:29
+ji @ vendor-Bu_GNBCQ.js:32
+Qa @ vendor-Bu_GNBCQ.js:29
+Hl @ vendor-Bu_GNBCQ.js:29
+di @ vendor-Bu_GNBCQ.js:29
+Mf @ vendor-Bu_GNBCQ.js:29

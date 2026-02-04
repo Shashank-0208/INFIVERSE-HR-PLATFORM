@@ -1716,8 +1716,22 @@ async def get_top_matches(job_id: str, limit: int = 10, auth = Depends(get_auth)
         # Fallback to database matching
         return await fallback_matching(job_id, limit)
 
+
+def _job_skill_tokens(text: str) -> set:
+    """Extract skill-like tokens from job requirements/description for matching."""
+    if not text:
+        return set()
+    s = re.sub(r"[,;|/&\n]+", " ", (text or "").lower())
+    tokens = set()
+    for part in s.split():
+        t = part.strip().strip(".-()")
+        if 2 <= len(t) <= 50 and t.isalnum():
+            tokens.add(t)
+    return tokens
+
+
 async def fallback_matching(job_id: str, limit: int):
-    """Fallback matching when agent service is unavailable"""
+    """Fallback matching when agent service is unavailable. Scores candidates by job JD/requirements/skills/experience/location, returns top N (not first N from DB)."""
     try:
         db = await get_mongo_db()
         
@@ -1729,40 +1743,56 @@ async def fallback_matching(job_id: str, limit: int):
         
         if not job_doc:
             return {"matches": [], "job_id": job_id, "limit": limit, "error": "Job not found", "agent_status": "error"}
-        
-        job_requirements = (job_doc.get("requirements", "") or "").lower()
-        job_location = job_doc.get("location", "") or ""
-        
-        cursor = db.candidates.find({}).limit(limit)
-        candidates_list = await cursor.to_list(length=limit)
-        matches = []
-        
-        for i, doc in enumerate(candidates_list):
+        job_req_text = ((job_doc.get("requirements") or "") + " " + (job_doc.get("description") or "")).lower()
+        job_skill_tokens = _job_skill_tokens(job_req_text)
+        job_location = (job_doc.get("location") or "").strip().lower()
+        job_exp_years = None
+        for m in re.finditer(r"(\d+)\s*[\+\-]?\s*(?:years?\s*(?:of\s*)?(?:experience|exp\.?)|y\.?o\.?e\.?|yrs?)", job_req_text, re.I):
+            job_exp_years = int(m.group(1))
+            break
+        cursor = db.candidates.find({})
+        candidates_list = await cursor.to_list(length=2000)
+        scored = []
+        for doc in candidates_list:
             candidate_skills = (doc.get("technical_skills") or "").lower()
-            candidate_location = doc.get("location") or ""
-            
-            # Basic skill matching
-            skill_match_count = sum(1 for skill in ['python', 'java', 'javascript'] 
-                                  if skill in candidate_skills and skill in job_requirements)
-            
-            # Location matching
-            location_match = job_location.lower() in candidate_location.lower() if job_location and candidate_location else False
-            
-            # Calculate score based on matches
-            base_score = 60 + (skill_match_count * 10) + (10 if location_match else 0) + (5 - i)
-            
+            candidate_location = (doc.get("location") or "").strip().lower()
+            candidate_exp = 0
+            try:
+                exp_val = doc.get("experience_years")
+                if exp_val is not None:
+                    candidate_exp = int(exp_val) if isinstance(exp_val, int) else int(str(exp_val).strip() or 0)
+            except (ValueError, TypeError):
+                pass
+            matched_skills = [t for t in job_skill_tokens if t in candidate_skills][:20]
+            skill_match_count = len(matched_skills)
+            skill_score = min(100, skill_match_count * 12) if job_skill_tokens else 50
+            location_match = bool(job_location and candidate_location and (job_location in candidate_location or candidate_location in job_location))
+            location_score = 100 if location_match else 0
+            if job_exp_years is not None:
+                if candidate_exp >= job_exp_years:
+                    experience_score = 100
+                else:
+                    experience_score = max(0, int(100 * candidate_exp / job_exp_years))
+            else:
+                experience_score = 50
+            total = (skill_score * 0.5) + (experience_score * 0.3) + (location_score * 0.2)
+            total = max(50, min(95, int(total)))
+            scored.append((total, doc, matched_skills, skill_score, experience_score, location_score, location_match))
+        scored.sort(key=lambda x: (-x[0], -x[3], -x[4]))
+        top = scored[:limit]
+        matches = []
+        for total, doc, matched_skills, skill_score, experience_score, location_score, location_match in top:
             matches.append({
                 "candidate_id": str(doc["_id"]),
                 "name": doc.get("name"),
                 "email": doc.get("email"),
-                "score": min(95, base_score),
-                "skills_match": doc.get("technical_skills") or "",
-                "experience_match": f"Skills: {skill_match_count} matches",
-                "location_match": location_match,
-                "reasoning": f"Fallback matching: {skill_match_count} skill matches, location: {location_match}",
-                "recommendation_strength": "Good Match" if base_score > 75 else "Fair Match"
+                "score": total,
+                "skills_match": ", ".join(matched_skills) if matched_skills else (doc.get("technical_skills") or ""),
+                "experience_match": experience_score,
+                "location_match": location_score,
+                "reasoning": f"Skills: {len(matched_skills)} match job JD; experience {experience_score}%; location {location_score}%",
+                "recommendation_strength": "Good Match" if total > 75 else "Fair Match"
             })
-        
         return {
             "matches": matches,
             "top_candidates": matches,
@@ -1771,7 +1801,7 @@ async def fallback_matching(job_id: str, limit: int):
             "total_candidates": len(matches),
             "algorithm_version": "2.0.0-gateway-fallback",
             "processing_time": "0.05s",
-            "ai_analysis": "Database fallback - Agent service unavailable",
+            "ai_analysis": "Database fallback - matched by job requirements, skills, experience and location",
             "agent_status": "disconnected"
         }
     except Exception as e:

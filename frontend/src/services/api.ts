@@ -9,7 +9,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000, // Increased timeout for Render cold starts (30 seconds)
   headers: {
     'Content-Type': 'application/json',
   },
@@ -406,7 +406,7 @@ export const getJobLocationSuggestions = async (q: string, limit = 15): Promise<
   }
 }
 
-export const createJob = async (jobData: Partial<Job>) => {
+export const createJob = async (jobData: Partial<Job> | Record<string, any>) => {
   try {
     const response = await api.post('/v1/jobs', jobData)
     return response.data

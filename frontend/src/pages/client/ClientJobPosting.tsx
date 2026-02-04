@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createJob, Job } from '../../services/api'
+import { createJob } from '../../services/api'
 import { toast } from 'react-hot-toast'
 
 export default function ClientJobPosting() {
@@ -24,14 +24,16 @@ export default function ClientJobPosting() {
     setLoading(true)
 
     try {
-      const jobData: Partial<Job> = {
+      // Map frontend fields to backend API format
+      // Backend expects different field names than the Job interface
+      const jobData: Record<string, any> = {
         title: formData.title,
         department: formData.department,
         location: formData.location,
-        experience_required: formData.experience_level,
-        job_type: formData.employment_type,
+        experience_level: formData.experience_level.toLowerCase(), // Backend expects: "entry", "mid", "senior", "lead"
+        requirements: formData.required_skills || formData.description, // Backend requires 'requirements' field
         description: formData.description,
-        skills_required: formData.required_skills,
+        employment_type: formData.employment_type, // Optional field
         status: 'active',
       }
 

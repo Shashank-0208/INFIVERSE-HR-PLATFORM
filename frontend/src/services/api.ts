@@ -341,9 +341,16 @@ export const getJobById = async (jobId: string): Promise<Job> => {
 
 /** Search-as-you-type: job suggestions by title/department. Requires auth. */
 export const getJobSuggestions = async (q: string, limit = 10): Promise<{ id: string; title: string; department: string; location?: string }[]> => {
-  if (!q?.trim()) return []
+  const normalizeAutocompleteQuery = (raw: string) =>
+    (raw ?? '')
+      .replace(/[\\/]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const qNorm = normalizeAutocompleteQuery(q)
+  if (!qNorm) return []
   try {
-    const response = await api.get('/v1/jobs/autocomplete', { params: { q: q.trim(), limit } })
+    const response = await api.get('/v1/jobs/autocomplete', { params: { q: qNorm, limit } })
     return response.data?.suggestions ?? []
   } catch (error) {
     console.error('Job suggestions error:', error)
@@ -353,9 +360,13 @@ export const getJobSuggestions = async (q: string, limit = 10): Promise<{ id: st
 
 /** Search-as-you-type: candidate suggestions by name/email/skills. Requires auth. */
 export const getCandidateSuggestions = async (q: string, limit = 10): Promise<{ id: string; name: string; email: string; technical_skills?: string; location?: string }[]> => {
-  if (!q?.trim()) return []
+  const qNorm = (q ?? '')
+    .replace(/[\\/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!qNorm) return []
   try {
-    const response = await api.get('/v1/candidates/autocomplete', { params: { q: q.trim(), limit } })
+    const response = await api.get('/v1/candidates/autocomplete', { params: { q: qNorm, limit } })
     return response.data?.suggestions ?? []
   } catch (error) {
     console.error('Candidate suggestions error:', error)
@@ -365,9 +376,13 @@ export const getCandidateSuggestions = async (q: string, limit = 10): Promise<{ 
 
 /** Search-as-you-type: skill suggestions from active jobs' requirements (for candidate browse jobs skills field). */
 export const getJobSkillSuggestions = async (q: string, limit = 15): Promise<{ id: string; label: string }[]> => {
-  if (!q?.trim()) return []
+  const qNorm = (q ?? '')
+    .replace(/[\\/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!qNorm) return []
   try {
-    const response = await api.get('/v1/jobs/skills/autocomplete', { params: { q: q.trim(), limit } })
+    const response = await api.get('/v1/jobs/skills/autocomplete', { params: { q: qNorm, limit } })
     return response.data?.suggestions ?? []
   } catch (error) {
     console.error('Job skill suggestions error:', error)
@@ -377,9 +392,13 @@ export const getJobSkillSuggestions = async (q: string, limit = 15): Promise<{ i
 
 /** Search-as-you-type: location suggestions from active jobs (for candidate browse jobs location field). */
 export const getJobLocationSuggestions = async (q: string, limit = 15): Promise<{ id: string; label: string }[]> => {
-  if (!q?.trim()) return []
+  const qNorm = (q ?? '')
+    .replace(/[\\/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!qNorm) return []
   try {
-    const response = await api.get('/v1/jobs/locations/autocomplete', { params: { q: q.trim(), limit } })
+    const response = await api.get('/v1/jobs/locations/autocomplete', { params: { q: qNorm, limit } })
     return response.data?.suggestions ?? []
   } catch (error) {
     console.error('Job location suggestions error:', error)

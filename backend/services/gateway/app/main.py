@@ -745,15 +745,41 @@ async def list_jobs(
 @app.get("/v1/jobs/autocomplete", tags=["Job Management"])
 async def jobs_autocomplete(q: Optional[str] = None, limit: int = 10):
     """Search-as-you-type: return job suggestions by title or department (public for candidate job search)."""
+    def _normalize_autocomplete_query(raw: str) -> str:
+        """Normalize user query for autocomplete matching.
+        - Removes/normalizes special characters (/, \\, -, etc.) into spaces
+        - Keeps only letters/numbers/spaces for fuzzy matching
+        """
+        if raw is None:
+            return ""
+        s = str(raw).strip()
+        if not s:
+            return ""
+        # Convert common separators/symbols into spaces, then strip any remaining non-alphanumerics.
+        s = re.sub(r"[\\/]+", " ", s)
+        s = re.sub(r"[^A-Za-z0-9]+", " ", s)
+        s = re.sub(r"\s+", " ", s).strip()
+        return s[:50]
+
+    def _fuzzy_regex_from_query(norm: str) -> Optional[str]:
+        """Build a fuzzy regex that matches tokens with any non-word separators between them.
+        Example: 'AR VR Engineer' -> 'AR[\\s\\W_]*VR[\\s\\W_]*Engineer'
+        """
+        tokens = [t for t in (norm or "").split(" ") if t]
+        if not tokens:
+            return None
+        return r"[\s\W_]*".join(re.escape(t) for t in tokens)[:200]
+
     if not q or not str(q).strip():
         return {"suggestions": []}
-    q = str(q).strip()[:50]
-    if not re.match(r"^[A-Za-z0-9\s\-_.]+$", q):
+    q_norm = _normalize_autocomplete_query(q)
+    if not q_norm:
         return {"suggestions": []}
     limit = max(1, min(limit, 20))
     try:
         db = await get_mongo_db()
-        regex = {"$regex": re.escape(q), "$options": "i"}
+        regex_pat = _fuzzy_regex_from_query(q_norm) or re.escape(q_norm)
+        regex = {"$regex": regex_pat, "$options": "i"}
         cursor = db.jobs.find({
             "status": "active",
             "$or": [{"title": regex}, {"department": regex}]
@@ -791,7 +817,11 @@ async def job_skills_autocomplete(q: Optional[str] = None, limit: int = 15):
     if not q or not str(q).strip():
         return {"suggestions": []}
     q = str(q).strip()[:50]
-    if not re.match(r"^[A-Za-z0-9\s\-_.]+$", q):
+    # Normalize query to handle special characters like C/C++, AR/VR, etc.
+    q_norm = re.sub(r"[\\/]+", " ", q)
+    q_norm = re.sub(r"[^A-Za-z0-9]+", " ", q_norm)
+    q_norm = re.sub(r"\s+", " ", q_norm).strip().lower()
+    if not q_norm:
         return {"suggestions": []}
     limit = max(1, min(limit, 25))
     try:
@@ -802,8 +832,14 @@ async def job_skills_autocomplete(q: Optional[str] = None, limit: int = 15):
         for doc in jobs_list:
             req = doc.get("requirements") or ""
             all_skills.update(_extract_skills_from_requirements(req))
-        q_lower = q.lower()
-        matching = sorted(s for s in all_skills if q_lower in s.lower())[:limit]
+        def _norm_token(s: str) -> str:
+            return re.sub(r"[^a-z0-9]+", "", (s or "").lower())
+
+        q_key = _norm_token(q_norm)
+        matching = sorted(
+            s for s in all_skills
+            if q_key and q_key in _norm_token(s)
+        )[:limit]
         return {"suggestions": [{"id": s, "label": s} for s in matching]}
     except Exception as e:
         return {"suggestions": [], "error": str(e)}
@@ -815,12 +851,16 @@ async def job_locations_autocomplete(q: Optional[str] = None, limit: int = 15):
     if not q or not str(q).strip():
         return {"suggestions": []}
     q = str(q).strip()[:50]
-    if not re.match(r"^[A-Za-z0-9\s\-_,.]+$", q):
+    q_norm = re.sub(r"[\\/]+", " ", q)
+    q_norm = re.sub(r"[^A-Za-z0-9]+", " ", q_norm)
+    q_norm = re.sub(r"\s+", " ", q_norm).strip()
+    if not q_norm:
         return {"suggestions": []}
     limit = max(1, min(limit, 25))
     try:
         db = await get_mongo_db()
-        regex = {"$regex": re.escape(q), "$options": "i"}
+        regex_pat = r"[\s\W_]*".join(re.escape(t) for t in q_norm.split(" ") if t)[:200]
+        regex = {"$regex": regex_pat, "$options": "i"}
         cursor = db.jobs.find({"status": "active", "location": regex}, {"location": 1})
         jobs_list = await cursor.to_list(length=500)
         seen = set()
@@ -1025,12 +1065,23 @@ async def candidates_autocomplete(q: Optional[str] = None, limit: int = 10, auth
     if not q or not str(q).strip():
         return {"suggestions": []}
     q = str(q).strip()[:50]
-    if not re.match(r"^[A-Za-z0-9\s@.\-_,]+$", q):
+    # Normalize special characters so users can search names/skills containing symbols.
+    # Keep @ and . for email searches, but treat slashes as separators.
+    q_norm = re.sub(r"[\\/]+", " ", q)
+    q_norm = re.sub(r"\s+", " ", q_norm).strip()
+    # If query is only symbols/spaces, bail out.
+    if not re.search(r"[A-Za-z0-9@.]", q_norm):
         return {"suggestions": []}
     limit = max(1, min(limit, 20))
     try:
         db = await get_mongo_db()
-        regex = {"$regex": re.escape(q), "$options": "i"}
+        # Fuzzy token match for non-email queries; for email-ish input keep a direct escaped regex.
+        if "@" in q_norm or "." in q_norm:
+            regex_pat = re.escape(q_norm)
+        else:
+            tokens = [t for t in re.sub(r"[^A-Za-z0-9]+", " ", q_norm).split(" ") if t]
+            regex_pat = r"[\s\W_]*".join(re.escape(t) for t in tokens)[:200] if tokens else re.escape(q_norm)
+        regex = {"$regex": regex_pat, "$options": "i"}
         cursor = db.candidates.find({
             "$or": [
                 {"name": regex},

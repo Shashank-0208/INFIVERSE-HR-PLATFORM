@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
-import { getJobs, bulkUploadCandidates } from '../../services/api'
+import { getRecruiterJobs, bulkUploadCandidates, type Job } from '../../services/api'
 import Loading from '../../components/Loading'
 
 interface CSVRow {
@@ -14,7 +14,8 @@ interface CSVRow {
 
 export default function BatchUpload() {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [jobId, setJobId] = useState<number>(1)
+  const [recruiterJobs, setRecruiterJobs] = useState<Job[]>([])
+  const [jobId, setJobId] = useState<string>('')
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<CSVRow[]>([])
   const [uploading, setUploading] = useState(false)
@@ -22,25 +23,28 @@ export default function BatchUpload() {
   const [isDragging, setIsDragging] = useState(false)
 
   useEffect(() => {
-    loadJobs()
+    loadRecruiterJobs()
   }, [])
 
-  const loadJobs = async () => {
+  const loadRecruiterJobs = async () => {
     try {
       setLoading(true)
-      const jobsData = await getJobs()
+      const jobsData = await getRecruiterJobs()
+      setRecruiterJobs(jobsData)
       if (jobsData.length > 0) {
-        setJobId(parseInt(jobsData[0].id) || 1)
+        setJobId((current) => {
+          const exists = current && jobsData.some((j) => j.id === current)
+          return exists ? current : jobsData[0].id
+        })
+      } else {
+        setJobId('')
       }
     } catch (error) {
-      console.error('Failed to load jobs:', error)
+      console.error('Failed to load recruiter jobs:', error)
+      toast.error('Failed to load your jobs. Make sure you are logged in as a recruiter.')
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleJobIdChange = (delta: number) => {
-    setJobId(prev => Math.max(1, prev + delta))
   }
 
   const handleFileChange = (selectedFile: File) => {
@@ -129,7 +133,7 @@ export default function BatchUpload() {
     }
 
     if (!jobId) {
-      toast.error('Please enter a Job ID')
+      toast.error('Please select a job')
       return
     }
 
@@ -156,7 +160,7 @@ export default function BatchUpload() {
           phone: (row.phone || '').trim(),
           experience_years: expYears,
           status: (row.status || 'applied').trim(),
-          job_id: jobId,
+          job_id: parseInt(jobId, 10) || 0,
           location: (row.location || '').trim(),
           technical_skills: (row.skills || '').trim(),
           designation: (row.designation || '').trim(),
@@ -210,35 +214,30 @@ export default function BatchUpload() {
         <p className="page-subtitle">Upload multiple candidates for a job position using CSV format</p>
       </div>
 
-      {/* Job ID Input */}
+      {/* Job selection: only jobs posted by the logged-in recruiter */}
       <div className="card">
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Job ID
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Select job for upload
         </label>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => handleJobIdChange(-1)}
-            className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-300 dark:border-gray-600 transition-all font-semibold"
-          >
-            −
-          </button>
-          <input
-            type="number"
+        {recruiterJobs.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
+            No jobs posted yet. Create a job from the dashboard first.
+          </p>
+        ) : (
+          <select
             value={jobId}
-            onChange={(e) => setJobId(Math.max(1, parseInt(e.target.value) || 1))}
-            min="1"
-            className="input-field flex-1 text-center"
+            onChange={(e) => setJobId(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
             required
-          />
-          <button
-            type="button"
-            onClick={() => handleJobIdChange(1)}
-            className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-300 dark:border-gray-600 transition-all font-semibold"
           >
-            +
-          </button>
-        </div>
+            <option value="">Select a job</option>
+            {recruiterJobs.map((job) => (
+              <option key={job.id} value={job.id}>
+                {job.title} – Job ID {job.id}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Expected CSV Format */}

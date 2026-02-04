@@ -991,21 +991,32 @@ export interface RecruiterStats {
   hired: number
 }
 
+/** Jobs posted by the logged-in recruiter only (for recruiter dashboard). */
+export const getRecruiterJobs = async (): Promise<Job[]> => {
+  try {
+    const response = await api.get('/v1/recruiter/jobs')
+    const list = response.data?.jobs ?? response.data ?? []
+    return Array.isArray(list) ? list.map((j: Record<string, unknown>) => normalizeJob(j)) : []
+  } catch (error) {
+    console.error('Error fetching recruiter jobs:', error)
+    return []
+  }
+}
+
 export const getRecruiterStats = async (): Promise<RecruiterStats> => {
   try {
     const response = await api.get('/v1/recruiter/stats')
     return response.data
   } catch {
-    // Calculate from jobs if dedicated endpoint doesn't exist
     try {
-      const jobs = await getJobs()
+      const jobs = await getRecruiterJobs()
       return {
         total_jobs: jobs.length,
-        total_applicants: jobs.reduce((sum: number, j: any) => sum + (j.applicants || 0), 0),
-        shortlisted: jobs.reduce((sum: number, j: any) => sum + (j.shortlisted || 0), 0),
-        interviewed: jobs.reduce((sum: number, j: any) => sum + (j.interviewed || 0), 0),
-        offers_sent: jobs.reduce((sum: number, j: any) => sum + (j.offers || 0), 0),
-        hired: jobs.reduce((sum: number, j: any) => sum + (j.hired || 0), 0)
+        total_applicants: 0,
+        shortlisted: 0,
+        interviewed: 0,
+        offers_sent: 0,
+        hired: 0
       }
     } catch {
       return {

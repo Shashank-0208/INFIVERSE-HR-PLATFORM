@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { getJobs, getRecruiterStats, getCandidatesByJob, getAllInterviews, getAllOffers, type Job, type RecruiterStats } from '../../services/api'
+import { getRecruiterJobs, getRecruiterStats, getCandidatesByJob, getAllInterviews, getAllOffers, type Job, type RecruiterStats } from '../../services/api'
 import StatsCard from '../../components/StatsCard'
 import Table from '../../components/Table'
 import Loading from '../../components/Loading'
@@ -99,9 +99,9 @@ export default function RecruiterDashboard() {
       loadingRef.current = true
       setLoading(true)
       
-      // Load all data in parallel for accurate stats
+      // Load recruiter-scoped jobs and stats (only this recruiter's jobs)
       const [jobsData, statsData, interviewsData, offersData] = await Promise.all([
-        getJobs().catch(() => []),
+        getRecruiterJobs().catch(() => []),
         getRecruiterStats().catch(() => null),
         getAllInterviews().catch(() => []),
         getAllOffers().catch(() => [])
@@ -127,16 +127,19 @@ export default function RecruiterDashboard() {
       }
       setJobStats(perJob)
 
-      if (statsData && statsData.total_applicants > 0) {
+      const jobIds = new Set(jobsData.map((j: Job) => j.id))
+      const myInterviews = interviewsData.filter((i: { job_id?: string }) => jobIds.has(i.job_id ?? ''))
+      const myOffers = offersData.filter((o: { job_id?: string }) => jobIds.has(o.job_id ?? ''))
+      if (statsData && (statsData.total_jobs > 0 || statsData.total_applicants > 0)) {
         setStats(statsData)
       } else {
         setStats({
           total_jobs: jobsData.length,
           total_applicants: totalApplicants,
           shortlisted: totalShortlisted,
-          interviewed: interviewsData.filter(i => i.status === 'scheduled' || i.status === 'completed').length,
-          offers_sent: offersData.length,
-          hired: offersData.filter(o => o.status === 'accepted').length
+          interviewed: myInterviews.filter((i: { status?: string }) => i.status === 'scheduled' || i.status === 'completed').length,
+          offers_sent: myOffers.length,
+          hired: myOffers.filter((o: { status?: string }) => o.status === 'accepted').length
         })
       }
     } catch (error) {

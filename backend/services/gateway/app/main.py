@@ -626,6 +626,11 @@ async def create_job(job: JobCreate, auth: dict = Depends(get_auth)):
             document["salary_min"] = float(job.salary_min)
         if job.salary_max is not None:
             document["salary_max"] = float(job.salary_max)
+        # Associate job with recruiter when created by recruiter JWT (for dashboard filtering)
+        if auth.get("type") == "jwt_token" and auth.get("role") == "recruiter":
+            rid = auth.get("user_id")
+            if rid is not None:
+                document["recruiter_id"] = str(rid)
         
         result = await db.jobs.insert_one(document)
         job_id = str(result.inserted_id)
@@ -3021,60 +3026,105 @@ async def get_candidate_stats(candidate_id: str, auth = Depends(get_auth)):
             "error": str(e)
         }
 
-@app.get("/v1/recruiter/stats", tags=["Recruiter Portal"])
-async def get_recruiter_stats(auth = Depends(get_auth)):
-    """Get Recruiter Dashboard Statistics"""
+@app.get("/v1/recruiter/jobs", tags=["Recruiter Portal"])
+async def get_recruiter_jobs(auth=Depends(get_auth)):
+    """List active jobs posted by the authenticated recruiter only."""
     try:
-        db = await get_mongo_db()
-        
-        # Verify the user is a recruiter
         auth_info = auth
         if auth_info.get("type") != "jwt_token" or auth_info.get("role") != "recruiter":
             raise HTTPException(status_code=403, detail="This endpoint is only available for recruiters")
-        
         recruiter_id = str(auth_info.get("user_id", ""))
-        
-        # Get total active jobs
-        active_jobs = await db.jobs.count_documents({"status": "active"})
-        
-        # Get total candidates (recruiters can see all candidates)
-        total_candidates = await db.candidates.count_documents({})
-        
-        # Get interviews scheduled (all interviews, not just for specific candidate)
-        interviews_scheduled = await db.interviews.count_documents({
-            "status": "scheduled"
-        })
-        
-        # Get offers made (all offers)
-        offers_made = await db.offers.count_documents({})
-        
-        # Get applications count (all applications)
-        total_applications = await db.job_applications.count_documents({})
-        
-        # Get shortlisted candidates
-        shortlisted_count = await db.job_applications.count_documents({
+        if not recruiter_id:
+            return {"jobs": [], "count": 0}
+        db = await get_mongo_db()
+        query = {"status": "active", "recruiter_id": recruiter_id}
+        cursor = db.jobs.find(query).sort("created_at", -1).limit(100)
+        jobs_list = await cursor.to_list(length=100)
+        jobs = []
+        for doc in jobs_list:
+            salary_min, salary_max = _job_salary_from_doc(doc)
+            jobs.append({
+                "id": str(doc["_id"]),
+                "title": doc.get("title"),
+                "department": doc.get("department"),
+                "location": doc.get("location"),
+                "experience_level": doc.get("experience_level"),
+                "requirements": doc.get("requirements"),
+                "description": doc.get("description"),
+                "job_type": doc.get("job_type") or doc.get("employment_type"),
+                "employment_type": doc.get("employment_type"),
+                "salary_min": salary_min,
+                "salary_max": salary_max,
+                "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+            })
+        return {"jobs": jobs, "count": len(jobs)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"jobs": [], "count": 0, "error": str(e)}
+
+
+@app.get("/v1/recruiter/stats", tags=["Recruiter Portal"])
+async def get_recruiter_stats(auth=Depends(get_auth)):
+    """Get Recruiter Dashboard Statistics (scoped to this recruiter's jobs only)."""
+    try:
+        db = await get_mongo_db()
+        auth_info = auth
+        if auth_info.get("type") != "jwt_token" or auth_info.get("role") != "recruiter":
+            raise HTTPException(status_code=403, detail="This endpoint is only available for recruiters")
+        recruiter_id = str(auth_info.get("user_id", ""))
+        if not recruiter_id:
+            return {
+                "total_jobs": 0,
+                "total_applicants": 0,
+                "shortlisted": 0,
+                "interviewed": 0,
+                "offers_sent": 0,
+                "hired": 0
+            }
+        # Jobs posted by this recruiter (active only)
+        cursor = db.jobs.find({"status": "active", "recruiter_id": recruiter_id}, {"_id": 1})
+        jobs_list = await cursor.to_list(length=500)
+        job_ids = [str(doc["_id"]) for doc in jobs_list]
+        total_jobs = len(job_ids)
+        if total_jobs == 0:
+            return {
+                "total_jobs": 0,
+                "total_applicants": 0,
+                "shortlisted": 0,
+                "interviewed": 0,
+                "offers_sent": 0,
+                "hired": 0
+            }
+        total_applicants = await db.job_applications.count_documents({"job_id": {"$in": job_ids}})
+        shortlisted = await db.job_applications.count_documents({
+            "job_id": {"$in": job_ids},
             "status": "shortlisted"
         })
-        
+        interviewed = await db.interviews.count_documents({"job_id": {"$in": job_ids}})
+        offers_sent = await db.offers.count_documents({"job_id": {"$in": job_ids}})
+        hired = await db.offers.count_documents({
+            "job_id": {"$in": job_ids},
+            "status": "accepted"
+        })
         return {
-            "active_jobs": active_jobs,
-            "total_candidates": total_candidates,
-            "interviews_scheduled": interviews_scheduled,
-            "offers_made": offers_made,
-            "total_applications": total_applications,
-            "shortlisted_candidates": shortlisted_count,
-            "recruiter_id": recruiter_id
+            "total_jobs": total_jobs,
+            "total_applicants": total_applicants,
+            "shortlisted": shortlisted,
+            "interviewed": interviewed,
+            "offers_sent": offers_sent,
+            "hired": hired
         }
     except HTTPException:
         raise
     except Exception as e:
         return {
-            "active_jobs": 0,
-            "total_candidates": 0,
-            "interviews_scheduled": 0,
-            "offers_made": 0,
-            "total_applications": 0,
-            "shortlisted_candidates": 0,
+            "total_jobs": 0,
+            "total_applicants": 0,
+            "shortlisted": 0,
+            "interviewed": 0,
+            "offers_sent": 0,
+            "hired": 0,
             "error": str(e)
         }
 

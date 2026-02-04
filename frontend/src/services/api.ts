@@ -281,6 +281,9 @@ export interface Job {
   status: string
   created_at?: string
   company?: string
+  /** Per-job counts from recruiter jobs endpoint (dashboard only). */
+  applicants?: number
+  shortlisted?: number
 }
 
 export interface JobFilters {
@@ -308,6 +311,8 @@ function normalizeJob(raw: Record<string, unknown>): Job {
     status: (raw.status as string) ?? 'active',
     created_at: raw.created_at as string | undefined,
     company: raw.company as string | undefined,
+    applicants: raw.applicants != null ? Number(raw.applicants) : undefined,
+    shortlisted: raw.shortlisted != null ? Number(raw.shortlisted) : undefined,
   }
 }
 

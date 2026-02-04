@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { getRecruiterJobs, getRecruiterStats, getCandidatesByJob, getAllInterviews, getAllOffers, type Job, type RecruiterStats } from '../../services/api'
+import { getRecruiterJobs, getRecruiterStats, getAllInterviews, getAllOffers, type Job, type RecruiterStats } from '../../services/api'
 import StatsCard from '../../components/StatsCard'
 import Table from '../../components/Table'
 import Loading from '../../components/Loading'
@@ -95,34 +95,42 @@ export default function RecruiterDashboard() {
 
   const loadDashboardData = async () => {
     if (loadingRef.current) return
+    loadingRef.current = true
+    setLoading(true)
+    let hasError = false
     try {
-      loadingRef.current = true
-      setLoading(true)
-      
-      // Load recruiter-scoped jobs and stats (only this recruiter's jobs)
+      // Single batch: jobs (with per-job applicants/shortlisted), stats, interviews, offers – no N+1
       const [jobsData, statsData, interviewsData, offersData] = await Promise.all([
-        getRecruiterJobs().catch(() => []),
-        getRecruiterStats().catch(() => null),
-        getAllInterviews().catch(() => []),
-        getAllOffers().catch(() => [])
+        getRecruiterJobs().catch((err) => {
+          if (import.meta.env.DEV) console.warn('getRecruiterJobs failed:', err)
+          hasError = true
+          return [] as Job[]
+        }),
+        getRecruiterStats().catch((err) => {
+          if (import.meta.env.DEV) console.warn('getRecruiterStats failed:', err)
+          hasError = true
+          return null
+        }),
+        getAllInterviews().catch((err) => {
+          if (import.meta.env.DEV) console.warn('getAllInterviews failed:', err)
+          hasError = true
+          return []
+        }),
+        getAllOffers().catch((err) => {
+          if (import.meta.env.DEV) console.warn('getAllOffers failed:', err)
+          hasError = true
+          return []
+        })
       ])
-      
+
       setJobs(jobsData)
 
-      // Single fetch for per-job applicant counts (first 10 jobs); used for table and aggregate stats
+      // Per-job stats from jobs response (backend includes applicants/shortlisted); no extra API calls
       const perJob: Record<string, { applicants: number; shortlisted: number }> = {}
-      let totalApplicants = 0
-      let totalShortlisted = 0
-      for (const job of jobsData.slice(0, 10)) {
-        try {
-          const candidates = await getCandidatesByJob(job.id)
-          const applicants = candidates.length
-          const shortlisted = candidates.filter((c: any) => c.status === 'shortlisted' || (c.score != null && c.score >= 80)).length
-          perJob[job.id] = { applicants, shortlisted }
-          totalApplicants += applicants
-          totalShortlisted += shortlisted
-        } catch {
-          perJob[job.id] = { applicants: 0, shortlisted: 0 }
+      for (const job of jobsData) {
+        perJob[job.id] = {
+          applicants: job.applicants ?? 0,
+          shortlisted: job.shortlisted ?? 0
         }
       }
       setJobStats(perJob)
@@ -133,6 +141,8 @@ export default function RecruiterDashboard() {
       if (statsData && (statsData.total_jobs > 0 || statsData.total_applicants > 0)) {
         setStats(statsData)
       } else {
+        const totalApplicants = jobsData.reduce((sum, j) => sum + (j.applicants ?? 0), 0)
+        const totalShortlisted = jobsData.reduce((sum, j) => sum + (j.shortlisted ?? 0), 0)
         setStats({
           total_jobs: jobsData.length,
           total_applicants: totalApplicants,
@@ -142,22 +152,22 @@ export default function RecruiterDashboard() {
           hired: myOffers.filter((o: { status?: string }) => o.status === 'accepted').length
         })
       }
+      if (hasError) toast.error('Some data could not be loaded. Try refreshing.')
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
-      toast.error('Failed to connect to backend API')
+      toast.error('Failed to connect to backend. Check your connection and try again.')
     } finally {
       loadingRef.current = false
       setLoading(false)
     }
   }
 
-  // Calculate stats from jobs if backend stats unavailable
-  // Also fetch candidates for each job to get accurate applicant counts
-  const totalApplicants = stats.total_applicants || jobs.reduce((sum, job: any) => sum + (job.applicants || 0), 0)
-  const totalShortlisted = stats.shortlisted || jobs.reduce((sum, job: any) => sum + (job.shortlisted || 0), 0)
-  const totalInterviewed = stats.interviewed || jobs.reduce((sum, job: any) => sum + (job.interviewed || 0), 0)
-  const totalOffers = stats.offers_sent || jobs.reduce((sum, job: any) => sum + (job.offers || 0), 0)
-  const totalJobs = stats.total_jobs || jobs.length
+  // Use stats from API when available; fallback to aggregating from jobs (applicants/shortlisted per job)
+  const totalApplicants = stats.total_applicants ?? jobs.reduce((sum, job: Job) => sum + (job.applicants ?? 0), 0)
+  const totalShortlisted = stats.shortlisted ?? jobs.reduce((sum, job: Job) => sum + (job.shortlisted ?? 0), 0)
+  const totalInterviewed = stats.interviewed ?? 0
+  const totalOffers = stats.offers_sent ?? 0
+  const totalJobs = stats.total_jobs ?? jobs.length
 
   return (
     <div className="space-y-8 animate-fade-in">

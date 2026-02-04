@@ -3040,11 +3040,31 @@ async def get_recruiter_jobs(auth=Depends(get_auth)):
         query = {"status": "active", "recruiter_id": recruiter_id}
         cursor = db.jobs.find(query).sort("created_at", -1).limit(100)
         jobs_list = await cursor.to_list(length=100)
+        job_ids = [str(doc["_id"]) for doc in jobs_list]
+        # Single aggregation for per-job applicants/shortlisted (avoids N+1 and slow match service)
+        counts_by_job: Dict[str, Dict[str, int]] = {}
+        if job_ids:
+            pipeline = [
+                {"$match": {"job_id": {"$in": job_ids}}},
+                {"$group": {
+                    "_id": "$job_id",
+                    "applicants": {"$sum": 1},
+                    "shortlisted": {"$sum": {"$cond": [{"$eq": ["$status", "shortlisted"]}, 1, 0]}},
+                }},
+            ]
+            async for agg_doc in db.job_applications.aggregate(pipeline):
+                jid = agg_doc.get("_id") or ""
+                counts_by_job[str(jid)] = {
+                    "applicants": agg_doc.get("applicants", 0),
+                    "shortlisted": agg_doc.get("shortlisted", 0),
+                }
         jobs = []
         for doc in jobs_list:
+            jid = str(doc["_id"])
+            counts = counts_by_job.get(jid, {"applicants": 0, "shortlisted": 0})
             salary_min, salary_max = _job_salary_from_doc(doc)
             jobs.append({
-                "id": str(doc["_id"]),
+                "id": jid,
                 "title": doc.get("title"),
                 "department": doc.get("department"),
                 "location": doc.get("location"),
@@ -3055,7 +3075,9 @@ async def get_recruiter_jobs(auth=Depends(get_auth)):
                 "employment_type": doc.get("employment_type"),
                 "salary_min": salary_min,
                 "salary_max": salary_max,
-                "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+                "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+                "applicants": counts["applicants"],
+                "shortlisted": counts["shortlisted"],
             })
         return {"jobs": jobs, "count": len(jobs)}
     except HTTPException:

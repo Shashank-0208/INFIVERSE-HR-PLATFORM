@@ -1269,13 +1269,69 @@ def _normalize_header(h: str) -> str:
 # Regexes for resume-style PDF extraction
 _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 _PHONE_RE = re.compile(r"[\+]?[(]?[0-9]{2,4}[)]?[-\s\./0-9]{7,}")
+_YEARS_EXP_RE = re.compile(r"(\d+)\s*[\+\-]?\s*(?:years?\s*(?:of\s*)?(?:experience|exp\.?|yoe)|y\.?o\.?e\.?|yrs?)", re.I)
+_EDUCATION_LEVEL_RE = re.compile(
+    r"\b(ph\.?d|doctorate|m\.?tech|m\.?e\.?|m\.?s\.?c\.?|m\.?ca|mba|m\.?a\.?|m\.?com|b\.?tech|b\.?e\.?|b\.?s\.?c\.?|b\.?ca|b\.?a\.?|b\.?com|bachelor|masters?|master|graduate|post\s*graduate|pg|ug|b\.?arch)\b",
+    re.I,
+)
+
+# Common tech/skill keywords for skills extraction
+_SKILL_KEYWORDS = re.compile(
+    r"\b(python|java|javascript|typescript|react|node\.?js|angular|vue|sql|mongodb|aws|docker|kubernetes|"
+    r"html|css|php|ruby|go\b|golang|c\+\+|c\b|r\b|scala|kotlin|swift|machine\s*learning|ml\b|ai\b|"
+    r"data\s*science|tableau|power\s*bi|excel|git|jenkins|agile|rest\s*api|graphql)\b",
+    re.I,
+)
+
+# Common Indian cities and location hints (expanded; optional RESUME_KEYWORDS_URL can add more)
+_LOCATION_HINTS = re.compile(
+    r"\b(mumbai|pune|bangalore|bengaluru|delhi|ncr|noida|gurgaon|gurugram|hyderabad|chennai|kolkata|"
+    r"ahmedabad|indore|jaipur|kochi|chandigarh|nagpur|nashik|thane|remote|india|in\b|"
+    r"bhubaneswar|coimbatore|mysore|mangalore|trivandrum|surat|vadodara|raipur|bhopal|lucknow|dehradun)\b",
+    re.I,
+)
+
+# Optional keywords loaded from URL (env RESUME_KEYWORDS_URL) for skills/locations not in hardcoded lists
+_EXTRA_SKILLS: List[str] = []
+_EXTRA_LOCATIONS: List[str] = []
+_KEYWORDS_FETCHED = False
+
+
+def _fetch_optional_keywords() -> None:
+    """Fetch optional skills/locations from JSON URL (env RESUME_KEYWORDS_URL). Run once, then use cache.
+    Expected JSON: {"skills": ["word1", "word2", ...], "locations": ["city1", ...]}.
+    Any skill/location phrase in the resume text that appears in these lists will be detected."""
+    global _EXTRA_SKILLS, _EXTRA_LOCATIONS, _KEYWORDS_FETCHED
+    if _KEYWORDS_FETCHED:
+        return
+    _KEYWORDS_FETCHED = True
+    url = os.environ.get("RESUME_KEYWORDS_URL", "").strip()
+    if not url:
+        return
+    try:
+        import httpx
+        with httpx.Client(timeout=10.0) as client:
+            r = client.get(url)
+            if r.status_code != 200:
+                return
+            data = r.json()
+        if isinstance(data.get("skills"), list):
+            _EXTRA_SKILLS[:] = [str(s).strip() for s in data["skills"] if s and len(str(s).strip()) <= 80]
+        if isinstance(data.get("locations"), list):
+            _EXTRA_LOCATIONS[:] = [str(l).strip() for l in data["locations"] if l and len(str(l).strip()) <= 80]
+    except Exception:
+        pass
 
 
 def _extract_one_resume_from_text(full_text: str) -> Dict[str, str]:
     """Extract a single candidate row from resume-style free text (one person per PDF)."""
+    _fetch_optional_keywords()
     lines = [ln.strip() for ln in full_text.splitlines() if ln.strip()]
-    text_lower = full_text.lower()
-    row = {"name": "", "email": "", "phone": "", "location": "", "technical_skills": "", "experience_years": "", "status": "applied"}
+    row = {
+        "name": "", "email": "", "phone": "", "location": "",
+        "technical_skills": "", "experience_years": "", "designation": "", "education_level": "",
+        "status": "applied"
+    }
 
     emails = _EMAIL_RE.findall(full_text)
     if emails:
@@ -1311,6 +1367,135 @@ def _extract_one_resume_from_text(full_text: str) -> Dict[str, str]:
                 break
     if not row["name"]:
         row["name"] = "Candidate"
+
+    # --- Location: lines with city/location hints or "location:" / "address:"
+    for ln in lines:
+        ln_lower = ln.lower()
+        if "location" in ln_lower or "address" in ln_lower or "based in" in ln_lower or "city" in ln_lower:
+            val = re.sub(r"^(location|address|based in|city)\s*[:\-]\s*", "", ln_lower, flags=re.I).strip()
+            if val and len(val) < 80 and not _EMAIL_RE.search(val):
+                row["location"] = val[:80].strip()
+                break
+    if not row["location"]:
+        loc_m = _LOCATION_HINTS.search(full_text)
+        if loc_m:
+            row["location"] = loc_m.group(0).strip()
+    # Optional locations from RESUME_KEYWORDS_URL
+    if not row["location"] and _EXTRA_LOCATIONS:
+        for loc in _EXTRA_LOCATIONS:
+            if loc.lower() in full_text.lower():
+                row["location"] = loc
+                break
+
+    # --- Experience years: "X years experience" / "X+ years" / "X YOE"
+    years_m = _YEARS_EXP_RE.search(full_text)
+    if years_m:
+        row["experience_years"] = years_m.group(1).strip()
+    else:
+        year_range = re.search(r"(\d+)\s*-\s*(\d+)\s*(?:years?|yrs?)", full_text, re.I)
+        if year_range:
+            try:
+                a, b = int(year_range.group(1)), int(year_range.group(2))
+                row["experience_years"] = str(max(a, b) - min(a, b)) if b != a else year_range.group(1)
+            except ValueError:
+                pass
+
+    # --- Technical skills: "Skills:" section (split by comma/semicolon/pipe so we capture any phrase) or keywords
+    in_skills = False
+    skill_tokens = []
+    for ln in lines:
+        ln_lower = ln.lower()
+        if re.match(r"^(technical\s*)?skills?|technologies?|expertise\s*[:\-]", ln_lower):
+            in_skills = True
+            rest = re.sub(r"^(technical\s*)?skills?|technologies?|expertise\s*[:\-]\s*", "", ln_lower, flags=re.I).strip()
+            if rest:
+                for part in re.split(r"[,;|\t]|\s+and\s+", rest):
+                    t = part.strip()
+                    if 2 <= len(t) <= 80 and not t.isdigit() and not _EMAIL_RE.search(t):
+                        skill_tokens.append(t)
+            continue
+        if in_skills:
+            if ln_lower.startswith(("experience", "education", "project", "work ", "employment")):
+                break
+            if ln and len(ln) < 120:
+                for part in re.split(r"[,;|\t]|\s+and\s+", ln_lower):
+                    t = part.strip()
+                    if 2 <= len(t) <= 80 and not t.isdigit() and not _EMAIL_RE.search(t):
+                        skill_tokens.append(t)
+            if len(skill_tokens) >= 30:
+                break
+    # Also catch "Proficient in X, Y, Z" or "Skills: X, Y, Z" anywhere in text (any words, not just hardcoded)
+    for pat in [
+        r"(?:proficient in|skills?|technologies?|expertise)\s*[:\-]\s*([^\n]{10,300})",
+        r"(?:key\s*skills?|core\s*skills?)\s*[:\-]\s*([^\n]{10,300})",
+    ]:
+        for m in re.finditer(pat, full_text, re.I):
+            chunk = m.group(1)
+            for part in re.split(r"[,;|\t]|\s+and\s+", chunk):
+                t = part.strip()
+                if 2 <= len(t) <= 80 and not t.isdigit() and not _EMAIL_RE.search(t):
+                    skill_tokens.append(t)
+    if skill_tokens:
+        row["technical_skills"] = ", ".join(dict.fromkeys(skill_tokens))[:500]
+    if not row["technical_skills"]:
+        skills_found = _SKILL_KEYWORDS.findall(full_text)
+        if skills_found:
+            row["technical_skills"] = ", ".join(dict.fromkeys(skills_found))[:500]
+    # Merge extra skills from optional RESUME_KEYWORDS_URL that appear in text
+    if _EXTRA_SKILLS and row["technical_skills"]:
+        existing = {t.strip().lower() for t in row["technical_skills"].split(",")}
+        for s in _EXTRA_SKILLS:
+            if s.lower() in full_text.lower() and s.strip().lower() not in existing:
+                row["technical_skills"] = (row["technical_skills"].strip() + ", " + s.strip()).strip()[:500]
+                existing.add(s.strip().lower())
+    elif _EXTRA_SKILLS:
+        found = [s for s in _EXTRA_SKILLS if s.lower() in full_text.lower()]
+        if found:
+            row["technical_skills"] = ", ".join(found)[:500]
+
+    # --- Designation / title: first line after "experience" or common title keywords
+    title_keywords = re.compile(
+        r"\b(software\s*engineer|developer|engineer|analyst|manager|lead|architect|consultant|"
+        r"intern|associate|senior|junior|full\s*stack|front\s*end|back\s*end|data\s*scientist)\b",
+        re.I,
+    )
+    for i, ln in enumerate(lines):
+        ln_lower = ln.lower()
+        if "experience" in ln_lower or "work experience" in ln_lower or "employment" in ln_lower:
+            for j in range(i + 1, min(i + 4, len(lines))):
+                cand = lines[j].strip()
+                if cand and len(cand) < 80 and title_keywords.search(cand) and not _EMAIL_RE.search(cand):
+                    row["designation"] = cand[:80]
+                    break
+            if row["designation"]:
+                break
+    if not row["designation"]:
+        m = title_keywords.search(full_text)
+        if m:
+            row["designation"] = m.group(0).strip()
+    # Fallback: first line after Experience that looks like a job title (any phrase, not just hardcoded keywords)
+    if not row["designation"]:
+        date_like = re.compile(r"^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)?\.?\s*\d{4}\s*[-–—]\s*(present|current|\d{4})", re.I)
+        for i, ln in enumerate(lines):
+            ln_lower = ln.lower()
+            if "experience" in ln_lower or "work experience" in ln_lower or "employment" in ln_lower:
+                for j in range(i + 1, min(i + 5, len(lines))):
+                    cand = lines[j].strip()
+                    if not cand or len(cand) < 5 or len(cand) > 80:
+                        continue
+                    if "@" in cand or _EMAIL_RE.search(cand) or date_like.match(cand):
+                        continue
+                    if re.match(r"^\d{4}\s*[-–—]", cand):
+                        continue
+                    row["designation"] = cand[:80]
+                    break
+                break
+
+    # --- Education level: B.Tech, M.Tech, MBA, Bachelor, etc.
+    edu_m = _EDUCATION_LEVEL_RE.search(full_text)
+    if edu_m:
+        row["education_level"] = edu_m.group(0).strip()
+
     return row
 
 

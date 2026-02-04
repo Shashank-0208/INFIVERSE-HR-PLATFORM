@@ -25,7 +25,8 @@ export default function ClientJobPosting() {
 
     try {
       // Map frontend fields to backend API format
-      const jobData: Partial<Job> = {
+      // Backend expects different field names than the Job interface
+      const jobData: Record<string, any> = {
         title: formData.title,
         department: formData.department,
         location: formData.location,

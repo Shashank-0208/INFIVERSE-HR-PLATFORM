@@ -1266,9 +1266,81 @@ def _normalize_header(h: str) -> str:
     return h
 
 
+# Regexes for resume-style PDF extraction
+_EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+_PHONE_RE = re.compile(r"[\+]?[(]?[0-9]{2,4}[)]?[-\s\./0-9]{7,}")
+
+
+def _extract_one_resume_from_text(full_text: str) -> Dict[str, str]:
+    """Extract a single candidate row from resume-style free text (one person per PDF)."""
+    lines = [ln.strip() for ln in full_text.splitlines() if ln.strip()]
+    text_lower = full_text.lower()
+    row = {"name": "", "email": "", "phone": "", "location": "", "technical_skills": "", "experience_years": "", "status": "applied"}
+
+    emails = _EMAIL_RE.findall(full_text)
+    if emails:
+        row["email"] = emails[0].strip()
+    phones = _PHONE_RE.findall(full_text)
+    if phones:
+        candidate_phone = phones[0].strip()
+        if len(candidate_phone) >= 7 and len(candidate_phone) <= 20:
+            row["phone"] = candidate_phone
+
+    name_candidates = []
+    for ln in lines[:15]:
+        if not ln or len(ln) > 80:
+            continue
+        if _EMAIL_RE.search(ln) or _PHONE_RE.search(ln):
+            break
+        if "@" in ln or ln.isdigit() or re.match(r"^[\d\s\-+().]+$", ln):
+            continue
+        if re.match(r"^(https?://|www\.)", ln, re.I):
+            continue
+        name_candidates.append(ln)
+    if name_candidates:
+        row["name"] = name_candidates[0][:100].strip() if name_candidates[0] else ""
+        if len(name_candidates) > 1 and not row["name"]:
+            row["name"] = name_candidates[1][:100].strip()
+
+    if not row["name"] and row["email"]:
+        for ln in lines:
+            if row["email"] in ln:
+                before = ln.split(row["email"])[0].strip()
+                if before and len(before) < 60 and "@" not in before:
+                    row["name"] = before[:100]
+                break
+    if not row["name"]:
+        row["name"] = "Candidate"
+    return row
+
+
+def _parse_pdf_as_table(lines: List[str]) -> List[Dict[str, Any]]:
+    """Parse PDF text as table (CSV-like: header row + data rows by comma/tab)."""
+    rows = []
+    headers = []
+    for i, line in enumerate(lines):
+        line = (line or "").strip()
+        if not line:
+            continue
+        parts = re.split(r"[\t,]+", line, maxsplit=14)
+        parts = [p.strip() for p in parts]
+        if i == 0 and len(parts) >= 2:
+            headers = [_normalize_header(p) for p in parts]
+            continue
+        if len(parts) >= 2:
+            row = {}
+            for j, val in enumerate(parts):
+                key = headers[j] if j < len(headers) else f"col_{j}"
+                row[key] = val
+            has_email = row.get("email") or any(_EMAIL_RE.search(str(v)) for v in row.values() if v)
+            if has_email:
+                rows.append(row)
+    return rows
+
+
 @app.post("/v1/candidates/parse-pdf", tags=["Candidate Management"])
 async def parse_pdf_candidates(file: UploadFile = File(...), auth=Depends(get_auth)):
-    """Parse a PDF file and extract candidate-like rows (text lines split by comma/tab)."""
+    """Parse PDF: single resume → one row (name/email/phone); table-like PDF → multiple rows."""
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="File must be a PDF")
     try:
@@ -1282,25 +1354,23 @@ async def parse_pdf_candidates(file: UploadFile = File(...), auth=Depends(get_au
             text = page.extract_text()
             if text:
                 lines.extend(text.splitlines())
-        # Parse lines: split by comma or tab, first line may be header
-        rows = []
-        headers = []
-        for i, line in enumerate(lines):
-            line = (line or "").strip()
-            if not line:
-                continue
-            parts = re.split(r"[\t,]+", line, maxsplit=9)
-            parts = [p.strip() for p in parts]
-            if i == 0 and len(parts) >= 2:
-                headers = [_normalize_header(p) for p in parts]
-                continue
-            if len(parts) >= 2:
-                row = {}
-                for j, val in enumerate(parts):
-                    key = headers[j] if j < len(headers) else f"col_{j}"
-                    row[key] = val
-                rows.append(row)
-        return {"rows": rows, "count": len(rows)}
+        full_text = "\n".join((ln or "").strip() for ln in lines if (ln or "").strip())
+        if not full_text.strip():
+            return {"rows": [], "count": 0}
+
+        table_rows = _parse_pdf_as_table(lines)
+        rows_with_email = sum(1 for r in table_rows if r.get("email") or any(_EMAIL_RE.search(str(v)) for v in r.values() if v))
+        if len(table_rows) >= 2 and rows_with_email >= 2:
+            for r in table_rows:
+                if not r.get("email"):
+                    for v in r.values():
+                        if v and _EMAIL_RE.search(str(v)):
+                            r["email"] = _EMAIL_RE.search(str(v)).group(0)
+                            break
+            return {"rows": table_rows, "count": len(table_rows)}
+
+        row = _extract_one_resume_from_text(full_text)
+        return {"rows": [row], "count": 1}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to parse PDF: {str(e)[:200]}")
 

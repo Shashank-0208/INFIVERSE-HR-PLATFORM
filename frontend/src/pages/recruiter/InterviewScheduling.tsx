@@ -108,8 +108,8 @@ export default function InterviewScheduling() {
   const loadCandidates = async () => {
     try {
       setCandidatesLoading(true)
-      const list = await searchCandidates('', {})
-      setCandidates(Array.isArray(list) ? list : [])
+      const result = await searchCandidates('', {})
+      setCandidates(Array.isArray(result.candidates) ? result.candidates : [])
     } catch (error) {
       console.error('Failed to load candidates:', error)
       setCandidates([])

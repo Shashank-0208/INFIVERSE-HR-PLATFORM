@@ -208,12 +208,12 @@ export default function CandidateSearch() {
       }
 
       const results = await searchCandidates(searchQuery || '', filters)
-      setCandidates(results)
+      setCandidates(results.candidates ?? [])
       
-      if (results.length === 0) {
+      if (!results.candidates?.length) {
         toast('No candidates found matching your criteria', { icon: 'ℹ' })
       } else {
-        toast.success(`Found ${results.length} candidates`)
+        toast.success(`Found ${results.candidates.length} candidates`)
       }
     } catch (error) {
       console.error('Search error:', error)

@@ -41,11 +41,11 @@ export default function ValuesAssessment() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [candidatesData, jobsData] = await Promise.all([
-        searchCandidates('', {}).catch(() => []),
+      const [candidatesRes, jobsData] = await Promise.all([
+        searchCandidates('', {}).catch(() => ({ candidates: [], total: 0 })),
         getRecruiterJobs().catch(() => [])
       ])
-      setCandidates(Array.isArray(candidatesData) ? candidatesData : [])
+      setCandidates(Array.isArray(candidatesRes.candidates) ? candidatesRes.candidates : [])
       setJobs(jobsData)
     } catch (error) {
       console.error('Failed to load data:', error)

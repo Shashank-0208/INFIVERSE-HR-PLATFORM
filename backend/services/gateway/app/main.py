@@ -1157,9 +1157,11 @@ async def search_candidates(
     education_level: Optional[str] = None,
     seniority_level: Optional[str] = None,
     status: Optional[str] = None,
+    limit: Optional[int] = 50,
+    offset: Optional[int] = 0,
     auth=Depends(get_auth)
 ):
-    """Search & Filter Candidates. For recruiters: only applicants to their jobs (optionally job_id). Text search: name/email (recruiter) or name/email/skills (others)."""
+    """Search & Filter Candidates. For recruiters: only applicants to their jobs (optionally job_id). Supports limit/offset for pagination."""
     q_text = (search or query or "").strip()[:100]
     if skills:
         if len(skills) > 200:
@@ -1191,14 +1193,14 @@ async def search_candidates(
         if is_recruiter:
             recruiter_id = str(auth.get("user_id", ""))
             if not recruiter_id:
-                return {"candidates": [], "filters": {"skills": skills, "location": location, "experience_min": experience_min}, "count": 0}
+                return {"candidates": [], "filters": {"skills": skills, "location": location, "experience_min": experience_min}, "count": 0, "total": 0}
             candidate_ids_scope = await _recruiter_applicant_ids(db, recruiter_id, job_id)
             if not candidate_ids_scope:
-                return {"candidates": [], "filters": {"skills": skills, "location": location, "experience_min": experience_min}, "count": 0}
+                return {"candidates": [], "filters": {"skills": skills, "location": location, "experience_min": experience_min}, "count": 0, "total": 0}
             try:
                 mongo_query["_id"] = {"$in": [ObjectId(cid) for cid in candidate_ids_scope]}
             except Exception:
-                return {"candidates": [], "filters": {"skills": skills, "location": location, "experience_min": experience_min}, "count": 0}
+                return {"candidates": [], "filters": {"skills": skills, "location": location, "experience_min": experience_min}, "count": 0, "total": 0}
         if q_text:
             if is_recruiter:
                 mongo_query["$or"] = [
@@ -1241,9 +1243,12 @@ async def search_candidates(
                 if tokens:
                     mongo_query["status"] = {"$in": tokens}
 
-        cursor = db.candidates.find(mongo_query).limit(50)
-        candidates_list = await cursor.to_list(length=50)
-        
+        limit = max(1, min(limit or 50, 2000))
+        offset = max(0, offset or 0)
+        total = await db.candidates.count_documents(mongo_query)
+        cursor = db.candidates.find(mongo_query).sort("_id", 1).skip(offset).limit(limit)
+        candidates_list = await cursor.to_list(length=limit)
+
         candidates = []
         for doc in candidates_list:
             candidates.append({
@@ -1258,17 +1263,21 @@ async def search_candidates(
                 "education_level": doc.get("education_level"),
                 "status": doc.get("status")
             })
-        
+
         return {
-            "candidates": candidates, 
-            "filters": {"skills": skills, "location": location, "experience_min": experience_min, "job_id": job_id}, 
-            "count": len(candidates)
+            "candidates": candidates,
+            "filters": {"skills": skills, "location": location, "experience_min": experience_min, "job_id": job_id},
+            "count": len(candidates),
+            "total": total,
+            "limit": limit,
+            "offset": offset
         }
     except Exception as e:
         return {
-            "candidates": [], 
-            "filters": {"skills": skills, "location": location, "experience_min": experience_min}, 
-            "count": 0, 
+            "candidates": [],
+            "filters": {"skills": skills, "location": location, "experience_min": experience_min},
+            "count": 0,
+            "total": 0,
             "error": str(e)
         }
 

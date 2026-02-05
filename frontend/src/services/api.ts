@@ -1077,17 +1077,27 @@ export const getAllCandidates = async (filters?: {
   }
 }
 
-export const searchCandidates = async (query: string, filters?: {
-  job_id?: string
-  skills?: string
-  location?: string
-  experience_min?: number
-  experience_max?: number
-  education_level?: string
-  seniority_level?: string
-  status?: string
-  search?: string
-}) => {
+export interface SearchCandidatesResult {
+  candidates: any[]
+  total: number
+}
+
+export const searchCandidates = async (
+  query: string,
+  filters?: {
+    job_id?: string
+    skills?: string
+    location?: string
+    experience_min?: number
+    experience_max?: number
+    education_level?: string
+    seniority_level?: string
+    status?: string
+    search?: string
+    limit?: number
+    offset?: number
+  }
+): Promise<SearchCandidatesResult> => {
   try {
     const searchTerm = (query ?? filters?.search ?? '').toString().trim()
     const params: Record<string, string | number | undefined> = { query: searchTerm }
@@ -1099,8 +1109,12 @@ export const searchCandidates = async (query: string, filters?: {
     if (filters?.education_level) params.education_level = filters.education_level
     if (filters?.seniority_level) params.seniority_level = filters.seniority_level
     if (filters?.status) params.status = filters.status
+    if (filters?.limit !== undefined) params.limit = filters.limit
+    if (filters?.offset !== undefined) params.offset = filters.offset
     const response = await api.get('/v1/candidates/search', { params })
-    return response.data.candidates || response.data || []
+    const candidates = response.data.candidates || response.data || []
+    const total = response.data.total ?? candidates.length
+    return { candidates: Array.isArray(candidates) ? candidates : [], total }
   } catch (error) {
     console.error('Error searching candidates:', error)
     throw error

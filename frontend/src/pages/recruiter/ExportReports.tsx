@@ -1,35 +1,50 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { searchCandidates, getAllInterviews, getRecruiterStats, type RecruiterStats } from '../../services/api'
 import Loading from '../../components/Loading'
 import StatsCard from '../../components/StatsCard'
 
+const PREVIEW_PAGE_SIZE = 5
+const EXPORT_FETCH_LIMIT = 2000
+
 export default function ExportReports() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<RecruiterStats | null>(null)
   const [candidates, setCandidates] = useState<any[]>([])
+  const [totalCandidates, setTotalCandidates] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
   const [interviews, setInterviews] = useState<any[]>([])
   const [exporting, setExporting] = useState(false)
+  const currentPageRef = useRef(currentPage)
+  currentPageRef.current = currentPage
 
-  useEffect(() => {
-    loadData()
-    // Auto-refresh every 30 seconds for real-time data
-    const interval = setInterval(loadData, 30000)
-    return () => clearInterval(interval)
-  }, [])
+  const maxPage = Math.max(1, Math.ceil(totalCandidates / PREVIEW_PAGE_SIZE))
+  const startItem = totalCandidates === 0 ? 0 : (currentPage - 1) * PREVIEW_PAGE_SIZE + 1
+  const endItem = Math.min(currentPage * PREVIEW_PAGE_SIZE, totalCandidates)
 
-  const loadData = async () => {
+  const loadData = useCallback(async (preservePage = false) => {
     try {
       setLoading(true)
-      // Overview metrics: getRecruiterStats() (same as Recruiter Dashboard) – all counts scoped to jobs posted by logged-in recruiter.
-      // Candidates and interviews: backend scopes to recruiter's applicants/jobs when auth is recruiter JWT.
-      const [statsData, candidatesData, interviewsData] = await Promise.all([
+      const pageToUse = preservePage ? currentPageRef.current : 1
+      const offset = (pageToUse - 1) * PREVIEW_PAGE_SIZE
+      const [statsData, candidatesRes, interviewsData] = await Promise.all([
         getRecruiterStats().catch(() => null),
-        searchCandidates('', {}).catch(() => []),
+        searchCandidates('', { limit: PREVIEW_PAGE_SIZE, offset }).catch(() => ({ candidates: [], total: 0 })),
         getAllInterviews().catch(() => [])
       ])
       setStats(statsData ?? null)
-      setCandidates(Array.isArray(candidatesData) ? candidatesData : [])
+      const total = candidatesRes.total ?? 0
+      setTotalCandidates(total)
+      const newMaxPage = Math.max(1, Math.ceil(total / PREVIEW_PAGE_SIZE))
+      if (preservePage && pageToUse > newMaxPage && newMaxPage >= 1) {
+        setCurrentPage(newMaxPage)
+        const clampedOffset = (newMaxPage - 1) * PREVIEW_PAGE_SIZE
+        const res = await searchCandidates('', { limit: PREVIEW_PAGE_SIZE, offset: clampedOffset }).catch(() => ({ candidates: [], total: 0 }))
+        setCandidates(res.candidates ?? [])
+      } else {
+        if (!preservePage) setCurrentPage(1)
+        setCandidates(candidatesRes.candidates ?? [])
+      }
       setInterviews(interviewsData)
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -37,7 +52,32 @@ export default function ExportReports() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadData(false)
+    const interval = setInterval(() => loadData(true), 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const goToPage = useCallback((page: number) => {
+    const p = Math.max(1, Math.min(page, maxPage))
+    setCurrentPage(p)
+    const offset = (p - 1) * PREVIEW_PAGE_SIZE
+    setLoading(true)
+    searchCandidates('', { limit: PREVIEW_PAGE_SIZE, offset })
+      .then((res) => {
+        setCandidates(res.candidates ?? [])
+        setTotalCandidates(res.total ?? 0)
+      })
+      .catch(() => {
+        setCandidates([])
+        toast.error('Failed to load page')
+      })
+      .finally(() => setLoading(false))
+  }, [maxPage])
+
+  const handleRefresh = () => loadData(true)
 
   const exportToCSV = (data: any[], filename: string) => {
     if (data.length === 0) {
@@ -82,10 +122,25 @@ export default function ExportReports() {
     toast.success(`Exported ${data.length} records to ${filename}`)
   }
 
-  const exportCompleteReport = () => {
+  const exportCompleteReport = async () => {
     setExporting(true)
     try {
-      const reportData = candidates.map(candidate => {
+      const allCandidates: any[] = []
+      let offset = 0
+      let hasMore = true
+      while (hasMore) {
+        const res = await searchCandidates('', { limit: EXPORT_FETCH_LIMIT, offset })
+        const list = res.candidates ?? []
+        allCandidates.push(...list)
+        hasMore = list.length === EXPORT_FETCH_LIMIT && allCandidates.length < (res.total ?? 0)
+        offset += EXPORT_FETCH_LIMIT
+      }
+      if (allCandidates.length === 0) {
+        toast.error('No data to export')
+        setExporting(false)
+        return
+      }
+      const reportData = allCandidates.map(candidate => {
         const candidateInterview = interviews.find(i => 
           String(i.candidate_id) === String(candidate.id || candidate.candidate_id)
         )
@@ -121,10 +176,20 @@ export default function ExportReports() {
     }
   }
 
-  const exportAssessmentSummary = () => {
+  const exportAssessmentSummary = async () => {
     setExporting(true)
     try {
-      const summaryData = candidates
+      const allCandidates: any[] = []
+      let offset = 0
+      let hasMore = true
+      while (hasMore) {
+        const res = await searchCandidates('', { limit: EXPORT_FETCH_LIMIT, offset })
+        const list = res.candidates ?? []
+        allCandidates.push(...list)
+        hasMore = list.length === EXPORT_FETCH_LIMIT && allCandidates.length < (res.total ?? 0)
+        offset += EXPORT_FETCH_LIMIT
+      }
+      const summaryData = allCandidates
         .filter(c => interviews.some(i => String(i.candidate_id) === String(c.id || c.candidate_id)))
         .map(candidate => {
           const interview = interviews.find(i => 
@@ -241,10 +306,10 @@ export default function ExportReports() {
             </p>
             <button
               onClick={exportCompleteReport}
-              disabled={exporting || candidates.length === 0}
+              disabled={exporting || totalCandidates === 0}
               className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              {exporting ? 'Exporting...' : `Export All (${candidates.length})`}
+              {exporting ? 'Exporting...' : `Export All (${totalCandidates})`}
             </button>
           </div>
 
@@ -275,7 +340,7 @@ export default function ExportReports() {
             </p>
             <div className="space-y-2">
               <button
-                onClick={loadData}
+                onClick={handleRefresh}
                 className="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
               >
                 Refresh Data
@@ -286,11 +351,11 @@ export default function ExportReports() {
       </div>
 
       {/* Data Preview */}
-      {candidates.length > 0 && (
+      {totalCandidates > 0 && (
         <div className="card">
           <h2 className="section-title mb-4">Data Preview</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Showing first 5 candidates (Total: {candidates.length})
+            Showing {startItem}&ndash;{endItem} of {totalCandidates} candidates
           </p>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -303,12 +368,12 @@ export default function ExportReports() {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                {candidates.slice(0, 5).map((candidate, idx) => {
-                  const hasInterview = interviews.some(i => 
+                {candidates.map((candidate, idx) => {
+                  const hasInterview = interviews.some(i =>
                     String(i.candidate_id) === String(candidate.id || candidate.candidate_id)
                   )
                   return (
-                    <tr key={idx}>
+                    <tr key={candidate.id || idx}>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                         {candidate.name || 'N/A'}
                       </td>
@@ -334,6 +399,27 @@ export default function ExportReports() {
                 })}
               </tbody>
             </table>
+          </div>
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage <= 1 || loading}
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Page {currentPage} of {maxPage}
+            </span>
+            <button
+              type="button"
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage >= maxPage || loading}
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
           </div>
         </div>
       )}

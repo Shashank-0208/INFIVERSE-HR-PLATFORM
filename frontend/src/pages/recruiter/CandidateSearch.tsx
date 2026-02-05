@@ -155,19 +155,6 @@ export default function CandidateSearch() {
   }, [])
 
   const handleSearch = async () => {
-    const hasSearchCriteria =
-      searchQuery.trim() ||
-      selectedJobId !== 'all' ||
-      skillsFilter.length > 0 ||
-      locationFilter.length > 0 ||
-      seniorityFilter.length > 0 ||
-      educationFilter.length > 0 ||
-      experienceFilter !== 'any'
-    if (!hasSearchCriteria) {
-      toast.error('Please enter search criteria or select a job to filter by')
-      return
-    }
-
     setLoading(true)
     setSearchClicked(true)
 
@@ -191,15 +178,33 @@ export default function CandidateSearch() {
       }
       
       if (experienceFilter !== 'any') {
-        if (experienceFilter.includes('0-2')) {
+        if (experienceFilter === '0-1') {
           filters.experience_min = 0
-          filters.experience_max = 2
-        } else if (experienceFilter.includes('2-5')) {
-          filters.experience_min = 2
+          filters.experience_max = 1
+        } else if (experienceFilter === '1-3') {
+          filters.experience_min = 1
+          filters.experience_max = 3
+        } else if (experienceFilter === '3-5') {
+          filters.experience_min = 3
           filters.experience_max = 5
-        } else if (experienceFilter.includes('5+')) {
+        } else if (experienceFilter === '5-8') {
           filters.experience_min = 5
+          filters.experience_max = 8
+        } else if (experienceFilter === '8+') {
+          filters.experience_min = 8
         }
+      }
+
+      if (educationFilter.length > 0) {
+        filters.education_level = educationFilter.join(',')
+      }
+
+      if (seniorityFilter.length > 0) {
+        filters.seniority_level = seniorityFilter.join(',')
+      }
+
+      if (statusFilter.length > 0) {
+        filters.status = statusFilter.join(',')
       }
 
       const results = await searchCandidates(searchQuery || '', filters)
@@ -352,10 +357,10 @@ export default function CandidateSearch() {
               </select>
             </div>
 
-            {/* Education Level */}
+            {/* Education Level - matches Candidate Profile / job posting style options */}
             <MultiSelectDropdown
               label="Education Level"
-              options={['Bachelors', 'Masters', 'PhD', 'Diploma']}
+              options={['High School', 'Associate', 'Diploma', 'Bachelor', 'Bachelors', 'Master', 'Masters', 'PhD']}
               selected={educationFilter}
               onChange={setEducationFilter}
               placeholder="Choose education level"

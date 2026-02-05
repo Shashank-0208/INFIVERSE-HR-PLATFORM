@@ -1148,6 +1148,10 @@ async def search_candidates(
     skills: Optional[str] = None,
     location: Optional[str] = None,
     experience_min: Optional[int] = None,
+    experience_max: Optional[int] = None,
+    education_level: Optional[str] = None,
+    seniority_level: Optional[str] = None,
+    status: Optional[str] = None,
     auth=Depends(get_auth)
 ):
     """Search & Filter Candidates. For recruiters: only applicants to their jobs (optionally job_id). Text search: name/email (recruiter) or name/email/skills (others)."""
@@ -1164,6 +1168,16 @@ async def search_candidates(
             raise HTTPException(status_code=400, detail="Invalid characters in location filter.")
     if experience_min is not None and experience_min < 0:
         raise HTTPException(status_code=400, detail="experience_min must be non-negative.")
+    if experience_max is not None and experience_max < 0:
+        raise HTTPException(status_code=400, detail="experience_max must be non-negative.")
+    if experience_min is not None and experience_max is not None and experience_min > experience_max:
+        raise HTTPException(status_code=400, detail="experience_min cannot exceed experience_max.")
+    if education_level and len(education_level) > 200:
+        raise HTTPException(status_code=400, detail="Education filter too long (max 200 characters).")
+    if seniority_level and len(seniority_level) > 100:
+        raise HTTPException(status_code=400, detail="Seniority filter too long (max 100 characters).")
+    if status and len(status) > 100:
+        raise HTTPException(status_code=400, detail="Status filter too long (max 100 characters).")
 
     try:
         db = await get_mongo_db()
@@ -1196,8 +1210,31 @@ async def search_candidates(
             mongo_query["technical_skills"] = {"$regex": skills, "$options": "i"}
         if location:
             mongo_query["location"] = {"$regex": location, "$options": "i"}
-        if experience_min is not None:
-            mongo_query["experience_years"] = {"$gte": experience_min}
+        if experience_min is not None or experience_max is not None:
+            exp_query: Dict[str, Any] = {}
+            if experience_min is not None:
+                exp_query["$gte"] = experience_min
+            if experience_max is not None:
+                exp_query["$lte"] = experience_max
+            mongo_query["experience_years"] = exp_query
+        if education_level:
+            level_str = (education_level or "").strip()[:200]
+            if level_str:
+                tokens = [t.strip() for t in re.split(r"[,]+", level_str) if t.strip()]
+                if tokens:
+                    mongo_query["education_level"] = {"$regex": "|".join(re.escape(t) for t in tokens), "$options": "i"}
+        if seniority_level:
+            seniority_str = (seniority_level or "").strip()[:100]
+            if seniority_str:
+                tokens = [t.strip() for t in re.split(r"[,]+", seniority_str) if t.strip()]
+                if tokens:
+                    mongo_query["seniority_level"] = {"$regex": "|".join(re.escape(t) for t in tokens), "$options": "i"}
+        if status:
+            status_str = (status or "").strip()[:100]
+            if status_str:
+                tokens = [t.strip().lower() for t in re.split(r"[,]+", status_str) if t.strip()]
+                if tokens:
+                    mongo_query["status"] = {"$in": tokens}
 
         cursor = db.candidates.find(mongo_query).limit(50)
         candidates_list = await cursor.to_list(length=50)

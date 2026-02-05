@@ -1073,6 +1073,9 @@ export const searchCandidates = async (query: string, filters?: {
   location?: string
   experience_min?: number
   experience_max?: number
+  education_level?: string
+  seniority_level?: string
+  status?: string
   search?: string
 }) => {
   try {
@@ -1082,6 +1085,10 @@ export const searchCandidates = async (query: string, filters?: {
     if (filters?.skills) params.skills = filters.skills
     if (filters?.location) params.location = filters.location
     if (filters?.experience_min !== undefined) params.experience_min = filters.experience_min
+    if (filters?.experience_max !== undefined) params.experience_max = filters.experience_max
+    if (filters?.education_level) params.education_level = filters.education_level
+    if (filters?.seniority_level) params.seniority_level = filters.seniority_level
+    if (filters?.status) params.status = filters.status
     const response = await api.get('/v1/candidates/search', { params })
     return response.data.candidates || response.data || []
   } catch (error) {

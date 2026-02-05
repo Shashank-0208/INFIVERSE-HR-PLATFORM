@@ -1,35 +1,81 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
-import { scheduleInterview, getInterviews, getJobs, type Interview } from '../../services/api'
+import {
+  scheduleInterview,
+  getInterviews,
+  getRecruiterJobs,
+  searchCandidates,
+  type Interview,
+  type CandidateProfile,
+  type Job
+} from '../../services/api'
 import Loading from '../../components/Loading'
+
+const INTERVIEW_TYPES = [
+  { value: 'on-site', label: 'On-site' },
+  { value: 'remote', label: 'Remote' },
+  { value: 'video_meet', label: 'Video meet' },
+  { value: 'voice_call', label: 'Voice call' }
+] as const
+type InterviewTypeValue = typeof INTERVIEW_TYPES[number]['value']
+
+/** Indian phone: +91XXXXXXXXXX, 91XXXXXXXXXX, 0XXXXXXXXXX, XXXXXXXXXX (10 digits, first digit 6-9). Same as backend gateway main.py. */
+const INDIAN_PHONE_REGEX = /^(\+91|91)?[6-9]\d{9}$/
+
+function normalizePhoneForValidation(phone: string): string {
+  const stripped = phone.replace(/[\s\-\.()]/g, '').trim()
+  if (stripped.startsWith('0') && stripped.length === 11) return stripped.slice(1)
+  return stripped
+}
+
+function validateIndianPhone(phone: string): { valid: boolean; message?: string; normalized?: string } {
+  if (!phone || !phone.trim()) return { valid: false, message: 'Phone number is required' }
+  const normalized = normalizePhoneForValidation(phone)
+  if (normalized.length < 10) return { valid: false, message: 'Enter a valid 10-digit Indian mobile number' }
+  const valid = INDIAN_PHONE_REGEX.test(normalized)
+  if (!valid) return { valid: false, message: 'Invalid format. Use e.g. +91XXXXXXXXXX, 0XXXXXXXXXX, or XXXXXXXXXX (10 digits, 6-9)' }
+  const digitsOnly = normalized.replace(/\D/g, '')
+  const canonical = digitsOnly.length === 10 ? `+91${digitsOnly}` : digitsOnly.startsWith('91') ? `+${digitsOnly}` : `+91${digitsOnly}`
+  return { valid: true, normalized: canonical }
+}
+
+function formatPhoneDisplay(value: string): string {
+  const n = normalizePhoneForValidation(value)
+  if (n.length === 10 && /^[6-9]/.test(n)) return `+91 ${n.slice(0, 5)} ${n.slice(5)}`
+  return value
+}
 
 export default function InterviewScheduling() {
   const [activeTab, setActiveTab] = useState<'schedule' | 'view'>('schedule')
   const [loading, setLoading] = useState(false)
   const [interviews, setInterviews] = useState<Interview[]>([])
-  const [jobs, setJobs] = useState<any[]>([])
-  
-  // Form state
+  const [jobs, setJobs] = useState<Job[]>([])
+  const [candidates, setCandidates] = useState<CandidateProfile[]>([])
+  const [candidatesLoading, setCandidatesLoading] = useState(false)
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([])
+  const [candidateDropdownOpen, setCandidateDropdownOpen] = useState(false)
+  const candidateDropdownRef = useRef<HTMLDivElement>(null)
+
   const [formData, setFormData] = useState({
-    candidate_id: '',
-    candidate_name: '',
     job_id: '',
     interview_date: '',
     interview_time: '',
-    interview_type: 'video',
+    interview_type: '' as InterviewTypeValue | '',
     interviewer: '',
     meeting_link: '',
+    meeting_address: '',
+    meeting_phone: '',
     notes: ''
   })
 
   useEffect(() => {
     if (activeTab === 'view') {
       loadInterviews()
-      // Auto-refresh interviews every 30 seconds when viewing
       const interval = setInterval(loadInterviews, 30000)
       return () => clearInterval(interval)
     }
     loadJobs()
+    loadCandidates()
   }, [activeTab])
 
   const loadInterviews = async () => {
@@ -47,68 +93,134 @@ export default function InterviewScheduling() {
 
   const loadJobs = async () => {
     try {
-      const jobsData = await getJobs()
+      const jobsData = await getRecruiterJobs()
       setJobs(jobsData)
       if (jobsData.length > 0 && !formData.job_id) {
-        setFormData(prev => ({ ...prev, job_id: jobsData[0].id.toString() }))
+        setFormData(prev => ({ ...prev, job_id: jobsData[0].id?.toString?.() ?? String(jobsData[0].id) }))
       }
     } catch (error) {
       console.error('Failed to load jobs:', error)
+      toast.error('Failed to load recruiter jobs')
     }
   }
 
+  const loadCandidates = async () => {
+    try {
+      setCandidatesLoading(true)
+      const list = await searchCandidates('', {})
+      setCandidates(Array.isArray(list) ? list : [])
+    } catch (error) {
+      console.error('Failed to load candidates:', error)
+      setCandidates([])
+    } finally {
+      setCandidatesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (candidateDropdownRef.current && !candidateDropdownRef.current.contains(e.target as Node)) {
+        setCandidateDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const toggleCandidate = (id: string) => {
+    setSelectedCandidateIds(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    )
+  }
+
+  const getValidationErrors = (): string[] => {
+    const err: string[] = []
+    if (selectedCandidateIds.length === 0) err.push('Select at least one candidate')
+    if (!formData.job_id) err.push('Select a job')
+    if (!formData.interview_date) err.push('Select interview date')
+    if (!formData.interview_time) err.push('Select interview time')
+    if (!formData.interview_type) err.push('Select interview type')
+    if (!formData.interviewer?.trim()) err.push('Enter interviewer name')
+    const type = formData.interview_type
+    const hasAddress = !!formData.meeting_address?.trim()
+    const hasPhone = !!formData.meeting_phone?.trim()
+    const hasLink = !!formData.meeting_link?.trim()
+
+    if (type === 'on-site' || type === 'remote') {
+      if (!hasAddress && !hasPhone) err.push('Enter address and/or phone number for Meet Type')
+      else if (hasPhone) {
+        const phoneCheck = validateIndianPhone(formData.meeting_phone!)
+        if (!phoneCheck.valid) err.push(phoneCheck.message || 'Invalid phone number for Meet Type')
+      }
+    } else if (type === 'video_meet') {
+      if (!hasLink && !hasPhone) err.push('Enter meeting link and/or phone number for Meet Type')
+      else if (hasPhone) {
+        const phoneCheck = validateIndianPhone(formData.meeting_phone!)
+        if (!phoneCheck.valid) err.push(phoneCheck.message || 'Invalid phone number for Meet Type')
+      }
+    } else if (type === 'voice_call') {
+      if (!hasPhone) err.push('Enter phone number for Meet Type')
+      else {
+        const phoneCheck = validateIndianPhone(formData.meeting_phone!)
+        if (!phoneCheck.valid) err.push(phoneCheck.message || 'Invalid phone number for Meet Type')
+      }
+    }
+    return err
+  }
+
+  const validationErrors = getValidationErrors()
+  const canSubmit = validationErrors.length === 0
+
+  const getNormalizedPhone = (): string | undefined => {
+    const p = formData.meeting_phone?.trim()
+    if (!p) return undefined
+    const result = validateIndianPhone(p)
+    return result.valid ? (result.normalized ?? p) : undefined
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.candidate_name || !formData.interviewer) {
-      toast.error('Please fill in candidate name and interviewer')
-      return
-    }
-
-    if (!formData.interview_date || !formData.interview_time) {
-      toast.error('Please select interview date and time')
-      return
-    }
-
+    if (!canSubmit) return
+    const interviewDateTime = `${formData.interview_date}T${formData.interview_time}:00`
+    const normalizedPhone = getNormalizedPhone()
     setLoading(true)
     try {
-      const interviewDateTime = `${formData.interview_date}T${formData.interview_time}:00`
-      
-      await scheduleInterview({
-        candidate_id: formData.candidate_id,
-        job_id: formData.job_id,
-        scheduled_date: interviewDateTime,
-        scheduled_time: formData.interview_time,
-        interview_type: formData.interview_type,
-        meeting_link: formData.meeting_link,
-        status: 'scheduled',
-        notes: formData.notes || `Interview scheduled for ${formData.candidate_name}`
-      })
-
-      toast.success(`Interview scheduled for ${formData.candidate_name}!`)
-      
-      // Reset form
+      let scheduled = 0
+      for (const candidateId of selectedCandidateIds) {
+        await scheduleInterview({
+          candidate_id: candidateId,
+          job_id: formData.job_id,
+          interview_date: interviewDateTime,
+          interviewer: formData.interviewer.trim(),
+          interview_type: formData.interview_type || undefined,
+          meeting_link: formData.meeting_link?.trim() || undefined,
+          meeting_address: formData.meeting_address?.trim() || undefined,
+          meeting_phone: normalizedPhone,
+          notes: formData.notes?.trim() || undefined,
+          status: 'scheduled'
+        })
+        scheduled++
+      }
+      toast.success(`Interview scheduled for ${scheduled} candidate(s)`)
+      setSelectedCandidateIds([])
       setFormData({
-        candidate_id: '',
-        candidate_name: '',
-        job_id: jobs.length > 0 ? jobs[0].id.toString() : '',
+        job_id: jobs.length > 0 ? (jobs[0].id?.toString?.() ?? String(jobs[0].id)) : '',
         interview_date: '',
         interview_time: '',
-        interview_type: 'video',
+        interview_type: '',
         interviewer: '',
         meeting_link: '',
+        meeting_address: '',
+        meeting_phone: '',
         notes: ''
       })
-
-      // Switch to view tab and refresh
       setActiveTab('view')
-      setTimeout(() => {
-        loadInterviews()
-      }, 500)
-    } catch (error: any) {
-      console.error('Schedule error:', error)
-      toast.error(error?.response?.data?.error || 'Failed to schedule interview')
+      setTimeout(loadInterviews, 500)
+    } catch (error: unknown) {
+      const msg = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : null
+      toast.error(msg || 'Failed to schedule interview')
     } finally {
       setLoading(false)
     }
@@ -117,11 +229,7 @@ export default function InterviewScheduling() {
   const formatDate = (dateStr: string) => {
     try {
       const date = new Date(dateStr)
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-      })
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
     } catch {
       return dateStr
     }
@@ -130,24 +238,28 @@ export default function InterviewScheduling() {
   const formatTime = (dateStr: string) => {
     try {
       const date = new Date(dateStr)
-      return date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      })
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     } catch {
       return dateStr
     }
   }
 
+  const meetTypeDisabled = !formData.interview_type
+  const phoneValidation = formData.meeting_phone?.trim()
+    ? validateIndianPhone(formData.meeting_phone)
+    : { valid: true as const, message: undefined }
+  const showPhoneError = !!formData.meeting_phone?.trim() && !phoneValidation.valid
+  const selectedCandidatesLabel = selectedCandidateIds.length === 0
+    ? 'Select candidates'
+    : `${selectedCandidateIds.length} candidate(s) selected`
+
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* Header */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 dark:from-green-500/10 dark:to-emerald-500/10 backdrop-blur-xl border border-green-300/20 dark:border-green-500/20">
         <h1 className="page-title">Interview Management System</h1>
         <p className="page-subtitle">Schedule, track, and manage candidate interviews</p>
       </div>
 
-      {/* Tabs */}
       <div className="card">
         <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
           <button
@@ -158,12 +270,7 @@ export default function InterviewScheduling() {
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Schedule Interview
-            </span>
+            Schedule Interview
           </button>
           <button
             onClick={() => setActiveTab('view')}
@@ -173,135 +280,207 @@ export default function InterviewScheduling() {
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              View Interviews
-            </span>
+            View Interviews
           </button>
         </div>
 
-        {/* Schedule Tab */}
         {activeTab === 'schedule' && (
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Candidate multi-select */}
+            <div ref={candidateDropdownRef} className="relative">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Candidates *
+              </label>
+              <button
+                type="button"
+                onClick={() => setCandidateDropdownOpen(!candidateDropdownOpen)}
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left flex items-center justify-between text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+              >
+                <span className={selectedCandidateIds.length === 0 ? 'text-gray-500' : ''}>
+                  {candidatesLoading ? 'Loading applicants...' : selectedCandidatesLabel}
+                </span>
+                <svg className={`w-5 h-5 transition-transform ${candidateDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {candidateDropdownOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {candidates.length === 0 && !candidatesLoading ? (
+                    <div className="p-4 text-sm text-gray-500 dark:text-gray-400">No applicants for your jobs yet</div>
+                  ) : (
+                    <div className="p-2 space-y-1">
+                      {candidates.map((c) => (
+                        <label
+                          key={c.id}
+                          className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 p-2 rounded"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedCandidateIds.includes(c.id)}
+                            onChange={() => toggleCandidate(c.id)}
+                            className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                          />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            {(c.name || 'Unknown')} - {c.email || ''}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Job ID */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Job ID *</label>
+              <select
+                value={formData.job_id}
+                onChange={(e) => setFormData({ ...formData, job_id: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+              >
+                {jobs.length === 0 ? (
+                  <option value="">No jobs posted</option>
+                ) : (
+                  jobs.map((job) => (
+                    <option key={job.id} value={job.id?.toString?.() ?? String(job.id)}>
+                      {job.title ?? 'Untitled'} - {job.id}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Candidate ID
-                </label>
-                <input
-                  type="number"
-                  value={formData.candidate_id}
-                  onChange={(e) => setFormData({ ...formData, candidate_id: e.target.value })}
-                  min="1"
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Candidate Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.candidate_name}
-                  onChange={(e) => setFormData({ ...formData, candidate_name: e.target.value })}
-                  required
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Job ID
-                </label>
-                <select
-                  value={formData.job_id}
-                  onChange={(e) => setFormData({ ...formData, job_id: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
-                >
-                  {jobs.map((job) => (
-                    <option key={job.id} value={job.id}>
-                      Job ID {job.id} - {job.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Interview Date *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Interview Date *</label>
                 <input
                   type="date"
                   value={formData.interview_date}
                   onChange={(e) => setFormData({ ...formData, interview_date: e.target.value })}
-                  required
                   min={new Date().toISOString().split('T')[0]}
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Interview Time *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Interview Time *</label>
                 <input
                   type="time"
                   value={formData.interview_time}
                   onChange={(e) => setFormData({ ...formData, interview_time: e.target.value })}
-                  required
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Interview Type
-                </label>
-                <select
-                  value={formData.interview_type}
-                  onChange={(e) => setFormData({ ...formData, interview_type: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="video">Video</option>
-                  <option value="phone">Phone</option>
-                  <option value="in-person">In-person</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Interviewer Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.interviewer}
-                  onChange={(e) => setFormData({ ...formData, interviewer: e.target.value })}
-                  required
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Meeting Link (Optional)
-                </label>
-                <input
-                  type="url"
-                  value={formData.meeting_link}
-                  onChange={(e) => setFormData({ ...formData, meeting_link: e.target.value })}
-                  placeholder="https://meet.google.com/..."
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
                 />
               </div>
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Interview Type *</label>
+              <select
+                value={formData.interview_type}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  interview_type: e.target.value as InterviewTypeValue,
+                  meeting_link: '',
+                  meeting_address: '',
+                  meeting_phone: ''
+                })}
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">Select type</option>
+                {INTERVIEW_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Notes (Optional)
+                Meet Type {formData.interview_type ? '*' : ''}
               </label>
+              <div className={`rounded-lg border p-4 ${meetTypeDisabled ? 'bg-gray-100 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 opacity-75 pointer-events-none' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800'}`}>
+                {!formData.interview_type && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Select an interview type above to enter meet details.</p>
+                )}
+                {(formData.interview_type === 'on-site' || formData.interview_type === 'remote') && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Address</label>
+                      <input
+                        type="text"
+                        value={formData.meeting_address}
+                        onChange={(e) => setFormData({ ...formData, meeting_address: e.target.value })}
+                        placeholder="Address or location"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Phone number</label>
+                      <input
+                        type="tel"
+                        value={formData.meeting_phone}
+                        onChange={(e) => setFormData({ ...formData, meeting_phone: e.target.value })}
+                        placeholder="Contact number"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                )}
+                {formData.interview_type === 'video_meet' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Meeting link (or phone)</label>
+                      <input
+                        type="url"
+                        value={formData.meeting_link}
+                        onChange={(e) => setFormData({ ...formData, meeting_link: e.target.value })}
+                        placeholder="https://meet.google.com/..."
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Phone number (optional if link provided)</label>
+                      <input
+                        type="tel"
+                        value={formData.meeting_phone}
+                        onChange={(e) => setFormData({ ...formData, meeting_phone: e.target.value })}
+                        placeholder="Backup phone"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                )}
+                {formData.interview_type === 'voice_call' && (
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Phone number *</label>
+                    <input
+                      type="tel"
+                      value={formData.meeting_phone}
+                      onChange={(e) => setFormData({ ...formData, meeting_phone: e.target.value })}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim()
+                        if (v && validateIndianPhone(v).valid) setFormData(prev => ({ ...prev, meeting_phone: formatPhoneDisplay(v) }))
+                      }}
+                      placeholder="e.g. +91 98765 43210, 09876543210, 9876543210"
+                      className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${showPhoneError ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                    />
+                    {showPhoneError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{phoneValidation.message}</p>}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Interviewer Name *</label>
+              <input
+                type="text"
+                value={formData.interviewer}
+                onChange={(e) => setFormData({ ...formData, interviewer: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notes (Optional)</label>
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -311,41 +490,43 @@ export default function InterviewScheduling() {
               />
             </div>
 
+            {validationErrors.length > 0 && (
+              <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">Please fix the following to schedule:</p>
+                <ul className="list-disc list-inside text-sm text-amber-700 dark:text-amber-300">
+                  {validationErrors.map((msg, i) => (
+                    <li key={i}>{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 disabled:opacity-50"
+              disabled={loading || !canSubmit}
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-green-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
                   <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
                   Scheduling...
                 </>
               ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  Schedule Interview
-                </>
+                <>Schedule Interview</>
               )}
             </button>
           </form>
         )}
 
-        {/* View Interviews Tab */}
         {activeTab === 'view' && (
           <div>
             {loading ? (
               <Loading message="Loading interviews..." />
             ) : interviews.length === 0 ? (
               <div className="text-center py-12">
-                <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
                 <p className="text-gray-500 dark:text-gray-400 text-lg">No interviews scheduled yet</p>
                 <button
                   onClick={() => setActiveTab('schedule')}
@@ -364,32 +545,24 @@ export default function InterviewScheduling() {
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-                          {interview.candidate_id || 'Candidate'}
+                          {interview.candidate_name || interview.candidate_id || 'Candidate'}
                         </h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                           <div>
                             <p className="text-gray-500 dark:text-gray-400">Date</p>
-                            <p className="font-semibold text-gray-900 dark:text-white">
-                              {formatDate(interview.scheduled_date)}
-                            </p>
+                            <p className="font-semibold text-gray-900 dark:text-white">{formatDate(interview.scheduled_date)}</p>
                           </div>
                           <div>
                             <p className="text-gray-500 dark:text-gray-400">Time</p>
-                            <p className="font-semibold text-gray-900 dark:text-white">
-                              {interview.scheduled_time || formatTime(interview.scheduled_date)}
-                            </p>
+                            <p className="font-semibold text-gray-900 dark:text-white">{interview.scheduled_time || formatTime(interview.scheduled_date)}</p>
                           </div>
                           <div>
                             <p className="text-gray-500 dark:text-gray-400">Job</p>
-                            <p className="font-semibold text-gray-900 dark:text-white">
-                              {interview.job_title || `Job ID ${interview.job_id}`}
-                            </p>
+                            <p className="font-semibold text-gray-900 dark:text-white">{interview.job_title || `Job ID ${interview.job_id}`}</p>
                           </div>
                           <div>
                             <p className="text-gray-500 dark:text-gray-400">Type</p>
-                            <p className="font-semibold text-gray-900 dark:text-white capitalize">
-                              {interview.interview_type}
-                            </p>
+                            <p className="font-semibold text-gray-900 dark:text-white capitalize">{interview.interview_type?.replace('_', ' ') || '—'}</p>
                           </div>
                           <div>
                             <p className="text-gray-500 dark:text-gray-400">Status</p>
@@ -404,12 +577,7 @@ export default function InterviewScheduling() {
                         </div>
                         {interview.meeting_link && (
                           <div className="mt-4">
-                            <a
-                              href={interview.meeting_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium text-sm"
-                            >
+                            <a href={interview.meeting_link} target="_blank" rel="noopener noreferrer" className="text-green-600 dark:text-green-400 hover:underline text-sm">
                               Join Meeting →
                             </a>
                           </div>
@@ -431,4 +599,3 @@ export default function InterviewScheduling() {
     </div>
   )
 }
-

@@ -355,6 +355,10 @@ class InterviewSchedule(BaseModel):
     interview_date: str
     interviewer: Optional[str] = "HR Team"
     notes: Optional[str] = None
+    interview_type: Optional[str] = None  # e.g. on-site, remote, video_meet, voice_call
+    meeting_link: Optional[str] = None
+    meeting_address: Optional[str] = None
+    meeting_phone: Optional[str] = None
 
 class JobOffer(BaseModel):
     candidate_id: str
@@ -2247,7 +2251,7 @@ async def get_all_feedback(candidate_id: Optional[str] = None, auth = Depends(ge
 
 @app.get("/v1/interviews", tags=["Assessment & Workflow"])
 async def get_interviews(candidate_id: Optional[str] = None, auth = Depends(get_auth)):
-    """Get All Interviews (supports filtering by candidate_id)"""
+    """Get All Interviews (supports filtering by candidate_id). Recruiter: only interviews for their jobs."""
     try:
         db = await get_mongo_db()
         
@@ -2260,18 +2264,38 @@ async def get_interviews(candidate_id: Optional[str] = None, auth = Depends(get_
                 if token_candidate_id and token_candidate_id != str(candidate_id):
                     raise HTTPException(status_code=403, detail="You can only view your own interviews")
             match_filter["candidate_id"] = candidate_id
+        # Recruiter: only interviews for jobs they posted
+        if auth.get("type") == "jwt_token" and auth.get("role") == "recruiter":
+            recruiter_id = str(auth.get("user_id", ""))
+            if recruiter_id:
+                cursor = db.jobs.find({"status": "active", "recruiter_id": recruiter_id}, {"_id": 1})
+                jobs_list = await cursor.to_list(length=500)
+                job_ids = [str(doc["_id"]) for doc in jobs_list]
+                match_filter["job_id"] = {"$in": job_ids} if job_ids else {"$in": []}
         
         pipeline = [
             {"$match": match_filter} if match_filter else {"$match": {}},
+            {"$addFields": {
+                "candidate_id_obj": {"$cond": [
+                    {"$and": [{"$ne": ["$candidate_id", None]}, {"$ne": ["$candidate_id", ""]}]},
+                    {"$toObjectId": "$candidate_id"},
+                    None
+                ]},
+                "job_id_obj": {"$cond": [
+                    {"$and": [{"$ne": ["$job_id", None]}, {"$ne": ["$job_id", ""]}]},
+                    {"$toObjectId": "$job_id"},
+                    None
+                ]}
+            }},
             {"$lookup": {
                 "from": "candidates",
-                "localField": "candidate_id",
+                "localField": "candidate_id_obj",
                 "foreignField": "_id",
                 "as": "candidate"
             }},
             {"$lookup": {
                 "from": "jobs",
-                "localField": "job_id",
+                "localField": "job_id_obj",
                 "foreignField": "_id",
                 "as": "job"
             }},
@@ -2283,6 +2307,11 @@ async def get_interviews(candidate_id: Optional[str] = None, auth = Depends(get_
                 "interview_date": 1,
                 "interviewer": 1,
                 "status": 1,
+                "interview_type": 1,
+                "meeting_link": 1,
+                "meeting_address": 1,
+                "meeting_phone": 1,
+                "notes": 1,
                 "candidate_name": {"$arrayElemAt": ["$candidate.name", 0]},
                 "job_title": {"$arrayElemAt": ["$job.title", 0]}
             }}
@@ -2294,22 +2323,29 @@ async def get_interviews(candidate_id: Optional[str] = None, auth = Depends(get_
         interviews = []
         for doc in interviews_list:
             interview_date = doc.get("interview_date")
-            interview_date_str = interview_date.isoformat() if interview_date else None
+            if hasattr(interview_date, "isoformat"):
+                interview_date_str = interview_date.isoformat()
+            elif interview_date:
+                interview_date_str = str(interview_date)
+            else:
+                interview_date_str = None
             interviews.append({
                 "id": doc.get("id"),
                 "candidate_id": doc.get("candidate_id"),
                 "job_id": doc.get("job_id"),
-                "interview_date": interview_date_str,  # Keep for backward compatibility
-                "scheduled_date": interview_date_str,  # Frontend expects this field name
-                "scheduled_time": None,  # Frontend expects this (can be extracted from date if needed)
-                "interview_type": "technical",  # Default value for frontend
+                "interview_date": interview_date_str,
+                "scheduled_date": interview_date_str,
+                "scheduled_time": None,
+                "interview_type": doc.get("interview_type") or "technical",
                 "interviewer": doc.get("interviewer"),
                 "status": doc.get("status") or "scheduled",
                 "candidate_name": doc.get("candidate_name"),
                 "job_title": doc.get("job_title"),
-                "company": None,  # Frontend expects this (can be added from job lookup if needed)
-                "meeting_link": None,  # Frontend expects this
-                "notes": None  # Frontend expects this
+                "company": None,
+                "meeting_link": doc.get("meeting_link"),
+                "meeting_address": doc.get("meeting_address"),
+                "meeting_phone": doc.get("meeting_phone"),
+                "notes": doc.get("notes")
             })
         
         return {"interviews": interviews, "count": len(interviews)}
@@ -2317,11 +2353,19 @@ async def get_interviews(candidate_id: Optional[str] = None, auth = Depends(get_
         return {"interviews": [], "count": 0, "error": str(e)}
 
 @app.post("/v1/interviews", tags=["Assessment & Workflow"])
-async def schedule_interview(interview: InterviewSchedule, api_key: str = Depends(get_api_key)):
-    """Schedule Interview"""
+async def schedule_interview(interview: InterviewSchedule, auth=Depends(get_auth)):
+    """Schedule Interview. Recruiter JWT: job_id must be one of recruiter's jobs. API key: no restriction."""
     try:
         db = await get_mongo_db()
-        
+        if auth.get("type") == "jwt_token" and auth.get("role") == "recruiter":
+            recruiter_id = str(auth.get("user_id", ""))
+            if recruiter_id:
+                cursor = db.jobs.find({"status": "active", "recruiter_id": recruiter_id}, {"_id": 1})
+                jobs_list = await cursor.to_list(length=500)
+                job_ids = [str(doc["_id"]) for doc in jobs_list]
+                if interview.job_id not in job_ids:
+                    raise HTTPException(status_code=403, detail="You can only schedule interviews for your own jobs")
+
         document = {
             "candidate_id": interview.candidate_id,
             "job_id": interview.job_id,
@@ -2331,6 +2375,22 @@ async def schedule_interview(interview: InterviewSchedule, api_key: str = Depend
             "notes": interview.notes,
             "created_at": datetime.now(timezone.utc)
         }
+        if interview.interview_type:
+            document["interview_type"] = interview.interview_type
+        if interview.meeting_link:
+            document["meeting_link"] = interview.meeting_link
+        if interview.meeting_address:
+            document["meeting_address"] = interview.meeting_address
+        if interview.meeting_phone:
+            phone_clean = re.sub(r"[\s\-\.()]", "", interview.meeting_phone.strip())
+            if phone_clean.startswith("0") and len(phone_clean) == 11:
+                phone_clean = phone_clean[1:]
+            if not re.match(r"^(\+91|91)?[6-9]\d{9}$", phone_clean):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid phone format. Use Indian format: +91XXXXXXXXXX, 0XXXXXXXXXX, or XXXXXXXXXX (10 digits, starting with 6-9)."
+                )
+            document["meeting_phone"] = interview.meeting_phone
         result = await db.interviews.insert_one(document)
         interview_id = str(result.inserted_id)
         

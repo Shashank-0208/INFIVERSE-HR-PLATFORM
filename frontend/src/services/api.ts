@@ -580,11 +580,18 @@ export interface Interview {
   job_title?: string
   company?: string
   scheduled_date: string
+  /** Backend schedule endpoint expects interview_date (combined datetime string). */
+  interview_date?: string
   scheduled_time?: string
   interview_type: string
   meeting_link?: string
+  meeting_address?: string
+  meeting_phone?: string
   status: 'scheduled' | 'completed' | 'cancelled' | 'rescheduled'
   notes?: string
+  candidate_name?: string
+  /** Backend schedule endpoint. */
+  interviewer?: string
 }
 
 export const getInterviews = async (candidateId?: string): Promise<Interview[]> => {

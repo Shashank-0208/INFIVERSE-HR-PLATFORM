@@ -1011,6 +1011,7 @@ export interface RecruiterStats {
   interviewed: number
   offers_sent: number
   hired: number
+  assessments_completed?: number
 }
 
 /** Jobs posted by the logged-in recruiter only (for recruiter dashboard). */
@@ -1038,7 +1039,8 @@ export const getRecruiterStats = async (): Promise<RecruiterStats> => {
         shortlisted: 0,
         interviewed: 0,
         offers_sent: 0,
-        hired: 0
+        hired: 0,
+        assessments_completed: 0
       }
     } catch {
       return {
@@ -1047,7 +1049,8 @@ export const getRecruiterStats = async (): Promise<RecruiterStats> => {
         shortlisted: 0,
         interviewed: 0,
         offers_sent: 0,
-        hired: 0
+        hired: 0,
+        assessments_completed: 0
       }
     }
   }

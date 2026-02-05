@@ -3672,7 +3672,7 @@ async def get_recruiter_jobs(auth=Depends(get_auth)):
 
 @app.get("/v1/recruiter/stats", tags=["Recruiter Portal"])
 async def get_recruiter_stats(auth=Depends(get_auth)):
-    """Get Recruiter Dashboard Statistics (scoped to this recruiter's jobs only)."""
+    """Get Recruiter Dashboard Statistics. All metrics are data-isolated: only jobs posted by the logged-in recruiter (recruiter_id from JWT) and related applicants, interviews, offers, and feedback are counted."""
     try:
         db = await get_mongo_db()
         auth_info = auth
@@ -3686,9 +3686,10 @@ async def get_recruiter_stats(auth=Depends(get_auth)):
                 "shortlisted": 0,
                 "interviewed": 0,
                 "offers_sent": 0,
-                "hired": 0
+                "hired": 0,
+                "assessments_completed": 0
             }
-        # Jobs posted by this recruiter (active only)
+        # Jobs posted by this recruiter (active only) – all counts below use these job_ids for isolation
         cursor = db.jobs.find({"status": "active", "recruiter_id": recruiter_id}, {"_id": 1})
         jobs_list = await cursor.to_list(length=500)
         job_ids = [str(doc["_id"]) for doc in jobs_list]
@@ -3700,7 +3701,8 @@ async def get_recruiter_stats(auth=Depends(get_auth)):
                 "shortlisted": 0,
                 "interviewed": 0,
                 "offers_sent": 0,
-                "hired": 0
+                "hired": 0,
+                "assessments_completed": 0
             }
         total_applicants = await db.job_applications.count_documents({"job_id": {"$in": job_ids}})
         shortlisted = await db.job_applications.count_documents({
@@ -3713,13 +3715,15 @@ async def get_recruiter_stats(auth=Depends(get_auth)):
             "job_id": {"$in": job_ids},
             "status": "accepted"
         })
+        assessments_completed = await db.feedback.count_documents({"job_id": {"$in": job_ids}})
         return {
             "total_jobs": total_jobs,
             "total_applicants": total_applicants,
             "shortlisted": shortlisted,
             "interviewed": interviewed,
             "offers_sent": offers_sent,
-            "hired": hired
+            "hired": hired,
+            "assessments_completed": assessments_completed
         }
     except HTTPException:
         raise
@@ -3731,6 +3735,7 @@ async def get_recruiter_stats(auth=Depends(get_auth)):
             "interviewed": 0,
             "offers_sent": 0,
             "hired": 0,
+            "assessments_completed": 0,
             "error": str(e)
         }
 

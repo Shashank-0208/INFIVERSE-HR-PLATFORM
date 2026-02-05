@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { getAllCandidates, getInterviews } from '../../services/api'
+import { searchCandidates, getAllInterviews, getRecruiterStats, type RecruiterStats } from '../../services/api'
 import Loading from '../../components/Loading'
 import StatsCard from '../../components/StatsCard'
 
 export default function ExportReports() {
   const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<RecruiterStats | null>(null)
   const [candidates, setCandidates] = useState<any[]>([])
   const [interviews, setInterviews] = useState<any[]>([])
   const [exporting, setExporting] = useState(false)
@@ -20,11 +21,15 @@ export default function ExportReports() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [candidatesData, interviewsData] = await Promise.all([
-        getAllCandidates().catch(() => []),
-        getInterviews().catch(() => [])
+      // Overview metrics: getRecruiterStats() (same as Recruiter Dashboard) – all counts scoped to jobs posted by logged-in recruiter.
+      // Candidates and interviews: backend scopes to recruiter's applicants/jobs when auth is recruiter JWT.
+      const [statsData, candidatesData, interviewsData] = await Promise.all([
+        getRecruiterStats().catch(() => null),
+        searchCandidates('', {}).catch(() => []),
+        getAllInterviews().catch(() => [])
       ])
-      setCandidates(candidatesData)
+      setStats(statsData ?? null)
+      setCandidates(Array.isArray(candidatesData) ? candidatesData : [])
       setInterviews(interviewsData)
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -153,10 +158,11 @@ export default function ExportReports() {
     }
   }
 
-  const totalCandidates = candidates.length
-  const totalInterviews = interviews.length
-  const assessedCount = interviews.length
-  const shortlisted = candidates.filter(c => c.status === 'shortlisted').length
+  // Assessment Overview: same source as Recruiter Dashboard – GET /v1/recruiter/stats (recruiter-scoped only)
+  const totalApplicants = stats?.total_applicants ?? 0       // Applicants to this recruiter's jobs
+  const totalInterviewsScheduled = stats?.interviewed ?? 0    // Interviews for this recruiter's jobs
+  const assessmentsCompleted = stats?.assessments_completed ?? 0  // Values assessments (feedback) for this recruiter's jobs
+  const shortlistedCount = stats?.shortlisted ?? 0           // Shortlisted applicants to this recruiter's jobs
 
   if (loading) {
     return <Loading message="Loading assessment data..." />
@@ -175,8 +181,8 @@ export default function ExportReports() {
         <h2 className="section-title mb-6">Assessment Overview</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatsCard
-            title="Total Candidates"
-            value={totalCandidates}
+            title="Total Applicants"
+            value={totalApplicants}
             color="blue"
             icon={
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,7 +192,7 @@ export default function ExportReports() {
           />
           <StatsCard
             title="Interviews Scheduled"
-            value={totalInterviews}
+            value={totalInterviewsScheduled}
             color="purple"
             icon={
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,7 +202,7 @@ export default function ExportReports() {
           />
           <StatsCard
             title="Assessments Completed"
-            value={assessedCount}
+            value={assessmentsCompleted}
             color="green"
             icon={
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -206,7 +212,7 @@ export default function ExportReports() {
           />
           <StatsCard
             title="Shortlisted Candidates"
-            value={shortlisted}
+            value={shortlistedCount}
             color="yellow"
             icon={
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

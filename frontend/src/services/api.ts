@@ -542,7 +542,7 @@ export const updateCandidateProfile = async (candidateId: string, data: Partial<
   }
 }
 
-// Match endpoint: 60s timeout for AI shortlist (gateway uses AGENT_MATCH_TIMEOUT=60).
+// Match endpoint: 60s timeout for AI shortlist (gateway uses AGENT_MATCH_TIMEOUT=90).
 const MATCH_REQUEST_TIMEOUT_MS = 90_000
 
 export const getCandidatesByJob = async (jobId: string) => {

@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { searchCandidates, getJobs, getCandidateSuggestions, type CandidateProfile } from '../../services/api'
+import { searchCandidates, getRecruiterJobs, getCandidateSuggestionsResponse, type CandidateProfile } from '../../services/api'
 import Table from '../../components/Table'
 import Loading from '../../components/Loading'
 import AutocompleteSearch from '../../components/AutocompleteSearch'
@@ -118,13 +118,14 @@ export default function CandidateSearch() {
   const navigate = useNavigate()
   const location = useLocation()
   const [candidates, setCandidates] = useState<CandidateProfile[]>([])
-  const [jobs, setJobs] = useState<any[]>([])
+  const [jobs, setJobs] = useState<{ id: string; title?: string }[]>([])
   const [loading, setLoading] = useState(false)
   const [searchClicked, setSearchClicked] = useState(false)
-  
+  const [hasApplicants, setHasApplicants] = useState<boolean | null>(null)
+
   // Search filters (prefill from navbar global search)
   const [searchQuery, setSearchQuery] = useState(() => (location.state as { searchQuery?: string })?.searchQuery || '')
-  const [selectedJob, setSelectedJob] = useState('all')
+  const [selectedJobId, setSelectedJobId] = useState<string>('all')
   const [experienceFilter, setExperienceFilter] = useState('any')
   const [seniorityFilter, setSeniorityFilter] = useState<string[]>([])
   const [educationFilter, setEducationFilter] = useState<string[]>([])
@@ -140,12 +141,18 @@ export default function CandidateSearch() {
 
   const loadJobs = async () => {
     try {
-      const jobsData = await getJobs()
+      const jobsData = await getRecruiterJobs()
       setJobs(jobsData)
     } catch (error) {
-      console.error('Failed to load jobs:', error)
+      console.error('Failed to load recruiter jobs:', error)
     }
   }
+
+  const fetchCandidateSuggestions = useCallback(async (q: string) => {
+    const { suggestions, has_applicants } = await getCandidateSuggestionsResponse(q, 10)
+    setHasApplicants(has_applicants ?? null)
+    return suggestions
+  }, [])
 
   const handleSearch = async () => {
     if (!searchQuery.trim() && !skillsFilter.length && !locationFilter.length && 
@@ -164,9 +171,8 @@ export default function CandidateSearch() {
         filters.search = searchQuery.trim()
       }
       
-      if (selectedJob !== 'all') {
-        const jobId = selectedJob.split(' - ')[0].replace('Job ID ', '')
-        filters.job_id = jobId
+      if (selectedJobId !== 'all') {
+        filters.job_id = selectedJobId
       }
       
       if (skillsFilter.length) {
@@ -219,7 +225,7 @@ export default function CandidateSearch() {
 
   const clearAllFilters = () => {
     setSearchQuery('')
-    setSelectedJob('all')
+    setSelectedJobId('all')
     setExperienceFilter('any')
     setSeniorityFilter([])
     setEducationFilter([])
@@ -235,7 +241,7 @@ export default function CandidateSearch() {
   const getActiveFiltersCount = () => {
     let count = 0
     if (searchQuery.trim()) count++
-    if (selectedJob !== 'all') count++
+    if (selectedJobId !== 'all') count++
     if (experienceFilter !== 'any') count++
     if (seniorityFilter.length > 0) count++
     if (educationFilter.length > 0) count++
@@ -273,45 +279,38 @@ export default function CandidateSearch() {
               <AutocompleteSearch
                 value={searchQuery}
                 onChange={setSearchQuery}
-                fetchSuggestions={getCandidateSuggestions}
-                getSuggestionLabel={(s) => `${(s as { name?: string }).name || ''} – ${(s as { email?: string }).email || ''}`}
-                placeholder="Search by name, skills, experience, location..."
+                fetchSuggestions={fetchCandidateSuggestions}
+                getSuggestionLabel={(s) => `${(s as { name?: string }).name || ''} - ${(s as { email?: string }).email || ''}`}
+                placeholder="Search by name or email"
                 inputClassName="input-field pl-10"
                 minLength={1}
                 debounceMs={250}
                 maxSuggestions={10}
-                emptyOptionLabel="No matching candidates"
-                onEmptySelect={() => toast('No candidates match your search. Try different terms.', { icon: 'ℹ' })}
+                emptyOptionLabel={hasApplicants === false ? 'No applicants yet' : 'No matching candidates'}
+                onEmptySelect={() => toast(hasApplicants === false ? 'You have no applicants yet.' : 'No candidates match your search. Try different terms.', { icon: 'ℹ' })}
               />
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Type to see suggestions (e.g. Sarah, Steven); then click Search to apply filters.</p>
           </div>
           <div className="md:col-span-1">
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Filter by Job
             </label>
-            <AutocompleteSearch
-              value={selectedJob === 'all' ? '' : selectedJob}
-              onChange={(v) => setSelectedJob(v ? v : 'all')}
-              fetchSuggestions={async (q) => {
-                const lower = (q || '').toLowerCase()
-                return jobs
-                  .filter((j) => ((j.title || '') + (j.id || '')).toLowerCase().includes(lower))
-                  .slice(0, 15)
-                  .map((j) => ({ id: j.id, title: j.title, department: j.department }))
-              }}
-              getSuggestionLabel={(s) => `Job ID ${(s as { id: string }).id} - ${(s as { title?: string }).title || ''}`}
-              placeholder="Type to search jobs (or All Jobs)"
-              inputClassName="input-field"
-              minLength={0}
-              debounceMs={150}
-              maxSuggestions={15}
-              emptyOptionLabel="No matching jobs"
-              onEmptySelect={() => toast('No jobs match your search.', { icon: 'ℹ' })}
-            />
-            {selectedJob && selectedJob !== 'all' && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Selected: {selectedJob}</p>
-            )}
+            <select
+              value={selectedJobId}
+              onChange={(e) => setSelectedJobId(e.target.value)}
+              className="input-field w-full"
+            >
+              <option value="all">All Jobs</option>
+              {jobs.length === 0 ? (
+                <option value="" disabled>No jobs posted</option>
+              ) : (
+                jobs.map((j) => (
+                  <option key={j.id} value={j.id}>
+                    {j.title || 'Untitled'} - {j.id}
+                  </option>
+                ))
+              )}
+            </select>
           </div>
         </div>
 
@@ -487,8 +486,12 @@ export default function CandidateSearch() {
               <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-gray-500 dark:text-gray-400 text-lg">No candidates found matching your criteria</p>
-              <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Try adjusting your search filters</p>
+              <p className="text-gray-500 dark:text-gray-400 text-lg">
+                {hasApplicants === false ? 'You have no applicants yet' : 'No candidates found matching your criteria'}
+              </p>
+              <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
+                {hasApplicants === false ? 'Candidates will appear here once they apply to your jobs.' : 'Try adjusting your search filters'}
+              </p>
             </div>
           ) : (
             <>

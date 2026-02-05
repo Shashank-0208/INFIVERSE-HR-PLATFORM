@@ -1065,36 +1065,66 @@ async def get_candidate_stats(auth=Depends(get_auth)):
         }
 
 
+async def _recruiter_applicant_ids(db, recruiter_id: str, job_id: Optional[str] = None) -> List[str]:
+    """Return list of candidate_ids that have applied to recruiter's jobs (or to a specific job)."""
+    cursor = db.jobs.find({"status": "active", "recruiter_id": recruiter_id}, {"_id": 1})
+    recruiter_jobs = await cursor.to_list(length=500)
+    job_ids = [str(doc["_id"]) for doc in recruiter_jobs]
+    if not job_ids:
+        return []
+    match_filter: Dict[str, Any] = {"job_id": {"$in": job_ids}}
+    if job_id:
+        match_filter["job_id"] = job_id
+    pipeline = [{"$match": match_filter}, {"$group": {"_id": "$candidate_id"}}]
+    candidate_ids = []
+    async for agg_doc in db.job_applications.aggregate(pipeline):
+        cid = agg_doc.get("_id")
+        if cid:
+            candidate_ids.append(str(cid))
+    return candidate_ids
+
+
 @app.get("/v1/candidates/autocomplete", tags=["Candidate Management"])
 async def candidates_autocomplete(q: Optional[str] = None, limit: int = 10, auth=Depends(get_auth)):
-    """Search-as-you-type: return candidate suggestions by name, email, or skills. Min 1 character."""
+    """Search-as-you-type: by name or email. For recruiters, only applicants to their jobs (data isolation)."""
     if not q or not str(q).strip():
-        return {"suggestions": []}
+        return {"suggestions": [], "has_applicants": None}
     q = str(q).strip()[:50]
-    # Normalize special characters so users can search names/skills containing symbols.
-    # Keep @ and . for email searches, but treat slashes as separators.
     q_norm = re.sub(r"[\\/]+", " ", q)
     q_norm = re.sub(r"\s+", " ", q_norm).strip()
-    # If query is only symbols/spaces, bail out.
     if not re.search(r"[A-Za-z0-9@.]", q_norm):
-        return {"suggestions": []}
+        return {"suggestions": [], "has_applicants": None}
     limit = max(1, min(limit, 20))
     try:
         db = await get_mongo_db()
-        # Fuzzy token match for non-email queries; for email-ish input keep a direct escaped regex.
+        is_recruiter = auth.get("type") == "jwt_token" and auth.get("role") == "recruiter"
+        candidate_ids_scope: Optional[List[str]] = None
+        if is_recruiter:
+            recruiter_id = str(auth.get("user_id", ""))
+            if recruiter_id:
+                candidate_ids_scope = await _recruiter_applicant_ids(db, recruiter_id)
+            else:
+                candidate_ids_scope = []
+        if is_recruiter and candidate_ids_scope is not None and len(candidate_ids_scope) == 0:
+            return {"suggestions": [], "has_applicants": False}
         if "@" in q_norm or "." in q_norm:
             regex_pat = re.escape(q_norm)
         else:
             tokens = [t for t in re.sub(r"[^A-Za-z0-9]+", " ", q_norm).split(" ") if t]
             regex_pat = r"[\s\W_]*".join(re.escape(t) for t in tokens)[:200] if tokens else re.escape(q_norm)
         regex = {"$regex": regex_pat, "$options": "i"}
-        cursor = db.candidates.find({
-            "$or": [
-                {"name": regex},
-                {"email": regex},
-                {"technical_skills": regex},
-            ]
-        }).sort("created_at", -1).limit(limit)
+        base_query: Dict[str, Any] = {
+            "$or": [{"name": regex}, {"email": regex}]
+        }
+        if is_recruiter and candidate_ids_scope:
+            try:
+                object_ids = [ObjectId(cid) for cid in candidate_ids_scope]
+                base_query["_id"] = {"$in": object_ids}
+            except Exception:
+                return {"suggestions": [], "has_applicants": True}
+        elif is_recruiter:
+            return {"suggestions": [], "has_applicants": False}
+        cursor = db.candidates.find(base_query).sort("created_at", -1).limit(limit)
         candidates_list = await cursor.to_list(length=limit)
         suggestions = []
         for doc in candidates_list:
@@ -1105,21 +1135,22 @@ async def candidates_autocomplete(q: Optional[str] = None, limit: int = 10, auth
                 "technical_skills": doc.get("technical_skills") or "",
                 "location": doc.get("location") or "",
             })
-        return {"suggestions": suggestions}
+        return {"suggestions": suggestions, "has_applicants": True if is_recruiter else None}
     except Exception as e:
-        return {"suggestions": [], "error": str(e)}
+        return {"suggestions": [], "has_applicants": None, "error": str(e)}
 
 
 @app.get("/v1/candidates/search", tags=["Candidate Management"])
 async def search_candidates(
     search: Optional[str] = None,
     query: Optional[str] = None,
+    job_id: Optional[str] = None,
     skills: Optional[str] = None,
     location: Optional[str] = None,
     experience_min: Optional[int] = None,
     auth=Depends(get_auth)
 ):
-    """Search & Filter Candidates. Use search or query for name/skills/email free text."""
+    """Search & Filter Candidates. For recruiters: only applicants to their jobs (optionally job_id). Text search: name/email (recruiter) or name/email/skills (others)."""
     q_text = (search or query or "").strip()[:100]
     if skills:
         if len(skills) > 200:
@@ -1136,21 +1167,39 @@ async def search_candidates(
 
     try:
         db = await get_mongo_db()
-        query = {}
+        mongo_query: Dict[str, Any] = {}
+        is_recruiter = auth.get("type") == "jwt_token" and auth.get("role") == "recruiter"
+        if is_recruiter:
+            recruiter_id = str(auth.get("user_id", ""))
+            if not recruiter_id:
+                return {"candidates": [], "filters": {"skills": skills, "location": location, "experience_min": experience_min}, "count": 0}
+            candidate_ids_scope = await _recruiter_applicant_ids(db, recruiter_id, job_id)
+            if not candidate_ids_scope:
+                return {"candidates": [], "filters": {"skills": skills, "location": location, "experience_min": experience_min}, "count": 0}
+            try:
+                mongo_query["_id"] = {"$in": [ObjectId(cid) for cid in candidate_ids_scope]}
+            except Exception:
+                return {"candidates": [], "filters": {"skills": skills, "location": location, "experience_min": experience_min}, "count": 0}
         if q_text:
-            query["$or"] = [
-                {"name": {"$regex": re.escape(q_text), "$options": "i"}},
-                {"email": {"$regex": re.escape(q_text), "$options": "i"}},
-                {"technical_skills": {"$regex": re.escape(q_text), "$options": "i"}},
-            ]
+            if is_recruiter:
+                mongo_query["$or"] = [
+                    {"name": {"$regex": re.escape(q_text), "$options": "i"}},
+                    {"email": {"$regex": re.escape(q_text), "$options": "i"}},
+                ]
+            else:
+                mongo_query["$or"] = [
+                    {"name": {"$regex": re.escape(q_text), "$options": "i"}},
+                    {"email": {"$regex": re.escape(q_text), "$options": "i"}},
+                    {"technical_skills": {"$regex": re.escape(q_text), "$options": "i"}},
+                ]
         if skills:
-            query["technical_skills"] = {"$regex": skills, "$options": "i"}
+            mongo_query["technical_skills"] = {"$regex": skills, "$options": "i"}
         if location:
-            query["location"] = {"$regex": location, "$options": "i"}
+            mongo_query["location"] = {"$regex": location, "$options": "i"}
         if experience_min is not None:
-            query["experience_years"] = {"$gte": experience_min}
+            mongo_query["experience_years"] = {"$gte": experience_min}
 
-        cursor = db.candidates.find(query).limit(50)
+        cursor = db.candidates.find(mongo_query).limit(50)
         candidates_list = await cursor.to_list(length=50)
         
         candidates = []
@@ -1170,7 +1219,7 @@ async def search_candidates(
         
         return {
             "candidates": candidates, 
-            "filters": {"skills": skills, "location": location, "experience_min": experience_min}, 
+            "filters": {"skills": skills, "location": location, "experience_min": experience_min, "job_id": job_id}, 
             "count": len(candidates)
         }
     except Exception as e:

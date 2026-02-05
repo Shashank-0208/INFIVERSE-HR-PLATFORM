@@ -363,19 +363,30 @@ export const getJobSuggestions = async (q: string, limit = 10): Promise<{ id: st
   }
 }
 
-/** Search-as-you-type: candidate suggestions by name/email/skills. Requires auth. */
+/** Search-as-you-type: candidate suggestions by name/email (recruiter: only their applicants). Requires auth. */
 export const getCandidateSuggestions = async (q: string, limit = 10): Promise<{ id: string; name: string; email: string; technical_skills?: string; location?: string }[]> => {
+  const res = await getCandidateSuggestionsResponse(q, limit)
+  return res.suggestions
+}
+
+/** Same as getCandidateSuggestions but returns { suggestions, has_applicants } for recruiter empty-state messaging. */
+export const getCandidateSuggestionsResponse = async (
+  q: string,
+  limit = 10
+): Promise<{ suggestions: { id: string; name: string; email: string; technical_skills?: string; location?: string }[]; has_applicants: boolean | null }> => {
   const qNorm = (q ?? '')
     .replace(/[\\/]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-  if (!qNorm) return []
+  if (!qNorm) return { suggestions: [], has_applicants: null }
   try {
     const response = await api.get('/v1/candidates/autocomplete', { params: { q: qNorm, limit } })
-    return response.data?.suggestions ?? []
+    const suggestions = response.data?.suggestions ?? []
+    const hasApplicants = response.data?.has_applicants ?? null
+    return { suggestions, has_applicants: hasApplicants }
   } catch (error) {
     console.error('Candidate suggestions error:', error)
-    return []
+    return { suggestions: [], has_applicants: null }
   }
 }
 
@@ -1057,15 +1068,20 @@ export const getAllCandidates = async (filters?: {
 }
 
 export const searchCandidates = async (query: string, filters?: {
-  skills?: string[]
-  min_experience?: number
-  max_experience?: number
+  job_id?: string
+  skills?: string
   location?: string
+  experience_min?: number
+  experience_max?: number
+  search?: string
 }) => {
   try {
-    const response = await api.get('/v1/candidates/search', {
-      params: { query, ...filters }
-    })
+    const params: Record<string, string | number | undefined> = { query: query || filters?.search }
+    if (filters?.job_id) params.job_id = filters.job_id
+    if (filters?.skills) params.skills = filters.skills
+    if (filters?.location) params.location = filters.location
+    if (filters?.experience_min !== undefined) params.experience_min = filters.experience_min
+    const response = await api.get('/v1/candidates/search', { params })
     return response.data.candidates || response.data || []
   } catch (error) {
     console.error('Error searching candidates:', error)

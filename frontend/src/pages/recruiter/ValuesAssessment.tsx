@@ -1,26 +1,26 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { getAllCandidates, getJobs, submitFeedback, type Job } from '../../services/api'
+import { searchCandidates, getRecruiterJobs, getCandidateFeedback, submitFeedback, type Job } from '../../services/api'
 import Loading from '../../components/Loading'
 
-interface Candidate {
-  id: string
-  name: string
-  email?: string
-}
+const EXPERIENCE_LEVELS = ['Entry', 'Mid', 'Senior', 'Lead'] as const
+const VALUE_SLIDER_MIN = 1
+const VALUE_SLIDER_MAX = 5
 
 export default function ValuesAssessment() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null)
+  const [candidates, setCandidates] = useState<{ id: string; name?: string; email?: string }[]>([])
   const [jobs, setJobs] = useState<Job[]>([])
   
   const [formData, setFormData] = useState({
     candidate_name: '',
     candidate_id: '',
     job_title: '',
-    reviewer_name: '',
     job_id: '',
+    experience_level: 'Entry' as typeof EXPERIENCE_LEVELS[number],
+    reviewer_name: '',
     interview_date: '',
     feedback_text: '',
     integrity: 3,
@@ -42,10 +42,10 @@ export default function ValuesAssessment() {
     try {
       setLoading(true)
       const [candidatesData, jobsData] = await Promise.all([
-        getAllCandidates().catch(() => []),
-        getJobs().catch(() => [])
+        searchCandidates('', {}).catch(() => []),
+        getRecruiterJobs().catch(() => [])
       ])
-      setCandidates(candidatesData)
+      setCandidates(Array.isArray(candidatesData) ? candidatesData : [])
       setJobs(jobsData)
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -57,40 +57,85 @@ export default function ValuesAssessment() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
+    setDuplicateWarning(null)
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
   const handleSliderChange = (value: string, valueName: string) => {
-    setFormData(prev => ({ ...prev, [valueName]: parseInt(value) }))
+    setDuplicateWarning(null)
+    const num = Math.min(VALUE_SLIDER_MAX, Math.max(VALUE_SLIDER_MIN, parseInt(value, 10) || VALUE_SLIDER_MIN))
+    setFormData(prev => ({ ...prev, [valueName]: num }))
+  }
+
+  const requiredFilled =
+    !!formData.candidate_id &&
+    !!formData.job_id &&
+    !!formData.experience_level &&
+    !!formData.reviewer_name?.trim() &&
+    !!formData.interview_date &&
+    !!formData.overall_recommendation
+  const canSubmit = requiredFilled && !duplicateWarning
+
+  const getValueRating = (key: string): number => {
+    const v = formData[key as keyof typeof formData]
+    if (typeof v !== 'number') return VALUE_SLIDER_MIN
+    return Math.min(VALUE_SLIDER_MAX, Math.max(VALUE_SLIDER_MIN, v))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.candidate_name || !formData.reviewer_name || !formData.candidate_id) {
-      toast.error('Please fill in all required fields')
-      return
-    }
+    if (!canSubmit) return
 
+    setDuplicateWarning(null)
     setSubmitting(true)
     try {
+      const existingList = await getCandidateFeedback(formData.candidate_id)
+      const jobId = (formData.job_id || '').trim()
+      const experienceLevel = (formData.experience_level || '').trim()
+      const comments = (formData.feedback_text || '').trim()
+      const integrity = getValueRating('integrity')
+      const honesty = getValueRating('honesty')
+      const discipline = getValueRating('discipline')
+      const hardWork = getValueRating('hardWork')
+      const gratitude = getValueRating('gratitude')
+
+      const isDuplicate = existingList.some((ex) => {
+        const exJob = (ex.job_id ?? '').toString().trim()
+        const exExp = (ex as { experience_level?: string }).experience_level ?? ''
+        const exComments = (ex.feedback_text ?? (ex as { comments?: string }).comments ?? '').toString().trim()
+        const exVal = ex.values_assessment ?? (ex as { values_scores?: Record<string, number> }).values_scores
+        if (exJob !== jobId) return false
+        if (exExp !== experienceLevel) return false
+        if (exComments !== comments) return false
+        if (exVal?.integrity !== integrity) return false
+        if (exVal?.honesty !== honesty) return false
+        if (exVal?.discipline !== discipline) return false
+        if ((exVal?.hardWork ?? (exVal as Record<string, number>)?.['hard_work']) !== hardWork) return false
+        if (exVal?.gratitude !== gratitude) return false
+        return true
+      })
+
+      if (isDuplicate) {
+        setDuplicateWarning(
+          'This values assessment is identical to an existing one for this candidate and job. Please change at least one value (e.g. ratings, feedback, experience level, or job) to submit a new assessment.'
+        )
+        setSubmitting(false)
+        return
+      }
+
       const feedbackData = {
-        candidate_id: formData.candidate_id,
-        job_id: formData.job_id || undefined,
-        feedback_text: formData.feedback_text,
-        values_score: {
-          integrity: formData.integrity,
-          honesty: formData.honesty,
-          discipline: formData.discipline,
-          hardWork: formData.hardWork,
-          gratitude: formData.gratitude,
-        },
-        overall_recommendation: formData.overall_recommendation,
-        reviewer_name: formData.reviewer_name,
-        interview_date: formData.interview_date || undefined,
+        job_id: formData.job_id || '',
+        integrity,
+        honesty,
+        discipline,
+        hard_work: hardWork,
+        gratitude,
+        comments: comments || undefined,
+        experience_level: formData.experience_level,
       }
 
       await submitFeedback(formData.candidate_id, feedbackData)
+      setDuplicateWarning(null)
       toast.success('Values assessment submitted successfully!')
       
       // Reset form
@@ -98,8 +143,9 @@ export default function ValuesAssessment() {
         candidate_name: '',
         candidate_id: '',
         job_title: '',
-        reviewer_name: '',
         job_id: '',
+        experience_level: 'Entry',
+        reviewer_name: '',
         interview_date: '',
         feedback_text: '',
         integrity: 3,
@@ -152,34 +198,27 @@ export default function ValuesAssessment() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Candidate Name *
-              </label>
-              <input
-                type="text"
-                name="candidate_name"
-                value={formData.candidate_name}
-                onChange={handleChange}
-                placeholder="Full name of the candidate"
-                className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Candidate ID *
+                Candidate *
               </label>
               <select
                 name="candidate_id"
                 value={formData.candidate_id}
-                onChange={handleChange}
+                onChange={(e) => {
+                  const id = e.target.value
+                  const c = candidates.find((x) => x.id === id)
+                  setFormData(prev => ({
+                    ...prev,
+                    candidate_id: id,
+                    candidate_name: c ? (c.name || '') : '',
+                  }))
+                }}
                 className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 required
               >
-                <option value="">Select Candidate</option>
-                {candidates.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.name} (ID: {candidate.id})
+                <option value="">Select candidate (applicants for your jobs)</option>
+                {candidates.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {(c.name || 'Unknown')} - {c.id}
                   </option>
                 ))}
               </select>
@@ -187,16 +226,45 @@ export default function ValuesAssessment() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Applied Position
+                Applied Job *
               </label>
-              <input
-                type="text"
-                name="job_title"
-                value={formData.job_title}
-                onChange={handleChange}
-                placeholder="Position they applied for"
+              <select
+                name="job_id"
+                value={formData.job_id}
+                onChange={(e) => {
+                  const id = e.target.value
+                  const j = jobs.find((x) => (x.id?.toString?.() ?? String(x.id)) === id)
+                  setFormData(prev => ({
+                    ...prev,
+                    job_id: id,
+                    job_title: j ? (j.title || '') : '',
+                  }))
+                }}
                 className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
+              >
+                <option value="">Select job (your posted jobs)</option>
+                {jobs.map((job) => (
+                  <option key={job.id} value={job.id?.toString?.() ?? String(job.id)}>
+                    {(job.title ?? 'Untitled')} - {job.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Experience Level *
+              </label>
+              <select
+                name="experience_level"
+                value={formData.experience_level}
+                onChange={handleChange}
+                className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              >
+                {EXPERIENCE_LEVELS.map((level) => (
+                  <option key={level} value={level}>{level}</option>
+                ))}
+              </select>
             </div>
             
             <div>
@@ -216,26 +284,7 @@ export default function ValuesAssessment() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Job ID
-              </label>
-              <select
-                name="job_id"
-                value={formData.job_id}
-                onChange={handleChange}
-                className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              >
-                <option value="">Select Job</option>
-                {jobs.map((job) => (
-                  <option key={job.id} value={job.id}>
-                    {job.title} (ID: {job.id})
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Interview Date
+                Interview Date *
               </label>
               <input
                 type="date"
@@ -293,12 +342,12 @@ export default function ValuesAssessment() {
                     type="range"
                     min="1"
                     max="5"
-                    value={formData[key as keyof typeof formData] as number}
+                    value={getValueRating(key)}
                     onChange={(e) => handleSliderChange(e.target.value, key)}
                     className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                   />
                   <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400 w-8 text-center">
-                    {formData[key as keyof typeof formData] as number}
+                    {getValueRating(key)}
                   </span>
                 </div>
               </div>
@@ -317,7 +366,7 @@ export default function ValuesAssessment() {
           
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Overall Recommendation
+              Overall Recommendation *
             </label>
             <select
               name="overall_recommendation"
@@ -334,11 +383,17 @@ export default function ValuesAssessment() {
           </div>
         </div>
 
+        {duplicateWarning && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-600 dark:bg-amber-900/20 p-4 text-amber-800 dark:text-amber-200" role="alert">
+            {duplicateWarning}
+          </div>
+        )}
+
         {/* Submit Button */}
         <div className="flex justify-end">
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !canSubmit}
             className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (

@@ -348,6 +348,7 @@ class FeedbackSubmission(BaseModel):
     hard_work: int
     gratitude: int
     comments: Optional[str] = None
+    experience_level: Optional[str] = None  # Entry, Mid, Senior, Lead (from recruiter form)
 
 class InterviewSchedule(BaseModel):
     candidate_id: str
@@ -2134,6 +2135,8 @@ async def submit_feedback(feedback: FeedbackSubmission, auth = Depends(get_auth)
             "comments": feedback.comments,
             "created_at": datetime.now(timezone.utc)
         }
+        if feedback.experience_level:
+            document["experience_level"] = feedback.experience_level
         result = await db.feedback.insert_one(document)
         feedback_id = str(result.inserted_id)
         
@@ -2203,6 +2206,7 @@ async def get_all_feedback(candidate_id: Optional[str] = None, auth = Depends(ge
                 "gratitude": 1,
                 "average_score": 1,
                 "comments": 1,
+                "experience_level": 1,
                 "created_at": 1,
                 "candidate_name": {"$arrayElemAt": ["$candidate.name", 0]},
                 "job_title": {"$arrayElemAt": ["$job.title", 0]}
@@ -2237,6 +2241,7 @@ async def get_all_feedback(candidate_id: Optional[str] = None, auth = Depends(ge
                 "comments": doc.get("comments"),  # Keep for backward compatibility
                 "feedback_text": doc.get("comments", ""),  # Frontend expects this field name
                 "rating": int(doc.get("average_score", 0)) if doc.get("average_score") else 0,  # Frontend expects rating
+                "experience_level": doc.get("experience_level"),
                 "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
                 "candidate_name": doc.get("candidate_name"),
                 "job_title": doc.get("job_title"),

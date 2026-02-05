@@ -55,6 +55,7 @@ export default function InterviewScheduling() {
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([])
   const [candidateDropdownOpen, setCandidateDropdownOpen] = useState(false)
   const candidateDropdownRef = useRef<HTMLDivElement>(null)
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     job_id: '',
@@ -127,6 +128,11 @@ export default function InterviewScheduling() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Clear duplicate warning when user changes form data or selection
+  useEffect(() => {
+    setDuplicateWarning(null)
+  }, [formData.job_id, formData.interview_date, formData.interview_time, formData.interview_type, formData.interviewer, formData.meeting_link, formData.meeting_address, formData.meeting_phone, formData.notes, selectedCandidateIds])
+
   const toggleCandidate = (id: string) => {
     setSelectedCandidateIds(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
@@ -178,13 +184,63 @@ export default function InterviewScheduling() {
     return result.valid ? (result.normalized ?? p) : undefined
   }
 
+  /** Normalize date/time to YYYY-MM-DDTHH:mm for duplicate comparison. */
+  const normalizeDateTime = (dateStr: string): string => {
+    if (!dateStr) return ''
+    try {
+      const d = new Date(dateStr)
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      const h = String(d.getHours()).padStart(2, '0')
+      const min = String(d.getMinutes()).padStart(2, '0')
+      return `${y}-${m}-${day}T${h}:${min}`
+    } catch {
+      return dateStr.slice(0, 16)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!canSubmit) return
     const interviewDateTime = `${formData.interview_date}T${formData.interview_time}:00`
     const normalizedPhone = getNormalizedPhone()
     setLoading(true)
+    setDuplicateWarning(null)
     try {
+      const existingList = await getInterviews()
+      const proposedDateTime = normalizeDateTime(interviewDateTime)
+      const proposedType = (formData.interview_type || '').trim()
+      const proposedInterviewer = (formData.interviewer || '').trim()
+      const proposedLink = (formData.meeting_link || '').trim()
+      const proposedAddress = (formData.meeting_address || '').trim()
+      const proposedPhoneNorm = (normalizedPhone || '').replace(/\D/g, '')
+      const proposedNotes = (formData.notes || '').trim()
+
+      for (const candidateId of selectedCandidateIds) {
+        const isDup = existingList.some((ex) => {
+          if (String(ex.candidate_id) !== String(candidateId)) return false
+          if (String(ex.job_id) !== String(formData.job_id)) return false
+          const exDateTime = normalizeDateTime(ex.scheduled_date || ex.interview_date || '')
+          if (exDateTime !== proposedDateTime) return false
+          if ((ex.interview_type || '').trim() !== proposedType) return false
+          if ((ex.interviewer || '').trim() !== proposedInterviewer) return false
+          if ((ex.meeting_link || '').trim() !== proposedLink) return false
+          if ((ex.meeting_address || '').trim() !== proposedAddress) return false
+          const exPhoneNorm = (ex.meeting_phone || '').replace(/\D/g, '')
+          if (exPhoneNorm !== proposedPhoneNorm) return false
+          if ((ex.notes || '').trim() !== proposedNotes) return false
+          return true
+        })
+        if (isDup) {
+          setDuplicateWarning(
+            'This interview is identical to a previously scheduled one. Scheduling has been prevented. Please change the date/time, interview type, meeting details, interviewer, or notes and try again.'
+          )
+          setLoading(false)
+          return
+        }
+      }
+
       let scheduled = 0
       for (const candidateId of selectedCandidateIds) {
         await scheduleInterview({
@@ -201,6 +257,7 @@ export default function InterviewScheduling() {
         })
         scheduled++
       }
+      setDuplicateWarning(null)
       toast.success(`Interview scheduled for ${scheduled} candidate(s)`)
       setSelectedCandidateIds([])
       setFormData({
@@ -489,6 +546,26 @@ export default function InterviewScheduling() {
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
               />
             </div>
+
+            {duplicateWarning && (
+              <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 flex items-start gap-3">
+                <svg className="w-6 h-6 flex-shrink-0 text-red-500 dark:text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-red-800 dark:text-red-200">Duplicate interview detected</p>
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-1">{duplicateWarning}</p>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-2">Your form data has been preserved. Update any field above and try again.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDuplicateWarning(null)}
+                  className="flex-shrink-0 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 text-sm font-medium"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
 
             {validationErrors.length > 0 && (
               <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">

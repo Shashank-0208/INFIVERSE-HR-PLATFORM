@@ -357,10 +357,10 @@ export default function CandidateSearch() {
               </select>
             </div>
 
-            {/* Education Level - matches Candidate Profile / job posting style options */}
+            {/* Education Level */}
             <MultiSelectDropdown
               label="Education Level"
-              options={['High School', 'Associate', 'Diploma', 'Bachelor', 'Bachelors', 'Master', 'Masters', 'PhD']}
+              options={['Bachelors', 'Masters', 'PhD', 'Diploma']}
               selected={educationFilter}
               onChange={setEducationFilter}
               placeholder="Choose education level"

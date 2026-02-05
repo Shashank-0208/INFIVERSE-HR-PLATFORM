@@ -1076,7 +1076,8 @@ export const searchCandidates = async (query: string, filters?: {
   search?: string
 }) => {
   try {
-    const params: Record<string, string | number | undefined> = { query: query || filters?.search }
+    const searchTerm = (query ?? filters?.search ?? '').toString().trim()
+    const params: Record<string, string | number | undefined> = { query: searchTerm }
     if (filters?.job_id) params.job_id = filters.job_id
     if (filters?.skills) params.skills = filters.skills
     if (filters?.location) params.location = filters.location

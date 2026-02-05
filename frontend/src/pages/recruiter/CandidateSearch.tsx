@@ -155,9 +155,16 @@ export default function CandidateSearch() {
   }, [])
 
   const handleSearch = async () => {
-    if (!searchQuery.trim() && !skillsFilter.length && !locationFilter.length && 
-        !seniorityFilter.length && !educationFilter.length && experienceFilter === 'any') {
-      toast.error('Please enter search criteria')
+    const hasSearchCriteria =
+      searchQuery.trim() ||
+      selectedJobId !== 'all' ||
+      skillsFilter.length > 0 ||
+      locationFilter.length > 0 ||
+      seniorityFilter.length > 0 ||
+      educationFilter.length > 0 ||
+      experienceFilter !== 'any'
+    if (!hasSearchCriteria) {
+      toast.error('Please enter search criteria or select a job to filter by')
       return
     }
 
@@ -286,7 +293,7 @@ export default function CandidateSearch() {
                 minLength={1}
                 debounceMs={250}
                 maxSuggestions={10}
-                emptyOptionLabel={hasApplicants === false ? 'No applicants yet' : 'No matching candidates'}
+                emptyOptionLabel={hasApplicants === false ? 'No applicants yet' : hasApplicants === true ? 'No matching candidates' : undefined}
                 onEmptySelect={() => toast(hasApplicants === false ? 'You have no applicants yet.' : 'No candidates match your search. Try different terms.', { icon: 'ℹ' })}
               />
             </div>

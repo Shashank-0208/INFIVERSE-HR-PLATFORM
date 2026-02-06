@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import RoleNavbar from '../navbars/RoleNavbar'
 import RecruiterSidebar from '../sidebars/RecruiterSidebar'
 import { SidebarProvider, useSidebar } from '../../context/SidebarContext'
+import { RecruiterConnectionProvider } from '../../context/RecruiterConnectionContext'
 
 function RecruiterLayoutContent() {
   const { isCollapsed, isMobileOpen, closeMobile } = useSidebar()
@@ -31,7 +32,9 @@ function RecruiterLayoutContent() {
 export default function RecruiterLayout() {
   return (
     <SidebarProvider>
-      <RecruiterLayoutContent />
+      <RecruiterConnectionProvider>
+        <RecruiterLayoutContent />
+      </RecruiterConnectionProvider>
     </SidebarProvider>
   )
 }

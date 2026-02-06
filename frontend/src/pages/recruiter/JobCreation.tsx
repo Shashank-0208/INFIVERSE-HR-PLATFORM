@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { createJob, getClientByConnectionId, RECRUITER_LAST_CONNECTION_KEY } from '../../services/api'
+import { useRecruiterConnection } from '../../context/RecruiterConnectionContext'
 import FormInput from '../../components/FormInput'
 
 const CONNECTION_ID_LENGTH = 24
@@ -37,6 +38,7 @@ function clearLastConnection() {
 
 export default function JobCreation() {
   const navigate = useNavigate()
+  const { status: connectionStatus, setConnection: setRecruiterConnection, clearConnection: clearRecruiterConnection } = useRecruiterConnection()
   const [loading, setLoading] = useState(false)
   const [connectionIdError, setConnectionIdError] = useState<string | null>(null)
   const [linkedCompany, setLinkedCompany] = useState<string | null>(null)
@@ -63,6 +65,19 @@ export default function JobCreation() {
       setIsConnectionIdLocked(true)
     }
   }, [])
+
+  // When sidebar context marks connection invalid (e.g. after 1hr revalidation), unlock form and reset sidebar
+  useEffect(() => {
+    if (connectionStatus === 'invalid' && isConnectionIdLocked) {
+      setFormData(prev => ({ ...prev, connection_id: '' }))
+      setLinkedCompany(null)
+      setConnectionIdError(null)
+      setShowConfirmConnection(false)
+      setIsConnectionIdLocked(false)
+      clearLastConnection()
+      clearRecruiterConnection()
+    }
+  }, [connectionStatus, isConnectionIdLocked, clearRecruiterConnection])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -128,12 +143,13 @@ export default function JobCreation() {
     }
   }
 
-  // Lock and persist only when user clicks OK in confirmation
+  // Lock and persist only when user clicks OK in confirmation; update sidebar via context
   const confirmAndLockConnectionId = () => {
     const id = formData.connection_id.trim()
     if (!id || !linkedCompany) return
     clearLastConnection()
     saveLastConnection(id, linkedCompany)
+    setRecruiterConnection(id, linkedCompany)
     setIsConnectionIdLocked(true)
     setShowConfirmConnection(false)
     toast.success('Connection ID confirmed')
@@ -146,6 +162,7 @@ export default function JobCreation() {
     setConnectionIdError(null)
     setShowConfirmConnection(false)
     clearLastConnection()
+    clearRecruiterConnection()
     setTimeout(() => connectionInputRef.current?.focus(), 0)
   }
 
@@ -157,6 +174,7 @@ export default function JobCreation() {
     setShowConfirmConnection(false)
     setIsConnectionIdLocked(false)
     clearLastConnection()
+    clearRecruiterConnection()
     setTimeout(() => connectionInputRef.current?.focus(), 0)
   }
 
@@ -303,10 +321,10 @@ export default function JobCreation() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Connection ID <span className="text-red-500">*</span>
             </label>
-            {isConnectionIdLocked && formData.connection_id && linkedCompany ? (
+            {isConnectionIdLocked && formData.connection_id ? (
               <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                 <code className="font-mono text-sm text-gray-900 dark:text-white break-all">{formData.connection_id}</code>
-                <span className="text-sm text-green-600 dark:text-green-400 font-medium">→ {linkedCompany}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">(Client shown in sidebar)</span>
                 <button
                   type="button"
                   onClick={handleUnlockConnectionId}

@@ -1,8 +1,46 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSidebar } from '../../context/SidebarContext'
 import { useAuth } from '../../context/AuthContext'
+import { useRecruiterConnectionOptional } from '../../context/RecruiterConnectionContext'
 import { authStorage, clearAuthStorage } from '../../utils/authStorage'
 import ApiStatus from '../ApiStatus'
+
+function RecruiterConnectionStatusBlock() {
+  const connection = useRecruiterConnectionOptional()
+  const { isCollapsed } = useSidebar()
+  if (!connection) return null
+  const { connectionId, companyName, status } = connection
+  if (!connectionId) {
+    return (
+      <div className={`px-3 pb-2 ${isCollapsed ? 'flex justify-center' : ''}`}>
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-100/50 dark:bg-slate-800/50">
+          <span className="w-2.5 h-2.5 rounded-full bg-gray-400 shrink-0" />
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">No client connected</span>
+        </div>
+      </div>
+    )
+  }
+  if (status === 'invalid') {
+    return (
+      <div className={`px-3 pb-2 ${isCollapsed ? 'flex justify-center' : ''}`}>
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+          <span className="text-xs font-medium text-red-700 dark:text-red-300 truncate">Connection no longer valid</span>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className={`px-3 pb-2 ${isCollapsed ? 'flex justify-center' : ''}`}>
+      <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50">
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+        <span className="text-xs font-medium text-emerald-800 dark:text-emerald-200 truncate" title={companyName || undefined}>
+          {companyName ? `→ ${companyName}` : 'Connected'}
+        </span>
+      </div>
+    </div>
+  )
+}
 
 export default function RecruiterSidebar() {
   const location = useLocation()
@@ -175,6 +213,7 @@ export default function RecruiterSidebar() {
         <div className={`px-3 pt-3 ${isCollapsed ? 'flex justify-center' : ''}`}>
           <ApiStatus />
         </div>
+        <RecruiterConnectionStatusBlock />
         <div className={`p-3 ${isCollapsed ? 'flex justify-center' : ''}`}>
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">

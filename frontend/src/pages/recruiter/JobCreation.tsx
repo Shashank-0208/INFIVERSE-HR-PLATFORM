@@ -27,11 +27,20 @@ function saveLastConnection(connectionId: string, companyName: string) {
   }
 }
 
+function clearLastConnection() {
+  try {
+    localStorage.removeItem(RECRUITER_LAST_CONNECTION_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 export default function JobCreation() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [connectionIdError, setConnectionIdError] = useState<string | null>(null)
   const [linkedCompany, setLinkedCompany] = useState<string | null>(null)
+  const [showConfirmConnection, setShowConfirmConnection] = useState(false)
   const [isConnectionIdLocked, setIsConnectionIdLocked] = useState(false)
   const connectionInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState({
@@ -103,33 +112,51 @@ export default function JobCreation() {
 
   const handleConnectionIdBlur = async () => {
     const id = formData.connection_id.trim()
-    if (!id || isConnectionIdLocked) return
+    if (!id || isConnectionIdLocked || showConfirmConnection) return
     await verifyConnectionId(id)
   }
 
-  // Lock and persist only when user presses Enter after seeing company name
-  const lockConnectionId = () => {
-    const id = formData.connection_id.trim()
-    if (!id || !linkedCompany) return
-    saveLastConnection(id, linkedCompany)
-    setIsConnectionIdLocked(true)
-    toast.success('Connection ID confirmed')
-  }
-
+  // Show confirmation when user presses Enter after seeing company name
   const handleConnectionIdKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return
-    if (isConnectionIdLocked) return
+    if (isConnectionIdLocked || showConfirmConnection) return
     e.preventDefault()
     if (linkedCompany) {
-      lockConnectionId()
+      setShowConfirmConnection(true)
     } else {
-      verifyConnectionId(formData.connection_id.trim()).then((ok) => ok && lockConnectionId())
+      verifyConnectionId(formData.connection_id.trim()).then((ok) => ok && setShowConfirmConnection(true))
     }
   }
 
-  const handleUnlockConnectionId = () => {
-    setIsConnectionIdLocked(false)
+  // Lock and persist only when user clicks OK in confirmation
+  const confirmAndLockConnectionId = () => {
+    const id = formData.connection_id.trim()
+    if (!id || !linkedCompany) return
+    clearLastConnection()
+    saveLastConnection(id, linkedCompany)
+    setIsConnectionIdLocked(true)
+    setShowConfirmConnection(false)
+    toast.success('Connection ID confirmed')
+  }
+
+  // Revert to input, clear connection ID and confirmation (from confirmation UI)
+  const cancelConfirmAndClear = () => {
+    setFormData(prev => ({ ...prev, connection_id: '' }))
+    setLinkedCompany(null)
     setConnectionIdError(null)
+    setShowConfirmConnection(false)
+    clearLastConnection()
+    setTimeout(() => connectionInputRef.current?.focus(), 0)
+  }
+
+  // Edit from locked state: return to input, clear and remove persisted value
+  const handleUnlockConnectionId = () => {
+    setFormData(prev => ({ ...prev, connection_id: '' }))
+    setLinkedCompany(null)
+    setConnectionIdError(null)
+    setShowConfirmConnection(false)
+    setIsConnectionIdLocked(false)
+    clearLastConnection()
     setTimeout(() => connectionInputRef.current?.focus(), 0)
   }
 
@@ -153,8 +180,8 @@ export default function JobCreation() {
       setConnectionIdError(formatError)
       return
     }
-    if (!linkedCompany) {
-      toast.error('Please verify the Connection ID first: blur the field to see the company name, then press Enter to confirm.')
+    if (!isConnectionIdLocked || !linkedCompany) {
+      toast.error('Please confirm the Connection ID: enter the ID, blur to see the company name, press Enter, then click OK.')
       return
     }
 
@@ -288,6 +315,28 @@ export default function JobCreation() {
                   Edit
                 </button>
               </div>
+            ) : showConfirmConnection && linkedCompany ? (
+              <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+                <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                  Connect to <strong>{linkedCompany}</strong>
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={confirmAndLockConnectionId}
+                    className="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                  >
+                    OK
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelConfirmAndClear}
+                    className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
             ) : (
               <>
                 <input
@@ -298,7 +347,7 @@ export default function JobCreation() {
                   onChange={handleChange}
                   onBlur={handleConnectionIdBlur}
                   onKeyDown={handleConnectionIdKeyDown}
-                  placeholder="Paste connection ID from your client (24 characters)"
+                  placeholder="Paste your Connection_id"
                   className={`input-field w-full font-mono ${connectionIdError ? 'border-red-500 dark:border-red-500' : ''}`}
                   maxLength={CONNECTION_ID_LENGTH}
                   required
@@ -308,14 +357,13 @@ export default function JobCreation() {
                     {connectionIdError}
                   </p>
                 )}
-                {linkedCompany && !connectionIdError && (
+                {linkedCompany && !connectionIdError && !showConfirmConnection && (
                   <p className="mt-1 text-sm text-green-600 dark:text-green-400">
-                    Linked to: <strong>{linkedCompany}</strong>
-                    {!isConnectionIdLocked && ' — Press Enter to confirm and lock'}
+                    Linked to: <strong>{linkedCompany}</strong> — Press Enter to confirm
                   </p>
                 )}
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Ask your client for their Connection ID from the Client Dashboard (Recruiter connection section). After the company name appears, press Enter to confirm.
+                  Ask your client for their Connection ID from the Client Dashboard (Recruiter connection section). Press enter for validation.
                 </p>
               </>
             )}

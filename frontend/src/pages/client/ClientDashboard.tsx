@@ -17,6 +17,8 @@ export default function ClientDashboard() {
     return () => clearInterval(interval)
   }, [])
 
+  // All data is client-scoped: APIs use logged-in client's JWT; backend returns only this client's jobs
+  // (including jobs recruiters posted via this client's connection_id). No client_id param is sent.
   const loadDashboardData = async () => {
     try {
       setLoading(true)
@@ -25,8 +27,8 @@ export default function ClientDashboard() {
         getClientStats(),
         getClientProfile()
       ])
-      setJobs(jobsData)
-      setStats(statsData)
+      setJobs(Array.isArray(jobsData) ? jobsData : [])
+      setStats(statsData ?? null)
       setConnectionId(profile?.connection_id ?? '')
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
@@ -175,7 +177,7 @@ export default function ClientDashboard() {
         
         <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <p className="text-sm text-blue-800 dark:text-blue-300">
-            Based on {totalApplications} candidates and {activeJobs} active jobs from database
+            Your pipeline: {totalApplications} candidates and {activeJobs} active jobs (only your company’s data; includes jobs recruiters posted using your Connection ID).
           </p>
         </div>
 

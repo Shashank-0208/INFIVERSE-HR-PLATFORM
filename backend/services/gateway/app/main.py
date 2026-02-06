@@ -1127,11 +1127,33 @@ async def _recruiter_applicant_ids(db, recruiter_id: str, job_id: Optional[str] 
     return candidate_ids
 
 
+def _client_id_query(client_id: str) -> Dict[str, Any]:
+    """Build query for jobs belonging to this client (supports string or int client_id in DB)."""
+    if not client_id or not str(client_id).strip():
+        return {}
+    cid = str(client_id).strip()
+    if cid.isdigit():
+        return {"$or": [{"client_id": cid}, {"client_id": int(cid)}]}
+    return {"client_id": cid}
+
+
 async def _client_job_ids(db, client_id: str) -> List[str]:
-    """Return list of job_ids for jobs belonging to this client (data isolation)."""
-    if not client_id:
+    """Return list of job_ids for active jobs belonging to this client (data isolation). Includes jobs posted by recruiters via connection_id."""
+    q = _client_id_query(client_id)
+    if not q:
         return []
-    cursor = db.jobs.find({"status": "active", "client_id": client_id}, {"_id": 1}).limit(500)
+    q["status"] = "active"
+    cursor = db.jobs.find(q, {"_id": 1}).limit(500)
+    jobs_list = await cursor.to_list(length=500)
+    return [str(doc["_id"]) for doc in jobs_list]
+
+
+async def _client_all_job_ids(db, client_id: str) -> List[str]:
+    """Return list of all job_ids for this client (any status). Used for stats so applications/interviews/offers count across all client jobs."""
+    q = _client_id_query(client_id)
+    if not q:
+        return []
+    cursor = db.jobs.find(q, {"_id": 1}).limit(500)
     jobs_list = await cursor.to_list(length=500)
     return [str(doc["_id"]) for doc in jobs_list]
 
@@ -2968,22 +2990,30 @@ async def get_client_jobs(auth=Depends(get_auth)):
 @app.get("/v1/client/stats", tags=["Client Portal API"])
 async def get_client_stats(auth=Depends(get_auth)):
     """Client dashboard statistics: active jobs, total applications, interviews scheduled, offers made.
-    When authenticated as client, only that client's jobs are included (data isolation)."""
+    Only available when authenticated as client. Returns only this client's data (jobs where client_id matches
+    logged-in client). Includes jobs posted by recruiters via connection_id. Data isolation: no other client's data."""
+    if auth.get("type") != "jwt_token" or auth.get("role") != "client":
+        raise HTTPException(status_code=403, detail="This endpoint is only available for clients")
+    client_id = str(auth.get("user_id", ""))
+    if not client_id:
+        return {
+            "active_jobs": 0,
+            "total_applications": 0,
+            "shortlisted": 0,
+            "interviews_scheduled": 0,
+            "offers_made": 0,
+            "hired": 0,
+        }
     try:
         db = await get_mongo_db()
-        job_ids: List[str]
-        if auth.get("type") == "jwt_token" and auth.get("role") == "client":
-            client_id = str(auth.get("user_id", ""))
-            job_ids = await _client_job_ids(db, client_id)
-        else:
-            # API key or other: all active jobs (backward compatibility)
-            cursor = db.jobs.find({"status": "active"}).limit(500)
-            jobs_list = await cursor.to_list(length=500)
-            job_ids = [str(doc["_id"]) for doc in jobs_list]
-        active_jobs = len(job_ids)
+        # Active jobs: only jobs with status=active (for "Active Jobs" metric)
+        active_job_ids = await _client_job_ids(db, client_id)
+        active_jobs = len(active_job_ids)
+        # All client jobs (any status) for applications/interviews/offers so pipeline reflects full client activity
+        job_ids = await _client_all_job_ids(db, client_id)
         if not job_ids:
             return {
-                "active_jobs": 0,
+                "active_jobs": active_jobs,
                 "total_applications": 0,
                 "shortlisted": 0,
                 "interviews_scheduled": 0,
@@ -2999,7 +3029,6 @@ async def get_client_stats(auth=Depends(get_auth)):
             "job_id": {"$in": job_ids},
             "status": {"$in": ["scheduled", "pending"]}
         })
-        # Include all interviews for "scheduled" display if collection has no status
         try:
             alt_interviews = await db.interviews.count_documents({"job_id": {"$in": job_ids}})
             if interviews_scheduled == 0 and alt_interviews > 0:
@@ -3019,7 +3048,10 @@ async def get_client_stats(auth=Depends(get_auth)):
             "offers_made": offers_made,
             "hired": hired,
         }
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.exception("get_client_stats failed: %s", e)
         return {
             "active_jobs": 0,
             "total_applications": 0,
@@ -3027,7 +3059,6 @@ async def get_client_stats(auth=Depends(get_auth)):
             "interviews_scheduled": 0,
             "offers_made": 0,
             "hired": 0,
-            "error": str(e),
         }
 
 

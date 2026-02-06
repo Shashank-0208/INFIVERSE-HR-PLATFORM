@@ -107,6 +107,14 @@ So: **no new tables or new columns**; only consistent use of `jobs.client_id` an
 
 ---
 
+## 8. Connection_id sync and client dashboard
+
+- **Recruiter posts with connection_id**: Backend sets `job.client_id` to that client, so the job is in the client’s pool immediately.
+- **Client dashboard**: **GET /v1/client/jobs** and **GET /v1/client/stats** use only the authenticated client’s `client_id` from JWT. They include jobs recruiters posted via this client’s connection_id. No client_id param; 403 for non-client on stats.
+- **Application pipeline**: Same stats; pipeline counts use `_client_all_job_ids` (all client jobs); Active Jobs uses active only.
+
+---
+
 ## Summary
 
 - **Recruiter isolation**: `recruiter_id` on **jobs**; helper `_recruiter_applicant_ids`; all relevant endpoints filter by recruiter’s job_ids or applicant set.

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { getClientJobs, getClientStats, Job, ClientStats } from '../../services/api'
+import { getClientJobs, getClientStats, getClientProfile, Job, ClientStats } from '../../services/api'
 import StatsCard from '../../components/StatsCard'
 import Loading from '../../components/Loading'
+import { toast } from 'react-hot-toast'
 
 export default function ClientDashboard() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [stats, setStats] = useState<ClientStats | null>(null)
+  const [connectionId, setConnectionId] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -18,18 +20,28 @@ export default function ClientDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
-      // Only fetch essential dashboard data: jobs list + lightweight stats (no match/top calls).
-      // Match results are loaded only on the dedicated Match Results page.
-      const [jobsData, statsData] = await Promise.all([
+      const [jobsData, statsData, profile] = await Promise.all([
         getClientJobs().catch(() => []),
-        getClientStats()
+        getClientStats(),
+        getClientProfile()
       ])
       setJobs(jobsData)
       setStats(statsData)
+      setConnectionId(profile?.connection_id ?? '')
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const copyConnectionId = async () => {
+    if (!connectionId) return
+    try {
+      await navigator.clipboard.writeText(connectionId)
+      toast.success('Connection ID copied to clipboard')
+    } catch {
+      toast.error('Failed to copy')
     }
   }
 
@@ -70,6 +82,31 @@ export default function ClientDashboard() {
           <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">Dedicated Client Interface for Job Posting & Candidate Review</p>
         </div>
       </div>
+
+      {/* Connection ID – share with recruiters for real-time job linking */}
+      {connectionId && (
+        <div className="mb-6 sm:mb-8 p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-emerald-500/5 to-teal-500/5 dark:from-emerald-500/10 dark:to-teal-500/10 border border-emerald-300/20 dark:border-emerald-500/20">
+          <h2 className="text-lg font-heading font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+            <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            Recruiter connection
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Share this ID with recruiters so they can post jobs for you and you can see activity in real time.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-mono text-gray-900 dark:text-white break-all">
+              {connectionId}
+            </code>
+            <button
+              type="button"
+              onClick={copyConnectionId}
+              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+            >
+              Copy
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Client Reports & Analytics */}
       <div className="mb-6 sm:mb-8">

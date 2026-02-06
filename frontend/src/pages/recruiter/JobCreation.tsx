@@ -1,36 +1,136 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { createJob } from '../../services/api'
+import { createJob, getClientByConnectionId, RECRUITER_LAST_CONNECTION_KEY } from '../../services/api'
 import FormInput from '../../components/FormInput'
+
+const CONNECTION_ID_LENGTH = 24
+const CONNECTION_ID_REGEX = /^[0-9a-fA-F]+$/
+
+function loadLastConnection(): { connectionId: string; companyName: string } | null {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(RECRUITER_LAST_CONNECTION_KEY) : null
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { connectionId?: string; companyName?: string }
+    if (parsed?.connectionId && parsed.connectionId.length === CONNECTION_ID_LENGTH) return { connectionId: parsed.connectionId, companyName: parsed.companyName ?? '' }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function saveLastConnection(connectionId: string, companyName: string) {
+  try {
+    localStorage.setItem(RECRUITER_LAST_CONNECTION_KEY, JSON.stringify({ connectionId, companyName }))
+  } catch {
+    // ignore
+  }
+}
 
 export default function JobCreation() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  const [connectionIdError, setConnectionIdError] = useState<string | null>(null)
+  const [linkedCompany, setLinkedCompany] = useState<string | null>(null)
+  const [isConnectionIdLocked, setIsConnectionIdLocked] = useState(false)
+  const connectionInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState({
     title: '',
     department: 'Engineering',
     location: '',
     experience_level: 'Entry',
     employment_type: 'Full-time',
-    client_id: 1,
+    connection_id: '',
     description: '',
     requirements: '',
   })
 
+  // Load persisted connection_id (locked from previous session)
+  useEffect(() => {
+    const last = loadLastConnection()
+    if (last) {
+      setFormData(prev => ({ ...prev, connection_id: last.connectionId }))
+      setLinkedCompany(last.companyName || null)
+      setIsConnectionIdLocked(true)
+    }
+  }, [])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: name === 'client_id' ? parseInt(value) || 1 : value 
-    }))
+    setFormData(prev => ({ ...prev, [name]: value }))
+    if (name === 'connection_id') {
+      setConnectionIdError(null)
+      setLinkedCompany(null)
+    }
   }
 
-  const handleClientIdChange = (delta: number) => {
-    setFormData(prev => ({
-      ...prev,
-      client_id: Math.max(1, prev.client_id + delta)
-    }))
+  const validateConnectionIdFormat = (id: string): string | null => {
+    const trimmed = id.trim()
+    if (!trimmed) return 'Connection ID is required'
+    if (trimmed.length !== CONNECTION_ID_LENGTH) return `Connection ID must be exactly ${CONNECTION_ID_LENGTH} characters`
+    if (!CONNECTION_ID_REGEX.test(trimmed)) return 'Connection ID must contain only letters and numbers (hexadecimal)'
+    return null
+  }
+
+  // Verify only: show company name, do NOT lock. User confirms by pressing Enter.
+  const verifyConnectionId = async (id: string): Promise<boolean> => {
+    const formatError = validateConnectionIdFormat(id)
+    if (formatError) {
+      setConnectionIdError(formatError)
+      setLinkedCompany(null)
+      toast.error(formatError)
+      return false
+    }
+    setConnectionIdError(null)
+    try {
+      const client = await getClientByConnectionId(id)
+      if (client) {
+        setLinkedCompany(client.company_name)
+        return true
+      } else {
+        setLinkedCompany(null)
+        setConnectionIdError('Invalid Connection ID. Please ask your client for the correct ID from their dashboard.')
+        toast.error('Invalid Connection ID. Please ask your client for the correct ID from their dashboard.')
+        return false
+      }
+    } catch {
+      setLinkedCompany(null)
+      setConnectionIdError('Could not verify Connection ID. Please check your connection and try again.')
+      toast.error('Could not verify Connection ID. Please check your connection and try again.')
+      return false
+    }
+  }
+
+  const handleConnectionIdBlur = async () => {
+    const id = formData.connection_id.trim()
+    if (!id || isConnectionIdLocked) return
+    await verifyConnectionId(id)
+  }
+
+  // Lock and persist only when user presses Enter after seeing company name
+  const lockConnectionId = () => {
+    const id = formData.connection_id.trim()
+    if (!id || !linkedCompany) return
+    saveLastConnection(id, linkedCompany)
+    setIsConnectionIdLocked(true)
+    toast.success('Connection ID confirmed')
+  }
+
+  const handleConnectionIdKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return
+    if (isConnectionIdLocked) return
+    e.preventDefault()
+    if (linkedCompany) {
+      lockConnectionId()
+    } else {
+      verifyConnectionId(formData.connection_id.trim()).then((ok) => ok && lockConnectionId())
+    }
+  }
+
+  const handleUnlockConnectionId = () => {
+    setIsConnectionIdLocked(false)
+    setConnectionIdError(null)
+    setTimeout(() => connectionInputRef.current?.focus(), 0)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,7 +141,25 @@ export default function JobCreation() {
       return
     }
 
+    const id = formData.connection_id.trim()
+    if (!id) {
+      toast.error('Connection ID is required. Ask your client for their Connection ID from their dashboard.')
+      setConnectionIdError('Connection ID is required')
+      return
+    }
+    const formatError = validateConnectionIdFormat(id)
+    if (formatError) {
+      toast.error(formatError)
+      setConnectionIdError(formatError)
+      return
+    }
+    if (!linkedCompany) {
+      toast.error('Please verify the Connection ID first: blur the field to see the company name, then press Enter to confirm.')
+      return
+    }
+
     setLoading(true)
+    setConnectionIdError(null)
 
     try {
       const jobData = {
@@ -52,30 +170,32 @@ export default function JobCreation() {
         employment_type: formData.employment_type,
         description: formData.description,
         requirements: formData.requirements,
-        client_id: formData.client_id,
+        connection_id: id,
       }
 
       await createJob(jobData)
       toast.success('Job created successfully!')
-      
-      // Reset form
-      setFormData({
+      // Keep connection_id and linked company for next job; only reset other fields
+      setFormData(prev => ({
         title: '',
         department: 'Engineering',
         location: '',
         experience_level: 'Entry',
         employment_type: 'Full-time',
-        client_id: 1,
+        connection_id: prev.connection_id,
         description: '',
         requirements: '',
-      })
-      
-      // Navigate back after a short delay
-      setTimeout(() => {
-        navigate('/recruiter')
-      }, 1500)
-    } catch (error) {
-      toast.error('Failed to create job')
+      }))
+      setTimeout(() => navigate('/recruiter'), 1500)
+    } catch (error: any) {
+      const msg = error?.response?.data?.detail || error?.message
+      const isInvalidConnection = typeof msg === 'string' && (msg.includes('Connection ID') || msg.includes('connection_id'))
+      if (isInvalidConnection) {
+        setConnectionIdError('Invalid Connection ID. Please ask your client for the correct ID from their dashboard.')
+        toast.error('Invalid Connection ID. Please ask your client for the correct ID from their dashboard.')
+      } else {
+        toast.error('Failed to create job')
+      }
       console.error(error)
     } finally {
       setLoading(false)
@@ -153,34 +273,52 @@ export default function JobCreation() {
           />
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Client ID
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Connection ID <span className="text-red-500">*</span>
             </label>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleClientIdChange(-1)}
-                className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-300 dark:border-gray-600 transition-all font-semibold"
-              >
-                −
-              </button>
-              <input
-                type="number"
-                name="client_id"
-                value={formData.client_id}
-                onChange={handleChange}
-                min="1"
-                className="input-field flex-1 text-center"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => handleClientIdChange(1)}
-                className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg border border-gray-300 dark:border-gray-600 transition-all font-semibold"
-              >
-                +
-              </button>
-            </div>
+            {isConnectionIdLocked && formData.connection_id && linkedCompany ? (
+              <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <code className="font-mono text-sm text-gray-900 dark:text-white break-all">{formData.connection_id}</code>
+                <span className="text-sm text-green-600 dark:text-green-400 font-medium">→ {linkedCompany}</span>
+                <button
+                  type="button"
+                  onClick={handleUnlockConnectionId}
+                  className="ml-auto px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Edit
+                </button>
+              </div>
+            ) : (
+              <>
+                <input
+                  ref={connectionInputRef}
+                  type="text"
+                  name="connection_id"
+                  value={formData.connection_id}
+                  onChange={handleChange}
+                  onBlur={handleConnectionIdBlur}
+                  onKeyDown={handleConnectionIdKeyDown}
+                  placeholder="Paste connection ID from your client (24 characters)"
+                  className={`input-field w-full font-mono ${connectionIdError ? 'border-red-500 dark:border-red-500' : ''}`}
+                  maxLength={CONNECTION_ID_LENGTH}
+                  required
+                />
+                {connectionIdError && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400" role="alert">
+                    {connectionIdError}
+                  </p>
+                )}
+                {linkedCompany && !connectionIdError && (
+                  <p className="mt-1 text-sm text-green-600 dark:text-green-400">
+                    Linked to: <strong>{linkedCompany}</strong>
+                    {!isConnectionIdLocked && ' — Press Enter to confirm and lock'}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Ask your client for their Connection ID from the Client Dashboard (Recruiter connection section). After the company name appears, press Enter to confirm.
+                </p>
+              </>
+            )}
           </div>
         </div>
 

@@ -25,7 +25,11 @@ from bson import ObjectId
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, field_validator, Field, model_validator
 import time
+import logging
+import traceback
 import psutil
+
+logger = logging.getLogger(__name__)
 
 # Import configuration
 try:
@@ -272,7 +276,8 @@ class JobCreate(BaseModel):
     experience_level: str  # Required: "entry", "mid", "senior", "lead" (case-insensitive)
     requirements: str
     description: str
-    client_id: Optional[int] = 1
+    client_id: Optional[int] = None  # Legacy; prefer connection_id for recruiter job posting
+    connection_id: Optional[str] = None  # Client's connection_id (shared from client dashboard); resolved to client_id
     employment_type: Optional[str] = "Full-time"
     salary_min: Optional[float] = None  # Optional salary range (INR)
     salary_max: Optional[float] = None
@@ -383,7 +388,7 @@ class ClientRegister(BaseModel):
     company_name: str
     contact_email: str
     password: str
-    client_code: str = None  # Optional, will be generated if not provided
+    client_code: Optional[str] = None  # Optional, will be generated if not provided
 
 class TwoFASetup(BaseModel):
     user_id: str
@@ -634,8 +639,17 @@ async def create_job(job: JobCreate, auth: dict = Depends(get_auth)):
         # Add optional fields if provided
         if job.employment_type:
             document["employment_type"] = job.employment_type
-        if job.client_id:
-            document["client_id"] = job.client_id
+        # Resolve connection_id to client_id when recruiter posts on behalf of a client
+        if job.connection_id and str(job.connection_id).strip():
+            cid_raw = str(job.connection_id).strip()
+            if len(cid_raw) != 24 or not all(c in "0123456789abcdefABCDEF" for c in cid_raw):
+                raise HTTPException(status_code=400, detail="Invalid Connection ID format (must be 24 hexadecimal characters)")
+            client_doc = await db.clients.find_one({"connection_id": cid_raw})
+            if not client_doc:
+                raise HTTPException(status_code=400, detail="Invalid Connection ID. Please ask your client for the correct ID from their dashboard.")
+            document["client_id"] = str(client_doc.get("client_id"))
+        elif job.client_id is not None:
+            document["client_id"] = str(job.client_id)
         if job.salary_min is not None:
             document["salary_min"] = float(job.salary_min)
         if job.salary_max is not None:
@@ -2664,33 +2678,49 @@ async def client_register(client_data: ClientRegister):
     try:
         db = await get_mongo_db()
 
+        client_id_normalized = str(client_data.client_id).strip()
+        if not client_id_normalized:
+            raise HTTPException(status_code=400, detail="Client ID is required")
+
         # Check if client_id already exists
-        existing_client = await db.clients.find_one({"client_id": client_data.client_id})
+        existing_client = await db.clients.find_one({"client_id": client_id_normalized})
+        if not existing_client and client_id_normalized.isdigit():
+            existing_client = await db.clients.find_one({"client_id": int(client_id_normalized)})
         if existing_client:
             raise HTTPException(status_code=400, detail="Client ID already exists")
 
-        # Check if email already exists
-        existing_email = await db.clients.find_one({"email": client_data.contact_email})
+        # Check if email already exists (normalize to lowercase for consistency)
+        email_normalized = str(client_data.contact_email or "").strip().lower()
+        if not email_normalized:
+            raise HTTPException(status_code=400, detail="Contact email is required")
+        existing_email = await db.clients.find_one({"email": email_normalized})
         if existing_email:
             raise HTTPException(status_code=400, detail="Email already registered")
 
         # Generate unique client_code if not provided
-        client_code = client_data.client_code or str(uuid.uuid4())
+        client_code = (client_data.client_code or str(uuid.uuid4())).strip() or str(uuid.uuid4())
 
         # Check if client_code already exists (should be unique)
         existing_code = await db.clients.find_one({"client_code": client_code})
         if existing_code:
             raise HTTPException(status_code=400, detail="Client code already exists. Please try again.")
 
+        # One-time connection_id for recruiter linking (24-char hex, same style as ObjectId)
+        connection_id = str(ObjectId())
+
         # Hash password
         password_hash = bcrypt.hashpw(client_data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-        # Insert client
+        # Insert client (normalize client_id to string for consistent lookups)
+        company_name_safe = str(client_data.company_name or "").strip()
+        if not company_name_safe:
+            raise HTTPException(status_code=400, detail="Company name is required")
         document = {
-            "client_id": client_data.client_id,
-            "company_name": client_data.company_name,
-            "email": client_data.contact_email,
+            "client_id": client_id_normalized,
+            "company_name": company_name_safe,
+            "email": email_normalized,
             "client_code": client_code,
+            "connection_id": connection_id,
             "password_hash": password_hash,
             "status": "active",
             "failed_login_attempts": 0,
@@ -2704,9 +2734,10 @@ async def client_register(client_data: ClientRegister):
             content=json.dumps({
                 "success": True,
                 "message": "Client registration successful",
-                "client_id": client_data.client_id,
-                "company_name": client_data.company_name,
-                "client_code": client_code
+                "client_id": client_id_normalized,
+                "company_name": str(client_data.company_name).strip(),
+                "client_code": client_code,
+                "connection_id": connection_id
             }),
             status_code=status.HTTP_201_CREATED,
             media_type="application/json"
@@ -2714,6 +2745,7 @@ async def client_register(client_data: ClientRegister):
     except HTTPException as e:
         raise e
     except Exception as e:
+        logger.exception("client_register failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/v1/client/login", tags=["Client Portal API"])
@@ -2810,6 +2842,72 @@ async def client_login(login_data: ClientLogin):
             "success": False,
             "error": f"Authentication error: {str(e)}"
         }
+
+
+@app.get("/v1/client/profile", tags=["Client Portal API"])
+async def get_client_profile(auth=Depends(get_auth)):
+    """Return authenticated client's profile including connection_id (for dashboard display and sharing with recruiters)."""
+    if auth.get("type") != "jwt_token" or auth.get("role") != "client":
+        raise HTTPException(status_code=403, detail="This endpoint is only available for clients")
+    raw_uid = auth.get("user_id")
+    if raw_uid is None or raw_uid == "":
+        raise HTTPException(status_code=401, detail="Client not identified")
+    client_id_str = str(raw_uid)
+    if not client_id_str.strip():
+        raise HTTPException(status_code=401, detail="Client not identified")
+    try:
+        db = await get_mongo_db()
+        # Support old clients: DB may have client_id as string or int
+        client = await db.clients.find_one({"client_id": client_id_str})
+        if not client and client_id_str.isdigit():
+            client = await db.clients.find_one({"client_id": int(client_id_str)})
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+        connection_id = client.get("connection_id")
+        if not connection_id:
+            # Backfill for clients created before connection_id existed
+            connection_id = str(ObjectId())
+            # Use the document's own client_id for update (may be int or str in DB)
+            doc_client_id = client.get("client_id")
+            await db.clients.update_one(
+                {"_id": client["_id"]},
+                {"$set": {"connection_id": connection_id}}
+            )
+        return {
+            "client_id": str(client.get("client_id", "")),
+            "company_name": str(client.get("company_name", "")),
+            "email": str(client.get("email", "")),
+            "connection_id": str(connection_id),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("get_client_profile failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/client/by-connection/{connection_id}", tags=["Client Portal API"])
+async def get_client_by_connection(connection_id: str, auth=Depends(get_auth)):
+    """Validate connection_id and return minimal client info. Used by recruiters when posting jobs."""
+    if not connection_id or not connection_id.strip():
+        raise HTTPException(status_code=400, detail="Connection ID is required")
+    connection_id = connection_id.strip()
+    if len(connection_id) != 24 or not all(c in "0123456789abcdefABCDEF" for c in connection_id):
+        raise HTTPException(status_code=400, detail="Invalid Connection ID format (must be 24 hexadecimal characters)")
+    try:
+        db = await get_mongo_db()
+        client = await db.clients.find_one({"connection_id": connection_id})
+        if not client:
+            raise HTTPException(status_code=404, detail="Invalid Connection ID. Please ask your client for the correct ID from their dashboard.")
+        company_name = client.get("company_name") or ""
+        return {
+            "client_id": client.get("client_id"),
+            "company_name": company_name,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/v1/client/jobs", tags=["Client Portal API"])

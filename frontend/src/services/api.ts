@@ -764,6 +764,40 @@ export const getAllOffers = async (): Promise<Offer[]> => {
   }
 }
 
+// ==================== CLIENT PROFILE & CONNECTION ID API ====================
+export interface ClientProfile {
+  client_id: string
+  company_name: string
+  email: string
+  connection_id: string
+}
+
+export const getClientProfile = async (): Promise<ClientProfile | null> => {
+  try {
+    const response = await api.get('/v1/client/profile')
+    return response.data
+  } catch (error) {
+    console.error('Error fetching client profile:', error)
+    return null
+  }
+}
+
+/** Validate connection_id and get client info (for recruiter job posting). Returns null if invalid. */
+export const getClientByConnectionId = async (connectionId: string): Promise<{ client_id: string; company_name: string } | null> => {
+  if (!connectionId?.trim()) return null
+  const id = connectionId.trim()
+  if (id.length !== 24 || !/^[0-9a-fA-F]+$/.test(id)) return null
+  try {
+    const response = await api.get(`/v1/client/by-connection/${encodeURIComponent(id)}`)
+    return response.data
+  } catch {
+    return null
+  }
+}
+
+/** Storage key for recruiter's last validated connection (persists across sessions). */
+export const RECRUITER_LAST_CONNECTION_KEY = 'recruiter_last_connection'
+
 // ==================== CLIENT DASHBOARD STATS API ====================
 /** Lightweight stats for client dashboard (no match/top calls). Match results stay on Match Results page. */
 export interface ClientStats {

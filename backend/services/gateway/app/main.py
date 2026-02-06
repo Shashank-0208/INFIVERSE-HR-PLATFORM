@@ -53,7 +53,8 @@ try:
         validate_api_key as jwt_validate_api_key,
         security as jwt_security,
         get_recruiter_auth as jwt_get_recruiter_auth,
-        require_role as jwt_require_role
+        require_role as jwt_require_role,
+        get_optional_auth as jwt_get_optional_auth,
     )
 except ImportError:
     # Fallback if monitoring module is not available
@@ -82,7 +83,8 @@ except ImportError:
             validate_api_key as jwt_validate_api_key,
             security as jwt_security,
             get_recruiter_auth as jwt_get_recruiter_auth,
-            require_role as jwt_require_role
+            require_role as jwt_require_role,
+            get_optional_auth as jwt_get_optional_auth,
         )
     except ImportError:
         jwt_get_auth = None
@@ -91,6 +93,7 @@ except ImportError:
         jwt_security = None
         jwt_get_recruiter_auth = None
         jwt_require_role = None
+        jwt_get_optional_auth = None
 
 # Use security scheme from jwt_auth.py (with auto_error=False) if available
 # Otherwise create a fallback with auto_error=False to allow credentials to be None
@@ -478,6 +481,7 @@ if jwt_get_auth is not None:
     get_auth = jwt_get_auth
     get_api_key = jwt_get_api_key
     validate_api_key = jwt_validate_api_key
+    get_optional_auth = jwt_get_optional_auth
 else:
     # Fallback: define basic functions if import failed
     def validate_api_key(api_key: str) -> bool:
@@ -488,6 +492,10 @@ else:
         if not credentials or not validate_api_key(credentials.credentials):
             raise HTTPException(status_code=401, detail="Invalid API key")
         return credentials.credentials
+
+    def get_optional_auth(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)):
+        """Optional auth - returns None if not authenticated (fallback when jwt_auth not loaded)."""
+        return None
 
     def get_auth(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)):
         """Dual authentication: API key or client JWT token"""
@@ -632,11 +640,16 @@ async def create_job(job: JobCreate, auth: dict = Depends(get_auth)):
             document["salary_min"] = float(job.salary_min)
         if job.salary_max is not None:
             document["salary_max"] = float(job.salary_max)
-        # Associate job with recruiter when created by recruiter JWT (for dashboard filtering)
+        # Associate job with recruiter when created by recruiter JWT (data isolation)
         if auth.get("type") == "jwt_token" and auth.get("role") == "recruiter":
             rid = auth.get("user_id")
             if rid is not None:
                 document["recruiter_id"] = str(rid)
+        # Associate job with client when created by client JWT (data isolation)
+        if auth.get("type") == "jwt_token" and auth.get("role") == "client":
+            cid = auth.get("user_id")
+            if cid is not None:
+                document["client_id"] = str(cid)
         
         result = await db.jobs.insert_one(document)
         job_id = str(result.inserted_id)
@@ -886,8 +899,8 @@ async def job_locations_autocomplete(q: Optional[str] = None, limit: int = 15):
 
 
 @app.get("/v1/jobs/{job_id}", tags=["Job Management"])
-async def get_job_by_id(job_id: str):
-    """Get a single job by ID (MongoDB ObjectId string or legacy id)."""
+async def get_job_by_id(job_id: str, auth: Optional[dict] = Depends(get_optional_auth)):
+    """Get a single job by ID (MongoDB ObjectId string or legacy id). Client JWT: only own jobs."""
     if not job_id:
         raise HTTPException(status_code=400, detail="Job ID is required")
     try:
@@ -898,6 +911,12 @@ async def get_job_by_id(job_id: str):
             doc = await db.jobs.find_one({"id": job_id})
         if not doc:
             raise HTTPException(status_code=404, detail="Job not found")
+        # Client data isolation: only allow access to own jobs
+        if auth and auth.get("type") == "jwt_token" and auth.get("role") == "client":
+            client_id = str(auth.get("user_id", ""))
+            job_ids = await _client_job_ids(db, client_id)
+            if job_id not in job_ids:
+                raise HTTPException(status_code=403, detail="You can only view your own jobs")
         salary_min, salary_max = _job_salary_from_doc(doc)
         return {
             "id": str(doc["_id"]),
@@ -924,11 +943,16 @@ class ShortlistRequest(BaseModel):
 
 @app.post("/v1/jobs/{job_id}/shortlist", tags=["Job Management"])
 async def shortlist_candidate_for_job(job_id: str, body: ShortlistRequest, auth=Depends(get_auth)):
-    """Mark a candidate as shortlisted for a job (upsert job_application with status shortlisted)."""
+    """Mark a candidate as shortlisted for a job (upsert job_application with status shortlisted). Client: only own jobs."""
     if not job_id or not body.candidate_id:
         raise HTTPException(status_code=400, detail="job_id and candidate_id are required")
     try:
         db = await get_mongo_db()
+        if auth.get("type") == "jwt_token" and auth.get("role") == "client":
+            client_id = str(auth.get("user_id", ""))
+            job_ids = await _client_job_ids(db, client_id)
+            if job_id not in job_ids:
+                raise HTTPException(status_code=403, detail="You can only shortlist for your own jobs")
         now = datetime.now(timezone.utc)
         existing = await db.job_applications.find_one({"job_id": job_id, "candidate_id": body.candidate_id})
         if existing:
@@ -1087,6 +1111,15 @@ async def _recruiter_applicant_ids(db, recruiter_id: str, job_id: Optional[str] 
         if cid:
             candidate_ids.append(str(cid))
     return candidate_ids
+
+
+async def _client_job_ids(db, client_id: str) -> List[str]:
+    """Return list of job_ids for jobs belonging to this client (data isolation)."""
+    if not client_id:
+        return []
+    cursor = db.jobs.find({"status": "active", "client_id": client_id}, {"_id": 1}).limit(500)
+    jobs_list = await cursor.to_list(length=500)
+    return [str(doc["_id"]) for doc in jobs_list]
 
 
 @app.get("/v1/candidates/autocomplete", tags=["Candidate Management"])
@@ -1282,13 +1315,18 @@ async def search_candidates(
         }
 
 @app.get("/v1/candidates/job/{job_id}", tags=["Candidate Management"])
-async def get_candidates_by_job(job_id: str, api_key: str = Depends(get_api_key)):
-    """Get All Candidates (Dynamic Matching)"""
+async def get_candidates_by_job(job_id: str, auth=Depends(get_auth)):
+    """Get All Candidates for a job. Client: only own jobs (data isolation)."""
     if not job_id:
         raise HTTPException(status_code=400, detail="Invalid job ID")
     
     try:
         db = await get_mongo_db()
+        if auth.get("type") == "jwt_token" and auth.get("role") == "client":
+            client_id = str(auth.get("user_id", ""))
+            job_ids = await _client_job_ids(db, client_id)
+            if job_id not in job_ids:
+                raise HTTPException(status_code=403, detail="You can only view candidates for your own jobs")
         cursor = db.candidates.find({}).limit(10)
         candidates_list = await cursor.to_list(length=10)
         
@@ -1759,9 +1797,17 @@ async def bulk_upload_candidates(candidates: CandidateBulk, auth=Depends(get_aut
 # AI Matching Engine (2 endpoints)
 @app.get("/v1/match/{job_id}/top", tags=["AI Matching Engine"])
 async def get_top_matches(job_id: str, limit: int = 10, auth = Depends(get_auth)):  # Accept JWT tokens or API keys
-    """AI-powered semantic candidate matching via Agent Service. When caller is a recruiter, only candidates who applied to that recruiter's jobs are considered."""
+    """AI-powered semantic candidate matching via Agent Service. Recruiter: only their applicants. Client: only own jobs."""
     if limit < 1 or limit > 50:
         raise HTTPException(status_code=400, detail="Invalid limit parameter (must be 1-50)")
+    
+    # Client data isolation: only allow match for own jobs
+    if auth.get("type") == "jwt_token" and auth.get("role") == "client":
+        db = await get_mongo_db()
+        client_id = str(auth.get("user_id", ""))
+        job_ids = await _client_job_ids(db, client_id)
+        if job_id not in job_ids:
+            raise HTTPException(status_code=403, detail="You can only view matches for your own jobs")
     
     # Recruiter scope: only candidates who applied to this recruiter's jobs (same pool as dashboard "Total Applicants")
     candidate_ids_scope: Optional[List[str]] = None
@@ -2286,6 +2332,11 @@ async def get_interviews(candidate_id: Optional[str] = None, auth = Depends(get_
                 jobs_list = await cursor.to_list(length=500)
                 job_ids = [str(doc["_id"]) for doc in jobs_list]
                 match_filter["job_id"] = {"$in": job_ids} if job_ids else {"$in": []}
+        # Client: only interviews for own jobs (data isolation)
+        if auth.get("type") == "jwt_token" and auth.get("role") == "client":
+            client_id = str(auth.get("user_id", ""))
+            job_ids = await _client_job_ids(db, client_id)
+            match_filter["job_id"] = {"$in": job_ids} if job_ids else {"$in": []}
         
         pipeline = [
             {"$match": match_filter} if match_filter else {"$match": {}},
@@ -2379,6 +2430,11 @@ async def schedule_interview(interview: InterviewSchedule, auth=Depends(get_auth
                 job_ids = [str(doc["_id"]) for doc in jobs_list]
                 if interview.job_id not in job_ids:
                     raise HTTPException(status_code=403, detail="You can only schedule interviews for your own jobs")
+        if auth.get("type") == "jwt_token" and auth.get("role") == "client":
+            client_id = str(auth.get("user_id", ""))
+            job_ids = await _client_job_ids(db, client_id)
+            if interview.job_id not in job_ids:
+                raise HTTPException(status_code=403, detail="You can only schedule interviews for your own jobs")
 
         document = {
             "candidate_id": interview.candidate_id,
@@ -2471,6 +2527,19 @@ async def get_all_offers(candidate_id: Optional[str] = None, auth = Depends(get_
                 if token_candidate_id and token_candidate_id != str(candidate_id):
                     raise HTTPException(status_code=403, detail="You can only view your own offers")
             match_filter["candidate_id"] = candidate_id
+        # Recruiter: only offers for their jobs
+        if auth.get("type") == "jwt_token" and auth.get("role") == "recruiter":
+            recruiter_id = str(auth.get("user_id", ""))
+            if recruiter_id:
+                cursor = db.jobs.find({"status": "active", "recruiter_id": recruiter_id}, {"_id": 1})
+                jobs_list = await cursor.to_list(length=500)
+                job_ids = [str(doc["_id"]) for doc in jobs_list]
+                match_filter["job_id"] = {"$in": job_ids} if job_ids else {"$in": []}
+        # Client: only offers for own jobs (data isolation)
+        if auth.get("type") == "jwt_token" and auth.get("role") == "client":
+            client_id = str(auth.get("user_id", ""))
+            job_ids = await _client_job_ids(db, client_id)
+            match_filter["job_id"] = {"$in": job_ids} if job_ids else {"$in": []}
         
         pipeline = [
             {"$match": match_filter} if match_filter else {"$match": {}},
@@ -2741,6 +2810,128 @@ async def client_login(login_data: ClientLogin):
             "success": False,
             "error": f"Authentication error: {str(e)}"
         }
+
+
+@app.get("/v1/client/jobs", tags=["Client Portal API"])
+async def get_client_jobs(auth=Depends(get_auth)):
+    """List jobs for the authenticated client only (data isolation). Like GET /v1/recruiter/jobs for clients."""
+    try:
+        if auth.get("type") != "jwt_token" or auth.get("role") != "client":
+            raise HTTPException(status_code=403, detail="This endpoint is only available for clients")
+        client_id = str(auth.get("user_id", ""))
+        if not client_id:
+            return {"jobs": [], "count": 0}
+        db = await get_mongo_db()
+        job_ids = await _client_job_ids(db, client_id)
+        if not job_ids:
+            return {"jobs": [], "count": 0}
+        cursor = db.jobs.find({"_id": {"$in": [ObjectId(j) for j in job_ids]}}).sort("created_at", -1).limit(100)
+        jobs_list = await cursor.to_list(length=100)
+        counts_by_job: Dict[str, Dict[str, int]] = {}
+        pipeline = [
+            {"$match": {"job_id": {"$in": job_ids}}},
+            {"$group": {
+                "_id": "$job_id",
+                "applicants": {"$sum": 1},
+                "shortlisted": {"$sum": {"$cond": [{"$eq": ["$status", "shortlisted"]}, 1, 0]}},
+            }},
+        ]
+        async for agg_doc in db.job_applications.aggregate(pipeline):
+            jid = agg_doc.get("_id") or ""
+            counts_by_job[str(jid)] = {"applicants": agg_doc.get("applicants", 0), "shortlisted": agg_doc.get("shortlisted", 0)}
+        jobs = []
+        for doc in jobs_list:
+            jid = str(doc["_id"])
+            counts = counts_by_job.get(jid, {"applicants": 0, "shortlisted": 0})
+            salary_min, salary_max = _job_salary_from_doc(doc)
+            jobs.append({
+                "id": jid,
+                "title": doc.get("title"),
+                "department": doc.get("department"),
+                "location": doc.get("location"),
+                "experience_level": doc.get("experience_level"),
+                "requirements": doc.get("requirements"),
+                "description": doc.get("description"),
+                "job_type": doc.get("job_type") or doc.get("employment_type"),
+                "employment_type": doc.get("employment_type"),
+                "salary_min": salary_min,
+                "salary_max": salary_max,
+                "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+                "applicants": counts["applicants"],
+                "shortlisted": counts["shortlisted"],
+            })
+        return {"jobs": jobs, "count": len(jobs)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"jobs": [], "count": 0, "error": str(e)}
+
+
+@app.get("/v1/client/stats", tags=["Client Portal API"])
+async def get_client_stats(auth=Depends(get_auth)):
+    """Client dashboard statistics: active jobs, total applications, interviews scheduled, offers made.
+    When authenticated as client, only that client's jobs are included (data isolation)."""
+    try:
+        db = await get_mongo_db()
+        job_ids: List[str]
+        if auth.get("type") == "jwt_token" and auth.get("role") == "client":
+            client_id = str(auth.get("user_id", ""))
+            job_ids = await _client_job_ids(db, client_id)
+        else:
+            # API key or other: all active jobs (backward compatibility)
+            cursor = db.jobs.find({"status": "active"}).limit(500)
+            jobs_list = await cursor.to_list(length=500)
+            job_ids = [str(doc["_id"]) for doc in jobs_list]
+        active_jobs = len(job_ids)
+        if not job_ids:
+            return {
+                "active_jobs": 0,
+                "total_applications": 0,
+                "shortlisted": 0,
+                "interviews_scheduled": 0,
+                "offers_made": 0,
+                "hired": 0,
+            }
+        total_applications = await db.job_applications.count_documents({"job_id": {"$in": job_ids}})
+        shortlisted = await db.job_applications.count_documents({
+            "job_id": {"$in": job_ids},
+            "status": "shortlisted"
+        })
+        interviews_scheduled = await db.interviews.count_documents({
+            "job_id": {"$in": job_ids},
+            "status": {"$in": ["scheduled", "pending"]}
+        })
+        # Include all interviews for "scheduled" display if collection has no status
+        try:
+            alt_interviews = await db.interviews.count_documents({"job_id": {"$in": job_ids}})
+            if interviews_scheduled == 0 and alt_interviews > 0:
+                interviews_scheduled = alt_interviews
+        except Exception:
+            pass
+        offers_made = await db.offers.count_documents({"job_id": {"$in": job_ids}})
+        hired = await db.offers.count_documents({
+            "job_id": {"$in": job_ids},
+            "status": {"$in": ["accepted", "hired"]}
+        })
+        return {
+            "active_jobs": active_jobs,
+            "total_applications": total_applications,
+            "shortlisted": shortlisted,
+            "interviews_scheduled": interviews_scheduled,
+            "offers_made": offers_made,
+            "hired": hired,
+        }
+    except Exception as e:
+        return {
+            "active_jobs": 0,
+            "total_applications": 0,
+            "shortlisted": 0,
+            "interviews_scheduled": 0,
+            "offers_made": 0,
+            "hired": 0,
+            "error": str(e),
+        }
+
 
 # Security Testing (7 endpoints)
 @app.get("/v1/security/rate-limit-status", tags=["Security Testing"])

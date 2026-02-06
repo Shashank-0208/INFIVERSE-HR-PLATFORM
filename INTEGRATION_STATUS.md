@@ -9,21 +9,18 @@ Both Client and Candidate sides are **fully integrated** with the backend API an
 ## 🔵 **CLIENT SIDE INTEGRATION**
 
 ### ✅ Dashboard (`/client`)
-**Status:** ✅ Fully Integrated with Real-Time Data
+**Status:** ✅ Fully Integrated with Real-Time Data (optimized: no match/top on dashboard)
 - **API Calls:**
   - `getJobs()` - Fetches all active jobs
-  - `getCandidatesByJob(jobId)` - Gets candidates for each job
-  - `getAllInterviews()` - Gets all interviews
-  - `getAllOffers()` - Gets all job offers
+  - `getClientStats()` - Lightweight stats: active jobs, total applications, interviews scheduled, offers made (DB counts only)
 - **Real-Time Features:**
   - Auto-refresh every 30 seconds
   - Live statistics: Active Jobs, Total Applications, Interviews Scheduled, Offers Made
   - Application Pipeline with conversion rates from real data
 - **Backend Endpoints Used:**
-  - `GET /v1/jobs`
-  - `GET /v1/match/{jobId}/top`
-  - `GET /v1/interviews`
-  - `GET /v1/offers`
+  - `GET /v1/client/jobs` (client-scoped jobs only; data isolation)
+  - `GET /v1/client/stats`
+- **Note:** Match/top candidate results are loaded only on the dedicated **Match Results** page (`/client/matches`), not on the dashboard. All client portal data is isolated by `client_id` (see `docs/CLIENT_DATA_ISOLATION.md`).
 
 ### ✅ Job Posting (`/client/jobs`)
 **Status:** ✅ Fully Integrated

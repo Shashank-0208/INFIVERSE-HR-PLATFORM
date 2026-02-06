@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react'
-import { getJobs, getCandidatesByJob, getAllInterviews, getAllOffers, Job, MatchResult } from '../../services/api'
+import { getClientJobs, getClientStats, Job, ClientStats } from '../../services/api'
 import StatsCard from '../../components/StatsCard'
 import Loading from '../../components/Loading'
 
 export default function ClientDashboard() {
   const [jobs, setJobs] = useState<Job[]>([])
+  const [stats, setStats] = useState<ClientStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [applications, setApplications] = useState<MatchResult[]>([])
-  const [interviews, setInterviews] = useState<any[]>([])
-  const [offers, setOffers] = useState<any[]>([])
 
   useEffect(() => {
     loadDashboardData()
@@ -20,29 +18,14 @@ export default function ClientDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
-      
-      // Load all data in parallel for better performance
-      const [jobsData, interviewsData, offersData] = await Promise.all([
-        getJobs().catch(() => []),
-        getAllInterviews().catch(() => []),
-        getAllOffers().catch(() => [])
+      // Only fetch essential dashboard data: jobs list + lightweight stats (no match/top calls).
+      // Match results are loaded only on the dedicated Match Results page.
+      const [jobsData, statsData] = await Promise.all([
+        getClientJobs().catch(() => []),
+        getClientStats()
       ])
-      
       setJobs(jobsData)
-      setInterviews(interviewsData)
-      setOffers(offersData)
-      
-      // Load applications for all jobs
-      const allApplications: MatchResult[] = []
-      for (const job of jobsData) {
-        try {
-          const matches = await getCandidatesByJob(job.id)
-          allApplications.push(...matches)
-        } catch (error) {
-          console.error(`Error loading matches for job ${job.id}:`, error)
-        }
-      }
-      setApplications(allApplications)
+      setStats(statsData)
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
     } finally {
@@ -50,21 +33,22 @@ export default function ClientDashboard() {
     }
   }
 
-  // Calculate statistics from real-time data
-  const activeJobs = jobs.filter(job => job.status === 'active' || !job.status).length
-  const totalApplications = applications.length
-  const interviewsScheduled = interviews.filter(i => i.status === 'scheduled' || !i.status).length
-  const offersMade = offers.length
+  // Use stats from dedicated client/stats endpoint (DB counts only)
+  const activeJobs = stats?.active_jobs ?? jobs.filter(job => job.status === 'active' || !job.status).length
+  const totalApplications = stats?.total_applications ?? 0
+  const interviewsScheduled = stats?.interviews_scheduled ?? 0
+  const offersMade = stats?.offers_made ?? 0
 
-  // Calculate pipeline data from real-time backend data
+  // Pipeline data from stats (no match/top; shortlisted = screened/reviewed)
   const applied = totalApplications
-  const aiScreened = applications.filter((app: MatchResult) => app.match_score && app.match_score > 0).length
-  const reviewed = applications.filter((app: any) => (app.status === 'reviewed' || app.status === 'shortlisted' || app.recommendation === 'Strong Recommend')).length
+  const shortlisted = stats?.shortlisted ?? 0
+  const aiScreened = shortlisted
+  const reviewed = shortlisted
   const interview = interviewsScheduled
   const offer = offersMade
-  const hired = offers.filter((o: any) => o.status === 'accepted' || o.status === 'hired').length
+  const hired = stats?.hired ?? 0
 
-  // Calculate conversion rates
+  // Conversion rates
   const conversionRates = {
     appliedToScreened: applied > 0 ? Math.round((aiScreened / applied) * 100) : 0,
     screenedToReviewed: aiScreened > 0 ? Math.round((reviewed / aiScreened) * 100) : 0,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getJobs, getTopMatches, Job, MatchResult } from '../../services/api'
+import { getClientJobs, getTopMatches, Job, MatchResult } from '../../services/api'
 import Loading from '../../components/Loading'
 import { toast } from 'react-hot-toast'
 
@@ -30,7 +30,7 @@ export default function MatchResults() {
   const loadJobs = async () => {
     try {
       setLoading(true)
-      const jobsData = await getJobs()
+      const jobsData = await getClientJobs()
       setJobs(jobsData)
       if (jobsData.length > 0) {
         setSelectedJobId(jobsData[0].id)

@@ -764,6 +764,42 @@ export const getAllOffers = async (): Promise<Offer[]> => {
   }
 }
 
+// ==================== CLIENT DASHBOARD STATS API ====================
+/** Lightweight stats for client dashboard (no match/top calls). Match results stay on Match Results page. */
+export interface ClientStats {
+  active_jobs: number
+  total_applications: number
+  shortlisted: number
+  interviews_scheduled: number
+  offers_made: number
+  hired: number
+}
+
+export const getClientStats = async (): Promise<ClientStats> => {
+  try {
+    const response = await api.get('/v1/client/stats')
+    const d = response.data
+    return {
+      active_jobs: d.active_jobs ?? 0,
+      total_applications: d.total_applications ?? 0,
+      shortlisted: d.shortlisted ?? 0,
+      interviews_scheduled: d.interviews_scheduled ?? 0,
+      offers_made: d.offers_made ?? 0,
+      hired: d.hired ?? 0,
+    }
+  } catch (error) {
+    console.error('Error fetching client stats:', error)
+    return {
+      active_jobs: 0,
+      total_applications: 0,
+      shortlisted: 0,
+      interviews_scheduled: 0,
+      offers_made: 0,
+      hired: 0,
+    }
+  }
+}
+
 export const respondToOffer = async (offerId: string, response: 'accepted' | 'rejected') => {
   try {
     const res = await api.put(`/v1/offers/${offerId}`, { status: response })
@@ -1022,6 +1058,18 @@ export const getRecruiterJobs = async (): Promise<Job[]> => {
     return Array.isArray(list) ? list.map((j: Record<string, unknown>) => normalizeJob(j)) : []
   } catch (error) {
     console.error('Error fetching recruiter jobs:', error)
+    return []
+  }
+}
+
+/** Jobs for the logged-in client only (data isolation). Use in client portal instead of getJobs(). */
+export const getClientJobs = async (): Promise<Job[]> => {
+  try {
+    const response = await api.get('/v1/client/jobs')
+    const list = response.data?.jobs ?? response.data ?? []
+    return Array.isArray(list) ? list.map((j: Record<string, unknown>) => normalizeJob(j)) : []
+  } catch (error) {
+    console.error('Error fetching client jobs:', error)
     return []
   }
 }

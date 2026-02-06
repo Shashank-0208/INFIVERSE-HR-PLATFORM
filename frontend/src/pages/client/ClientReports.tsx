@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getJobs, getCandidatesByJob, getAllInterviews, getAllOffers, Job } from '../../services/api'
+import { getClientJobs, getClientStats, getAllInterviews, getAllOffers, Job } from '../../services/api'
 import Loading from '../../components/Loading'
 
 export default function ClientReports() {
@@ -23,33 +23,22 @@ export default function ClientReports() {
   const loadReports = async () => {
     try {
       setLoading(true)
-      
-      // Load all data in parallel for real-time updates
-      const [jobsData, interviewsData, offersData] = await Promise.all([
-        getJobs().catch(() => []),
+      // Client-scoped data only (getClientJobs + getClientStats; interviews/offers filtered by client on backend)
+      const [jobsData, clientStats, interviewsData, offersData] = await Promise.all([
+        getClientJobs().catch(() => []),
+        getClientStats(),
         getAllInterviews().catch(() => []),
         getAllOffers().catch(() => [])
       ])
       
       setJobs(jobsData)
 
-      // Calculate statistics from real-time data
-      let totalApplications = 0
-      for (const job of jobsData) {
-        try {
-          const matches = await getCandidatesByJob(job.id)
-          totalApplications += matches.length
-        } catch (error) {
-          console.error(`Error loading matches for job ${job.id}:`, error)
-        }
-      }
-
       setStats({
-        totalJobs: jobsData.length,
-        totalApplications,
+        totalJobs: clientStats.active_jobs,
+        totalApplications: clientStats.total_applications,
         totalInterviews: interviewsData.length,
         totalOffers: offersData.length,
-        totalHired: offersData.filter((o: any) => o.status === 'accepted' || o.status === 'hired').length,
+        totalHired: clientStats.hired,
       })
     } catch (error) {
       console.error('Failed to load reports:', error)

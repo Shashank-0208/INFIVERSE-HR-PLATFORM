@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getJobs, getCandidatesByJob, Job, MatchResult } from '../../services/api'
+import { getClientJobs, getCandidatesByJob, Job, MatchResult } from '../../services/api'
 import Loading from '../../components/Loading'
 
 export default function ClientCandidates() {
@@ -29,7 +29,7 @@ export default function ClientCandidates() {
   const loadJobs = async () => {
     try {
       setLoading(true)
-      const jobsData = await getJobs()
+      const jobsData = await getClientJobs()
       setJobs(jobsData)
       if (jobsData.length > 0) {
         setSelectedJobId(jobsData[0].id)

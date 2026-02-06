@@ -1,8 +1,81 @@
+import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSidebar } from '../../context/SidebarContext'
 import { useAuth } from '../../context/AuthContext'
 import { authStorage, clearAuthStorage } from '../../utils/authStorage'
+import {
+  getClientConnectedRecruiter,
+  subscribeClientConnectionEvents,
+  type ClientConnectedRecruiter,
+} from '../../services/api'
 import ApiStatus from '../ApiStatus'
+
+function ClientConnectedRecruiterStatusBlock() {
+  const { isCollapsed } = useSidebar()
+  const [data, setData] = useState<ClientConnectedRecruiter | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const abort = new AbortController()
+    const run = async () => {
+      try {
+        const result = await getClientConnectedRecruiter()
+        if (!cancelled) setData(result)
+      } catch {
+        if (!cancelled) setData({ recruiter_name: null, status: 'none' })
+      }
+    }
+    run()
+    const unsubscribe = subscribeClientConnectionEvents((ev) => {
+      if (cancelled) return
+      if (ev.event === 'connected') {
+        setData({
+          recruiter_name: ev.recruiter_name ?? null,
+          status: 'connected',
+        })
+      } else if (ev.event === 'disconnected') {
+        setData({ recruiter_name: null, status: 'none' })
+      }
+    }, abort.signal)
+    return () => {
+      cancelled = true
+      unsubscribe()
+      abort.abort()
+    }
+  }, [])
+
+  if (data?.status === 'none' || !data) {
+    return (
+      <div className={`px-3 pb-2 ${isCollapsed ? 'flex justify-center' : ''}`}>
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-100/50 dark:bg-slate-800/50">
+          <span className="w-2.5 h-2.5 rounded-full bg-gray-400 shrink-0" />
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate">No recruiter connected</span>
+        </div>
+      </div>
+    )
+  }
+  if (data.status === 'invalid') {
+    return (
+      <div className={`px-3 pb-2 ${isCollapsed ? 'flex justify-center' : ''}`}>
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+          <span className="text-xs font-medium text-red-700 dark:text-red-300 truncate">Connection no longer valid</span>
+        </div>
+      </div>
+    )
+  }
+  const name = data.recruiter_name || 'Recruiter'
+  return (
+    <div className={`px-3 pb-2 ${isCollapsed ? 'flex justify-center' : ''}`}>
+      <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50">
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+        <span className="text-xs font-medium text-emerald-800 dark:text-emerald-200 truncate" title={name}>
+          → {name}
+        </span>
+      </div>
+    </div>
+  )
+}
 
 export default function ClientSidebar() {
   const location = useLocation()
@@ -122,6 +195,8 @@ export default function ClientSidebar() {
         <div className={`px-3 pt-3 ${isCollapsed ? 'flex justify-center' : ''}`}>
           <ApiStatus />
         </div>
+        {/* Connected Recruiter (mirrors recruiter sidebar's client company block) */}
+        <ClientConnectedRecruiterStatusBlock />
         {/* User Details */}
         <div className={`p-3 ${isCollapsed ? 'flex justify-center' : ''}`}>
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>

@@ -1,6 +1,9 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
-import { getClientByConnectionId } from '../services/api'
-import { RECRUITER_LAST_CONNECTION_KEY } from '../services/api'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import {
+  disconnectRecruiterConnection,
+  subscribeRecruiterConnectionEvents,
+  RECRUITER_LAST_CONNECTION_KEY,
+} from '../services/api'
 
 const CONNECTION_ID_LENGTH = 24
 
@@ -55,8 +58,6 @@ function clearStorage() {
   }
 }
 
-const REVALIDATE_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
-
 export function RecruiterConnectionProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<RecruiterConnectionState>(() => {
     const stored = loadFromStorage()
@@ -69,33 +70,28 @@ export function RecruiterConnectionProvider({ children }: { children: React.Reac
     }
     return initialState
   })
-  const revalidateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const revalidate = useCallback(async (connectionId: string) => {
-    try {
-      const client = await getClientByConnectionId(connectionId)
-      if (client?.company_name != null) {
-        setState(prev => ({
-          ...prev,
-          companyName: client.company_name,
-          status: 'connected',
-        }))
-        saveToStorage(connectionId, client.company_name)
-      } else {
-        clearStorage()
-        setState(prev => ({
-          connectionId: prev.connectionId,
-          companyName: null,
-          status: 'invalid',
-        }))
-      }
-    } catch {
-      clearStorage()
-      setState(prev => ({
-        connectionId: prev.connectionId,
-        companyName: null,
-        status: 'invalid',
-      }))
+  // Synchronized updates via SSE - no per-user polling; both parties get same events
+  useEffect(() => {
+    const abort = new AbortController()
+    const unsubscribe = subscribeRecruiterConnectionEvents(
+      (ev) => {
+        if (ev.event === 'connected' && ev.company_name != null) {
+          setState(prev => ({
+            ...prev,
+            companyName: ev.company_name ?? null,
+            status: 'connected',
+          }))
+        } else if (ev.event === 'disconnected') {
+          clearStorage()
+          setState(initialState)
+        }
+      },
+      abort.signal
+    )
+    return () => {
+      unsubscribe()
+      abort.abort()
     }
   }, [])
 
@@ -107,35 +103,13 @@ export function RecruiterConnectionProvider({ children }: { children: React.Reac
       companyName,
       status: 'connected',
     })
-    if (revalidateTimerRef.current) {
-      clearInterval(revalidateTimerRef.current)
-      revalidateTimerRef.current = null
-    }
-    revalidateTimerRef.current = setInterval(() => revalidate(connectionId), REVALIDATE_INTERVAL_MS)
-  }, [revalidate])
-
-  const clearConnection = useCallback(() => {
-    clearStorage()
-    setState(initialState)
-    if (revalidateTimerRef.current) {
-      clearInterval(revalidateTimerRef.current)
-      revalidateTimerRef.current = null
-    }
   }, [])
 
-  // Start 1-hour revalidation when we have a connection (e.g. from storage on load)
-  useEffect(() => {
-    const cid = state.connectionId
-    if (cid && !revalidateTimerRef.current) {
-      revalidateTimerRef.current = setInterval(() => revalidate(cid), REVALIDATE_INTERVAL_MS)
-    }
-    return () => {
-      if (revalidateTimerRef.current) {
-        clearInterval(revalidateTimerRef.current)
-        revalidateTimerRef.current = null
-      }
-    }
-  }, [state.connectionId, revalidate])
+  const clearConnection = useCallback(() => {
+    disconnectRecruiterConnection().catch(() => {})
+    clearStorage()
+    setState(initialState)
+  }, [])
 
   const value: RecruiterConnectionContextValue = {
     ...state,

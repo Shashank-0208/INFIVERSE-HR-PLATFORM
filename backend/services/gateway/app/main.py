@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Security, Response, Request, File, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import json
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,11 +25,45 @@ from bson import ObjectId
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, field_validator, Field, model_validator
 import time
+import asyncio
 import logging
 import traceback
 import psutil
 
 logger = logging.getLogger(__name__)
+
+# In-memory SSE channels for connection events (client and recruiter notified simultaneously)
+_connection_event_queues: Dict[str, List[asyncio.Queue]] = {}
+_connection_event_lock = asyncio.Lock()
+
+
+async def _push_connection_event(channel: str, event: Dict[str, Any]) -> None:
+    """Push an event to all subscribers of a channel (e.g. 'client:123' or 'recruiter:456')."""
+    async with _connection_event_lock:
+        queues = list(_connection_event_queues.get(channel, []))
+    for q in queues:
+        try:
+            q.put_nowait(event)
+        except asyncio.QueueFull:
+            pass
+
+
+async def _subscribe_connection_events(channel: str) -> asyncio.Queue:
+    """Subscribe to connection events for a channel. Returns a queue that will receive events."""
+    q: asyncio.Queue = asyncio.Queue(maxsize=32)
+    async with _connection_event_lock:
+        _connection_event_queues.setdefault(channel, []).append(q)
+    return q
+
+
+def _unsubscribe_connection_events(channel: str, q: asyncio.Queue) -> None:
+    async def _remove():
+        async with _connection_event_lock:
+            lst = _connection_event_queues.get(channel, [])
+            if q in lst:
+                lst.remove(q)
+    asyncio.create_task(_remove())
+
 
 # Import configuration
 try:
@@ -2910,7 +2944,7 @@ async def get_client_profile(auth=Depends(get_auth)):
 
 @app.get("/v1/client/by-connection/{connection_id}", tags=["Client Portal API"])
 async def get_client_by_connection(connection_id: str, auth=Depends(get_auth)):
-    """Validate connection_id and return minimal client info. Used by recruiters when posting jobs."""
+    """Validate connection_id and return minimal client info. Used by recruiters when posting jobs. Records recruiter as connected to this client for client sidebar."""
     if not connection_id or not connection_id.strip():
         raise HTTPException(status_code=400, detail="Connection ID is required")
     connection_id = connection_id.strip()
@@ -2922,6 +2956,38 @@ async def get_client_by_connection(connection_id: str, auth=Depends(get_auth)):
         if not client:
             raise HTTPException(status_code=404, detail="Invalid Connection ID. Please ask your client for the correct ID from their dashboard.")
         company_name = client.get("company_name") or ""
+        client_id_raw = client.get("client_id")
+        client_id_str = str(client_id_raw) if client_id_raw is not None else ""
+        # When a recruiter validates this connection_id, record them and notify both parties (synchronized)
+        if client_id_str and auth.get("type") == "jwt_token" and auth.get("role") == "recruiter":
+            recruiter_id = str(auth.get("user_id") or "")
+            recruiter_name = str(auth.get("name") or "Recruiter").strip() or "Recruiter"
+            if recruiter_id:
+                try:
+                    # Previous client this recruiter was connected to (if any)
+                    old_doc = await db.client_connected_recruiter.find_one({"recruiter_id": recruiter_id})
+                    old_client_id = str(old_doc["client_id"]) if old_doc and old_doc.get("client_id") else None
+                    # Remove this recruiter from any other client (so previous client sees disconnected)
+                    await db.client_connected_recruiter.delete_many({"recruiter_id": recruiter_id})
+                    # Link this recruiter to the new client
+                    await db.client_connected_recruiter.update_one(
+                        {"client_id": client_id_str},
+                        {"$set": {
+                            "recruiter_id": recruiter_id,
+                            "recruiter_name": recruiter_name,
+                            "last_validated_at": datetime.now(timezone.utc),
+                        }},
+                        upsert=True
+                    )
+                    # Notify previous client they are disconnected (recruiter switched to another client)
+                    if old_client_id and old_client_id != client_id_str:
+                        await _push_connection_event(f"client:{old_client_id}", {"event": "disconnected"})
+                    # Notify new client: connected with recruiter name (both see update immediately)
+                    await _push_connection_event(f"client:{client_id_str}", {"event": "connected", "recruiter_name": recruiter_name})
+                    # Notify recruiter: connected to this client's company
+                    await _push_connection_event(f"recruiter:{recruiter_id}", {"event": "connected", "company_name": company_name})
+                except Exception as e:
+                    logger.exception("connection record/notify failed: %s", e)
         return {
             "client_id": client.get("client_id"),
             "company_name": company_name,
@@ -2929,6 +2995,119 @@ async def get_client_by_connection(connection_id: str, auth=Depends(get_auth)):
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/client/connected-recruiter", tags=["Client Portal API"])
+async def get_client_connected_recruiter(auth=Depends(get_auth)):
+    """Return the recruiter connected to this client (via connection_id), for display in client sidebar. Client-only. Revalidates: if no job links client and recruiter, status is invalid."""
+    if auth.get("type") != "jwt_token" or auth.get("role") != "client":
+        raise HTTPException(status_code=403, detail="This endpoint is only available for clients")
+    client_id = str(auth.get("user_id", ""))
+    if not client_id:
+        return {"recruiter_name": None, "status": "none"}
+    try:
+        db = await get_mongo_db()
+        doc = await db.client_connected_recruiter.find_one({"client_id": client_id})
+        if not doc:
+            return {"recruiter_name": None, "status": "none"}
+        recruiter_id = doc.get("recruiter_id")
+        recruiter_name = doc.get("recruiter_name") or "Recruiter"
+        if not recruiter_id:
+            return {"recruiter_name": None, "status": "none"}
+        # Revalidate: at least one job must link this client and this recruiter
+        job = await db.jobs.find_one({"client_id": client_id, "recruiter_id": recruiter_id})
+        if not job:
+            return {"recruiter_name": recruiter_name, "status": "invalid"}
+        return {"recruiter_name": recruiter_name, "status": "connected"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("get_client_connected_recruiter failed: %s", e)
+        return {"recruiter_name": None, "status": "none"}
+
+
+_SSE_HEARTBEAT_INTERVAL = 25.0
+
+
+async def _client_connection_event_stream(client_id: str):
+    channel = f"client:{client_id}"
+    q = await _subscribe_connection_events(channel)
+    try:
+        while True:
+            try:
+                event = await asyncio.wait_for(q.get(), timeout=_SSE_HEARTBEAT_INTERVAL)
+                yield f"data: {json.dumps(event)}\n\n"
+            except asyncio.TimeoutError:
+                yield ": heartbeat\n\n"
+    finally:
+        _unsubscribe_connection_events(channel, q)
+
+
+async def _recruiter_connection_event_stream(recruiter_id: str):
+    channel = f"recruiter:{recruiter_id}"
+    q = await _subscribe_connection_events(channel)
+    try:
+        while True:
+            try:
+                event = await asyncio.wait_for(q.get(), timeout=_SSE_HEARTBEAT_INTERVAL)
+                yield f"data: {json.dumps(event)}\n\n"
+            except asyncio.TimeoutError:
+                yield ": heartbeat\n\n"
+    finally:
+        _unsubscribe_connection_events(channel, q)
+
+
+@app.get("/v1/client/connection-events", tags=["Client Portal API"])
+async def client_connection_events(auth=Depends(get_auth)):
+    """SSE stream for connection status. Client-only. Emits connected/disconnected so client and recruiter stay in sync."""
+    if auth.get("type") != "jwt_token" or auth.get("role") != "client":
+        raise HTTPException(status_code=403, detail="This endpoint is only available for clients")
+    client_id = str(auth.get("user_id", ""))
+    if not client_id:
+        raise HTTPException(status_code=400, detail="Invalid client")
+    return StreamingResponse(
+        _client_connection_event_stream(client_id),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/v1/recruiter/connection-events", tags=["Recruiter API"])
+async def recruiter_connection_events(auth=Depends(get_auth)):
+    """SSE stream for connection status. Recruiter-only. Emits connected/disconnected so client and recruiter stay in sync."""
+    if auth.get("type") != "jwt_token" or auth.get("role") not in ("recruiter", "admin"):
+        raise HTTPException(status_code=403, detail="This endpoint is only available for recruiters")
+    recruiter_id = str(auth.get("user_id", ""))
+    if not recruiter_id:
+        raise HTTPException(status_code=400, detail="Invalid recruiter")
+    return StreamingResponse(
+        _recruiter_connection_event_stream(recruiter_id),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/v1/recruiter/disconnect", tags=["Recruiter API"])
+async def recruiter_disconnect(auth=Depends(get_auth)):
+    """Explicitly disconnect recruiter from current client. Notifies both client and recruiter via SSE so status stays synchronized."""
+    if auth.get("type") != "jwt_token" or auth.get("role") not in ("recruiter", "admin"):
+        raise HTTPException(status_code=403, detail="This endpoint is only available for recruiters")
+    recruiter_id = str(auth.get("user_id", ""))
+    if not recruiter_id:
+        raise HTTPException(status_code=400, detail="Invalid recruiter")
+    try:
+        db = await get_mongo_db()
+        doc = await db.client_connected_recruiter.find_one({"recruiter_id": recruiter_id})
+        if doc:
+            client_id = str(doc.get("client_id", ""))
+            await db.client_connected_recruiter.delete_many({"recruiter_id": recruiter_id})
+            if client_id:
+                await _push_connection_event(f"client:{client_id}", {"event": "disconnected"})
+            await _push_connection_event(f"recruiter:{recruiter_id}", {"event": "disconnected"})
+        return {}
+    except Exception as e:
+        logger.exception("recruiter_disconnect failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

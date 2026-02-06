@@ -4,7 +4,7 @@ import { authStorage } from '../utils/authStorage'
 // API Base URL - Gateway service
 // Standardized variable name: VITE_API_BASE_URL (see ENVIRONMENT_VARIABLES.md)
 // Default to localhost for local development, use env var or Render URL for production
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
   (import.meta.env.DEV ? 'http://localhost:8000' : 'https://bhiv-hr-gateway-l0xp.onrender.com')
 
 const api = axios.create({
@@ -832,6 +832,127 @@ export const getClientStats = async (): Promise<ClientStats> => {
       hired: 0,
     }
   }
+}
+
+export type ClientConnectedRecruiter = {
+  recruiter_name: string | null
+  status: 'none' | 'connected' | 'invalid'
+}
+
+export const getClientConnectedRecruiter = async (): Promise<ClientConnectedRecruiter> => {
+  try {
+    const response = await api.get<ClientConnectedRecruiter>('/v1/client/connected-recruiter')
+    const d = response.data
+    return {
+      recruiter_name: d?.recruiter_name ?? null,
+      status: d?.status === 'connected' || d?.status === 'invalid' ? d.status : 'none',
+    }
+  } catch {
+    return { recruiter_name: null, status: 'none' }
+  }
+}
+
+/** Call when recruiter explicitly disconnects; notifies client and recruiter via SSE so both see disconnect immediately. */
+export const disconnectRecruiterConnection = async (): Promise<void> => {
+  await api.post('/v1/recruiter/disconnect')
+}
+
+export type ConnectionEvent = { event: 'connected' | 'disconnected'; recruiter_name?: string; company_name?: string }
+
+/** Subscribe to client connection SSE; use AbortSignal to stop. No polling - both parties get same events. */
+export function subscribeClientConnectionEvents(
+  onEvent: (data: ConnectionEvent) => void,
+  signal?: AbortSignal
+): () => void {
+  const token = authStorage.getItem('auth_token')
+  if (!token) return () => {}
+  const url = `${API_BASE_URL}/v1/client/connection-events`
+  const controller = new AbortController()
+  if (signal) signal.addEventListener('abort', () => controller.abort())
+  let buffer = ''
+  const run = async () => {
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      })
+      if (!res.ok || !res.body) return
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += dec.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() ?? ''
+        for (const part of parts) {
+          const line = part.split('\n').find(l => l.startsWith('data:'))
+          if (line) {
+            try {
+              const data = JSON.parse(line.slice(5).trim()) as ConnectionEvent
+              onEvent(data)
+            } catch {
+              // ignore heartbeat or invalid
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if ((e as { name?: string })?.name !== 'AbortError') {
+        console.warn('Client connection-events stream ended:', e)
+      }
+    }
+  }
+  run()
+  return () => controller.abort()
+}
+
+/** Subscribe to recruiter connection SSE; use AbortSignal to stop. No polling - both parties get same events. */
+export function subscribeRecruiterConnectionEvents(
+  onEvent: (data: ConnectionEvent) => void,
+  signal?: AbortSignal
+): () => void {
+  const token = authStorage.getItem('auth_token')
+  if (!token) return () => {}
+  const url = `${API_BASE_URL}/v1/recruiter/connection-events`
+  const controller = new AbortController()
+  if (signal) signal.addEventListener('abort', () => controller.abort())
+  let buffer = ''
+  const run = async () => {
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      })
+      if (!res.ok || !res.body) return
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += dec.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() ?? ''
+        for (const part of parts) {
+          const line = part.split('\n').find(l => l.startsWith('data:'))
+          if (line) {
+            try {
+              const data = JSON.parse(line.slice(5).trim()) as ConnectionEvent
+              onEvent(data)
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if ((e as { name?: string })?.name !== 'AbortError') {
+        console.warn('Recruiter connection-events stream ended:', e)
+      }
+    }
+  }
+  run()
+  return () => controller.abort()
 }
 
 export const respondToOffer = async (offerId: string, response: 'accepted' | 'rejected') => {

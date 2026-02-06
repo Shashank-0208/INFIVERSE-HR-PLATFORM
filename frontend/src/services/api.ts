@@ -852,6 +852,14 @@ export const getClientConnectedRecruiter = async (): Promise<ClientConnectedRecr
   }
 }
 
+/** Establish and lock recruiter–client connection. Call only after validation (getClientByConnectionId). Notifies client so dashboard shows activated only after confirm. */
+export const confirmRecruiterConnection = async (connectionId: string): Promise<{ client_id: string; company_name: string }> => {
+  const res = await api.post<{ client_id: string; company_name: string }>('/v1/recruiter/confirm-connection', {
+    connection_id: connectionId.trim(),
+  })
+  return res.data
+}
+
 /** Call when recruiter explicitly disconnects; notifies client and recruiter via SSE so both see disconnect immediately. */
 export const disconnectRecruiterConnection = async (): Promise<void> => {
   await api.post('/v1/recruiter/disconnect')

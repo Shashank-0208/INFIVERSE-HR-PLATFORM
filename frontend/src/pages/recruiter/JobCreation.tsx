@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { createJob, getClientByConnectionId, RECRUITER_LAST_CONNECTION_KEY } from '../../services/api'
+import { createJob, getClientByConnectionId, confirmRecruiterConnection, RECRUITER_LAST_CONNECTION_KEY } from '../../services/api'
 import { useRecruiterConnection } from '../../context/RecruiterConnectionContext'
 import FormInput from '../../components/FormInput'
 
@@ -143,16 +143,27 @@ export default function JobCreation() {
     }
   }
 
-  // Lock and persist only when user clicks OK in confirmation; update sidebar via context
-  const confirmAndLockConnectionId = () => {
+  // Lock and persist only when user clicks OK in confirmation; establish connection on backend so client sees activated only now
+  const confirmAndLockConnectionId = async () => {
     const id = formData.connection_id.trim()
     if (!id || !linkedCompany) return
-    clearLastConnection()
-    saveLastConnection(id, linkedCompany)
-    setRecruiterConnection(id, linkedCompany)
-    setIsConnectionIdLocked(true)
-    setShowConfirmConnection(false)
-    toast.success('Connection ID confirmed')
+    setLoading(true)
+    try {
+      await confirmRecruiterConnection(id)
+      clearLastConnection()
+      saveLastConnection(id, linkedCompany)
+      setRecruiterConnection(id, linkedCompany)
+      setIsConnectionIdLocked(true)
+      setShowConfirmConnection(false)
+      toast.success('Connection ID confirmed')
+    } catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'response' in err && typeof (err as { response?: { data?: { detail?: string } } }).response?.data?.detail === 'string'
+        ? (err as { response: { data: { detail: string } } }).response.data.detail
+        : 'Failed to confirm connection. Please try again.'
+      toast.error(msg)
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Revert to input, clear connection ID and confirmation (from confirmation UI)
@@ -340,10 +351,11 @@ export default function JobCreation() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={confirmAndLockConnectionId}
-                    className="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                    onClick={() => void confirmAndLockConnectionId()}
+                    disabled={loading}
+                    className="px-4 py-2 text-sm font-medium rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    OK
+                    {loading ? 'Confirming…' : 'OK'}
                   </button>
                   <button
                     type="button"

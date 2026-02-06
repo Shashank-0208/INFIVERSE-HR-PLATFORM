@@ -110,8 +110,22 @@ So: **no new tables or new columns**; only consistent use of `jobs.client_id` an
 ## 8. Connection_id sync and client dashboard
 
 - **Recruiter posts with connection_id**: Backend sets `job.client_id` to that client, so the job is in the client’s pool immediately.
-- **Client dashboard**: **GET /v1/client/jobs** and **GET /v1/client/stats** use only the authenticated client’s `client_id` from JWT. They include jobs recruiters posted via this client’s connection_id. No client_id param; 403 for non-client on stats.
-- **Application pipeline**: Same stats; pipeline counts use `_client_all_job_ids` (all client jobs); Active Jobs uses active only.
+- **Client dashboard**: **GET /v1/client/jobs** and **GET /v1/client/stats** use the authenticated client’s `client_id` from JWT. No client_id param; 403 for non-client on stats.
+
+---
+
+## 9. Connected recruiter: blended job set (pre- and post-connection)
+
+When a client and recruiter are **connected** (recruiter confirmed connection via **POST /v1/recruiter/confirm-connection**), the client’s dashboard shows **all jobs posted by that recruiter**—both jobs posted before and after the connection.
+
+- **Helpers**:
+  - `_client_connected_recruiter_id(db, client_id)` – returns the connected recruiter’s id from `client_connected_recruiter`, or `None` if not connected.
+  - `_client_job_ids_for_dashboard(db, client_id)` – active job IDs = client’s own jobs **union** all active jobs where `recruiter_id` = connected recruiter (when connected). When disconnected, returns only client’s jobs.
+  - `_client_all_job_ids_for_dashboard(db, client_id)` – same for all statuses (used for stats: applications, interviews, offers, hired).
+
+- **When connected**: **GET /v1/client/jobs**, **GET /v1/client/stats**, and all client-scoped job access (get job, shortlist, candidates, matches, interviews) use the dashboard job set, so the client sees and can act on recruiter-posted jobs (including those created before the connection).
+- **When disconnected**: The same endpoints use only jobs where `client_id` = logged-in client; the recruiter’s jobs drop out automatically. No extra “revert” step; data isolation is preserved by recomputing the set from `client_connected_recruiter` on each request.
+- **Recruiter posts without connection_id**: Those jobs have `recruiter_id` but may have no or another `client_id`; they become visible to this client only after the recruiter connects to this client (confirm-connection), so the client dashboard blends “my jobs” and “my connected recruiter’s jobs” appropriately.
 
 ---
 

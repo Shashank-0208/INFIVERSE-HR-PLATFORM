@@ -959,10 +959,10 @@ async def get_job_by_id(job_id: str, auth: Optional[dict] = Depends(get_optional
             doc = await db.jobs.find_one({"id": job_id})
         if not doc:
             raise HTTPException(status_code=404, detail="Job not found")
-        # Client data isolation: only allow access to own jobs
+        # Client data isolation: own jobs + connected recruiter's jobs when connected
         if auth and auth.get("type") == "jwt_token" and auth.get("role") == "client":
             client_id = str(auth.get("user_id", ""))
-            job_ids = await _client_job_ids(db, client_id)
+            job_ids = await _client_job_ids_for_dashboard(db, client_id)
             if job_id not in job_ids:
                 raise HTTPException(status_code=403, detail="You can only view your own jobs")
         salary_min, salary_max = _job_salary_from_doc(doc)
@@ -998,7 +998,7 @@ async def shortlist_candidate_for_job(job_id: str, body: ShortlistRequest, auth=
         db = await get_mongo_db()
         if auth.get("type") == "jwt_token" and auth.get("role") == "client":
             client_id = str(auth.get("user_id", ""))
-            job_ids = await _client_job_ids(db, client_id)
+            job_ids = await _client_job_ids_for_dashboard(db, client_id)
             if job_id not in job_ids:
                 raise HTTPException(status_code=403, detail="You can only shortlist for your own jobs")
         now = datetime.now(timezone.utc)
@@ -1190,6 +1190,50 @@ async def _client_all_job_ids(db, client_id: str) -> List[str]:
     cursor = db.jobs.find(q, {"_id": 1}).limit(500)
     jobs_list = await cursor.to_list(length=500)
     return [str(doc["_id"]) for doc in jobs_list]
+
+
+async def _client_connected_recruiter_id(db, client_id: str) -> Optional[str]:
+    """Return recruiter_id if this client has an active connection (client_connected_recruiter). Else None."""
+    if not client_id or not str(client_id).strip():
+        return None
+    doc = await db.client_connected_recruiter.find_one({"client_id": str(client_id).strip()})
+    if not doc:
+        return None
+    return str(doc["recruiter_id"]) if doc.get("recruiter_id") else None
+
+
+async def _client_job_ids_for_dashboard(db, client_id: str) -> List[str]:
+    """Job IDs for client dashboard: client's own jobs + all jobs by connected recruiter (when connected). When disconnected, only client's jobs."""
+    own_ids = await _client_job_ids(db, client_id)
+    recruiter_id = await _client_connected_recruiter_id(db, client_id)
+    if not recruiter_id:
+        return own_ids
+    cursor = db.jobs.find({"status": "active", "recruiter_id": recruiter_id}, {"_id": 1}).limit(500)
+    recruiter_jobs = await cursor.to_list(length=500)
+    recruiter_ids = [str(doc["_id"]) for doc in recruiter_jobs]
+    seen = set(own_ids)
+    for jid in recruiter_ids:
+        if jid not in seen:
+            seen.add(jid)
+            own_ids.append(jid)
+    return own_ids
+
+
+async def _client_all_job_ids_for_dashboard(db, client_id: str) -> List[str]:
+    """All job IDs (any status) for client dashboard: client's jobs + connected recruiter's jobs when connected."""
+    own_ids = await _client_all_job_ids(db, client_id)
+    recruiter_id = await _client_connected_recruiter_id(db, client_id)
+    if not recruiter_id:
+        return own_ids
+    cursor = db.jobs.find({"recruiter_id": recruiter_id}, {"_id": 1}).limit(500)
+    recruiter_jobs = await cursor.to_list(length=500)
+    recruiter_ids = [str(doc["_id"]) for doc in recruiter_jobs]
+    seen = set(own_ids)
+    for jid in recruiter_ids:
+        if jid not in seen:
+            seen.add(jid)
+            own_ids.append(jid)
+    return own_ids
 
 
 @app.get("/v1/candidates/autocomplete", tags=["Candidate Management"])
@@ -1394,7 +1438,7 @@ async def get_candidates_by_job(job_id: str, auth=Depends(get_auth)):
         db = await get_mongo_db()
         if auth.get("type") == "jwt_token" and auth.get("role") == "client":
             client_id = str(auth.get("user_id", ""))
-            job_ids = await _client_job_ids(db, client_id)
+            job_ids = await _client_job_ids_for_dashboard(db, client_id)
             if job_id not in job_ids:
                 raise HTTPException(status_code=403, detail="You can only view candidates for your own jobs")
         cursor = db.candidates.find({}).limit(10)
@@ -1875,7 +1919,7 @@ async def get_top_matches(job_id: str, limit: int = 10, auth = Depends(get_auth)
     if auth.get("type") == "jwt_token" and auth.get("role") == "client":
         db = await get_mongo_db()
         client_id = str(auth.get("user_id", ""))
-        job_ids = await _client_job_ids(db, client_id)
+        job_ids = await _client_job_ids_for_dashboard(db, client_id)
         if job_id not in job_ids:
             raise HTTPException(status_code=403, detail="You can only view matches for your own jobs")
     
@@ -2405,7 +2449,7 @@ async def get_interviews(candidate_id: Optional[str] = None, auth = Depends(get_
         # Client: only interviews for own jobs (data isolation)
         if auth.get("type") == "jwt_token" and auth.get("role") == "client":
             client_id = str(auth.get("user_id", ""))
-            job_ids = await _client_job_ids(db, client_id)
+            job_ids = await _client_job_ids_for_dashboard(db, client_id)
             match_filter["job_id"] = {"$in": job_ids} if job_ids else {"$in": []}
         
         pipeline = [
@@ -2502,7 +2546,7 @@ async def schedule_interview(interview: InterviewSchedule, auth=Depends(get_auth
                     raise HTTPException(status_code=403, detail="You can only schedule interviews for your own jobs")
         if auth.get("type") == "jwt_token" and auth.get("role") == "client":
             client_id = str(auth.get("user_id", ""))
-            job_ids = await _client_job_ids(db, client_id)
+            job_ids = await _client_job_ids_for_dashboard(db, client_id)
             if interview.job_id not in job_ids:
                 raise HTTPException(status_code=403, detail="You can only schedule interviews for your own jobs")
 
@@ -2608,7 +2652,7 @@ async def get_all_offers(candidate_id: Optional[str] = None, auth = Depends(get_
         # Client: only offers for own jobs (data isolation)
         if auth.get("type") == "jwt_token" and auth.get("role") == "client":
             client_id = str(auth.get("user_id", ""))
-            job_ids = await _client_job_ids(db, client_id)
+            job_ids = await _client_job_ids_for_dashboard(db, client_id)
             match_filter["job_id"] = {"$in": job_ids} if job_ids else {"$in": []}
         
         pipeline = [
@@ -2956,38 +3000,7 @@ async def get_client_by_connection(connection_id: str, auth=Depends(get_auth)):
         if not client:
             raise HTTPException(status_code=404, detail="Invalid Connection ID. Please ask your client for the correct ID from their dashboard.")
         company_name = client.get("company_name") or ""
-        client_id_raw = client.get("client_id")
-        client_id_str = str(client_id_raw) if client_id_raw is not None else ""
-        # When a recruiter validates this connection_id, record them and notify both parties (synchronized)
-        if client_id_str and auth.get("type") == "jwt_token" and auth.get("role") == "recruiter":
-            recruiter_id = str(auth.get("user_id") or "")
-            recruiter_name = str(auth.get("name") or "Recruiter").strip() or "Recruiter"
-            if recruiter_id:
-                try:
-                    # Previous client this recruiter was connected to (if any)
-                    old_doc = await db.client_connected_recruiter.find_one({"recruiter_id": recruiter_id})
-                    old_client_id = str(old_doc["client_id"]) if old_doc and old_doc.get("client_id") else None
-                    # Remove this recruiter from any other client (so previous client sees disconnected)
-                    await db.client_connected_recruiter.delete_many({"recruiter_id": recruiter_id})
-                    # Link this recruiter to the new client
-                    await db.client_connected_recruiter.update_one(
-                        {"client_id": client_id_str},
-                        {"$set": {
-                            "recruiter_id": recruiter_id,
-                            "recruiter_name": recruiter_name,
-                            "last_validated_at": datetime.now(timezone.utc),
-                        }},
-                        upsert=True
-                    )
-                    # Notify previous client they are disconnected (recruiter switched to another client)
-                    if old_client_id and old_client_id != client_id_str:
-                        await _push_connection_event(f"client:{old_client_id}", {"event": "disconnected"})
-                    # Notify new client: connected with recruiter name (both see update immediately)
-                    await _push_connection_event(f"client:{client_id_str}", {"event": "connected", "recruiter_name": recruiter_name})
-                    # Notify recruiter: connected to this client's company
-                    await _push_connection_event(f"recruiter:{recruiter_id}", {"event": "connected", "company_name": company_name})
-                except Exception as e:
-                    logger.exception("connection record/notify failed: %s", e)
+        # Validation only: do NOT record connection or push SSE here. Connection is established only when recruiter confirms via POST /v1/recruiter/confirm-connection.
         return {
             "client_id": client.get("client_id"),
             "company_name": company_name,
@@ -3000,7 +3013,7 @@ async def get_client_by_connection(connection_id: str, auth=Depends(get_auth)):
 
 @app.get("/v1/client/connected-recruiter", tags=["Client Portal API"])
 async def get_client_connected_recruiter(auth=Depends(get_auth)):
-    """Return the recruiter connected to this client (via connection_id), for display in client sidebar. Client-only. Revalidates: if no job links client and recruiter, status is invalid."""
+    """Return the recruiter connected to this client (after recruiter confirmed connection), for display in client sidebar. Client-only."""
     if auth.get("type") != "jwt_token" or auth.get("role") != "client":
         raise HTTPException(status_code=403, detail="This endpoint is only available for clients")
     client_id = str(auth.get("user_id", ""))
@@ -3015,10 +3028,6 @@ async def get_client_connected_recruiter(auth=Depends(get_auth)):
         recruiter_name = doc.get("recruiter_name") or "Recruiter"
         if not recruiter_id:
             return {"recruiter_name": None, "status": "none"}
-        # Revalidate: at least one job must link this client and this recruiter
-        job = await db.jobs.find_one({"client_id": client_id, "recruiter_id": recruiter_id})
-        if not job:
-            return {"recruiter_name": recruiter_name, "status": "invalid"}
         return {"recruiter_name": recruiter_name, "status": "connected"}
     except HTTPException:
         raise
@@ -3088,6 +3097,55 @@ async def recruiter_connection_events(auth=Depends(get_auth)):
     )
 
 
+class ConfirmConnectionBody(BaseModel):
+    connection_id: str
+
+
+@app.post("/v1/recruiter/confirm-connection", tags=["Recruiter API"])
+async def recruiter_confirm_connection(body: ConfirmConnectionBody, auth=Depends(get_auth)):
+    """Establish and lock the recruiter-client connection. Call only after validation (GET by-connection). Records connection and notifies client and recruiter via SSE so client dashboard shows activated only after confirm."""
+    if auth.get("type") != "jwt_token" or auth.get("role") not in ("recruiter", "admin"):
+        raise HTTPException(status_code=403, detail="This endpoint is only available for recruiters")
+    connection_id = (body.connection_id or "").strip()
+    if len(connection_id) != 24 or not all(c in "0123456789abcdefABCDEF" for c in connection_id):
+        raise HTTPException(status_code=400, detail="Invalid Connection ID format (must be 24 hexadecimal characters)")
+    recruiter_id = str(auth.get("user_id") or "")
+    recruiter_name = str(auth.get("name") or "Recruiter").strip() or "Recruiter"
+    if not recruiter_id:
+        raise HTTPException(status_code=400, detail="Invalid recruiter")
+    try:
+        db = await get_mongo_db()
+        client = await db.clients.find_one({"connection_id": connection_id})
+        if not client:
+            raise HTTPException(status_code=404, detail="Invalid Connection ID. Please ask your client for the correct ID from their dashboard.")
+        company_name = client.get("company_name") or ""
+        client_id_str = str(client.get("client_id") or "")
+        if not client_id_str:
+            raise HTTPException(status_code=400, detail="Invalid client")
+        old_doc = await db.client_connected_recruiter.find_one({"recruiter_id": recruiter_id})
+        old_client_id = str(old_doc["client_id"]) if old_doc and old_doc.get("client_id") else None
+        await db.client_connected_recruiter.delete_many({"recruiter_id": recruiter_id})
+        await db.client_connected_recruiter.update_one(
+            {"client_id": client_id_str},
+            {"$set": {
+                "recruiter_id": recruiter_id,
+                "recruiter_name": recruiter_name,
+                "last_validated_at": datetime.now(timezone.utc),
+            }},
+            upsert=True
+        )
+        if old_client_id and old_client_id != client_id_str:
+            await _push_connection_event(f"client:{old_client_id}", {"event": "disconnected"})
+        await _push_connection_event(f"client:{client_id_str}", {"event": "connected", "recruiter_name": recruiter_name})
+        await _push_connection_event(f"recruiter:{recruiter_id}", {"event": "connected", "company_name": company_name})
+        return {"client_id": client.get("client_id"), "company_name": company_name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("recruiter_confirm_connection failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/v1/recruiter/disconnect", tags=["Recruiter API"])
 async def recruiter_disconnect(auth=Depends(get_auth)):
     """Explicitly disconnect recruiter from current client. Notifies both client and recruiter via SSE so status stays synchronized."""
@@ -3121,7 +3179,7 @@ async def get_client_jobs(auth=Depends(get_auth)):
         if not client_id:
             return {"jobs": [], "count": 0}
         db = await get_mongo_db()
-        job_ids = await _client_job_ids(db, client_id)
+        job_ids = await _client_job_ids_for_dashboard(db, client_id)
         if not job_ids:
             return {"jobs": [], "count": 0}
         cursor = db.jobs.find({"_id": {"$in": [ObjectId(j) for j in job_ids]}}).sort("created_at", -1).limit(100)
@@ -3185,11 +3243,11 @@ async def get_client_stats(auth=Depends(get_auth)):
         }
     try:
         db = await get_mongo_db()
-        # Active jobs: only jobs with status=active (for "Active Jobs" metric)
-        active_job_ids = await _client_job_ids(db, client_id)
+        # Active jobs: client's jobs + connected recruiter's jobs when connected
+        active_job_ids = await _client_job_ids_for_dashboard(db, client_id)
         active_jobs = len(active_job_ids)
-        # All client jobs (any status) for applications/interviews/offers so pipeline reflects full client activity
-        job_ids = await _client_all_job_ids(db, client_id)
+        # All jobs (any status) for pipeline stats: client's + connected recruiter's when connected
+        job_ids = await _client_all_job_ids_for_dashboard(db, client_id)
         if not job_ids:
             return {
                 "active_jobs": active_jobs,

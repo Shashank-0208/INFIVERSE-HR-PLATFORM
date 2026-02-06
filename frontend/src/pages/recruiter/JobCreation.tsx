@@ -322,13 +322,12 @@ export default function JobCreation() {
               Connection ID <span className="text-red-500">*</span>
             </label>
             {isConnectionIdLocked && formData.connection_id ? (
-              <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                <code className="font-mono text-sm text-gray-900 dark:text-white break-all">{formData.connection_id}</code>
-                <span className="text-xs text-gray-500 dark:text-gray-400">(Client shown in sidebar)</span>
+              <div className="flex items-center gap-2 w-full h-11 sm:h-12 rounded-lg sm:rounded-xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-2 border-gray-200 dark:border-gray-700 px-3 sm:px-4">
+                <code className="font-mono text-sm sm:text-base font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0" title={formData.connection_id}>{formData.connection_id}</code>
                 <button
                   type="button"
                   onClick={handleUnlockConnectionId}
-                  className="ml-auto px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  className="inline-flex items-center justify-center shrink-0 rounded-lg h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
                 >
                   Edit
                 </button>

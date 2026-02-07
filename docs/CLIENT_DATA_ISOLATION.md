@@ -114,18 +114,18 @@ So: **no new tables or new columns**; only consistent use of `jobs.client_id` an
 
 ---
 
-## 9. Connected recruiter: blended job set (pre- and post-connection)
+## 9. Connected recruiters (multi-recruiter per client): blended job set
 
-When a client and recruiter are **connected** (recruiter confirmed connection via **POST /v1/recruiter/confirm-connection**), the client’s dashboard shows **all jobs posted by that recruiter**—both jobs posted before and after the connection.
+A **client can have multiple recruiters connected** at the same time. Each connection is one document in `client_connected_recruiter` with composite key `(client_id, recruiter_id)`. A recruiter can be connected to only one client at a time (confirming a new client disconnects them from the previous one).
 
 - **Helpers**:
-  - `_client_connected_recruiter_id(db, client_id)` – returns the connected recruiter’s id from `client_connected_recruiter`, or `None` if not connected.
-  - `_client_job_ids_for_dashboard(db, client_id)` – active job IDs = client’s own jobs **union** all active jobs where `recruiter_id` = connected recruiter (when connected). When disconnected, returns only client’s jobs.
-  - `_client_all_job_ids_for_dashboard(db, client_id)` – same for all statuses (used for stats: applications, interviews, offers, hired).
+  - `_client_connected_recruiter_ids(db, client_id)` – returns the list of recruiter_ids connected to this client (all documents with that `client_id`).
+  - `_client_job_ids_for_dashboard(db, client_id)` – active job IDs = client’s own jobs **union** all active jobs where `recruiter_id` is in the connected recruiter list. When no recruiters connected, returns only client’s jobs.
+  - `_client_all_job_ids_for_dashboard(db, client_id)` – same for all statuses (used for stats).
 
-- **When connected**: **GET /v1/client/jobs**, **GET /v1/client/stats**, and all client-scoped job access (get job, shortlist, candidates, matches, interviews) use the dashboard job set, so the client sees and can act on recruiter-posted jobs (including those created before the connection).
-- **When disconnected**: The same endpoints use only jobs where `client_id` = logged-in client; the recruiter’s jobs drop out automatically. No extra “revert” step; data isolation is preserved by recomputing the set from `client_connected_recruiter` on each request.
-- **Recruiter posts without connection_id**: Those jobs have `recruiter_id` but may have no or another `client_id`; they become visible to this client only after the recruiter connects to this client (confirm-connection), so the client dashboard blends “my jobs” and “my connected recruiter’s jobs” appropriately.
+- **When connected (one or more recruiters)**: **GET /v1/client/jobs**, **GET /v1/client/stats**, and all client-scoped job access use the dashboard job set (client jobs + all connected recruiters’ jobs), so the client sees and can act on every connected recruiter’s jobs with proper isolation per recruiter-client pair.
+- **When disconnected**: Endpoints use only jobs where `client_id` = logged-in client; recruiter jobs drop out when that recruiter disconnects. Data isolation is preserved by recomputing from `client_connected_recruiter` on each request.
+- **Client sidebar**: **GET /v1/client/connected-recruiter** returns `connected_count` and `status`; the UI shows the number of recruiters connected (e.g. “2 recruiters connected”), not individual names.
 
 ---
 

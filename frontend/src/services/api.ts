@@ -835,20 +835,19 @@ export const getClientStats = async (): Promise<ClientStats> => {
 }
 
 export type ClientConnectedRecruiter = {
-  recruiter_name: string | null
-  status: 'none' | 'connected' | 'invalid'
+  connected_count: number
+  status: 'none' | 'connected'
 }
 
 export const getClientConnectedRecruiter = async (): Promise<ClientConnectedRecruiter> => {
   try {
-    const response = await api.get<ClientConnectedRecruiter>('/v1/client/connected-recruiter')
+    const response = await api.get<{ connected_count?: number; status?: string }>('/v1/client/connected-recruiter')
     const d = response.data
-    return {
-      recruiter_name: d?.recruiter_name ?? null,
-      status: d?.status === 'connected' || d?.status === 'invalid' ? d.status : 'none',
-    }
+    const count = typeof d?.connected_count === 'number' ? d.connected_count : 0
+    const status = d?.status === 'connected' ? 'connected' : 'none'
+    return { connected_count: count, status }
   } catch {
-    return { recruiter_name: null, status: 'none' }
+    return { connected_count: 0, status: 'none' }
   }
 }
 
@@ -865,7 +864,12 @@ export const disconnectRecruiterConnection = async (): Promise<void> => {
   await api.post('/v1/recruiter/disconnect')
 }
 
-export type ConnectionEvent = { event: 'connected' | 'disconnected'; recruiter_name?: string; company_name?: string }
+export type ConnectionEvent = {
+  event: 'connected' | 'disconnected'
+  recruiter_name?: string
+  company_name?: string
+  connected_count?: number
+}
 
 /** Subscribe to client connection SSE; use AbortSignal to stop. No polling - both parties get same events. */
 export function subscribeClientConnectionEvents(

@@ -22,19 +22,18 @@ function ClientConnectedRecruiterStatusBlock() {
         const result = await getClientConnectedRecruiter()
         if (!cancelled) setData(result)
       } catch {
-        if (!cancelled) setData({ recruiter_name: null, status: 'none' })
+        if (!cancelled) setData({ connected_count: 0, status: 'none' })
       }
     }
     run()
     const unsubscribe = subscribeClientConnectionEvents((ev) => {
       if (cancelled) return
-      if (ev.event === 'connected') {
+      if (ev.event === 'connected' || ev.event === 'disconnected') {
+        const count = typeof ev.connected_count === 'number' ? ev.connected_count : 0
         setData({
-          recruiter_name: ev.recruiter_name ?? null,
-          status: 'connected',
+          connected_count: count,
+          status: count > 0 ? 'connected' : 'none',
         })
-      } else if (ev.event === 'disconnected') {
-        setData({ recruiter_name: null, status: 'none' })
       }
     }, abort.signal)
     return () => {
@@ -44,7 +43,8 @@ function ClientConnectedRecruiterStatusBlock() {
     }
   }, [])
 
-  if (data?.status === 'none' || !data) {
+  const count = data?.connected_count ?? 0
+  if (data?.status === 'none' || count === 0) {
     return (
       <div className={`px-3 pb-2 ${isCollapsed ? 'flex justify-center' : ''}`}>
         <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-100/50 dark:bg-slate-800/50">
@@ -54,23 +54,13 @@ function ClientConnectedRecruiterStatusBlock() {
       </div>
     )
   }
-  if (data.status === 'invalid') {
-    return (
-      <div className={`px-3 pb-2 ${isCollapsed ? 'flex justify-center' : ''}`}>
-        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-          <span className="text-xs font-medium text-red-700 dark:text-red-300 truncate">Connection no longer valid</span>
-        </div>
-      </div>
-    )
-  }
-  const name = data.recruiter_name || 'Recruiter'
+  const label = count === 1 ? '1 recruiter connected' : `${count} recruiters connected`
   return (
     <div className={`px-3 pb-2 ${isCollapsed ? 'flex justify-center' : ''}`}>
       <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50">
         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-        <span className="text-xs font-medium text-emerald-800 dark:text-emerald-200 truncate" title={name}>
-          → {name}
+        <span className="text-xs font-medium text-emerald-800 dark:text-emerald-200 truncate" title={label}>
+          {label}
         </span>
       </div>
     </div>

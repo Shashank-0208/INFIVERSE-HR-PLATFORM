@@ -40,6 +40,7 @@ import ClientJobPosting from './pages/client/ClientJobPosting'
 import ClientCandidates from './pages/client/ClientCandidates'
 import MatchResults from './pages/client/MatchResults'
 import ClientReports from './pages/client/ClientReports'
+import LiveRecruiterMonitoring from './pages/client/LiveRecruiterMonitoring'
 
 function App() {
   const [showSplash, setShowSplash] = useState(true)
@@ -119,6 +120,7 @@ function App() {
                 <Route path="jobs" element={<ClientJobPosting />} />
                 <Route path="candidates" element={<ClientCandidates />} />
                 <Route path="matches" element={<MatchResults />} />
+                <Route path="live-monitoring" element={<LiveRecruiterMonitoring />} />
                 <Route path="reports" element={<ClientReports />} />
               </Route>
 

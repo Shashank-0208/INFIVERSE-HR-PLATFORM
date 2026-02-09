@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { createJob } from '../../services/api'
+import { useState, useEffect } from 'react'
+import { createJob, getClientProfile } from '../../services/api'
 import { toast } from 'react-hot-toast'
+import { authStorage } from '../../utils/authStorage'
 
 export default function ClientJobPosting() {
   const [loading, setLoading] = useState(false)
+  const [clientCompany, setClientCompany] = useState<string>('')
   const [formData, setFormData] = useState({
     title: '',
     department: 'Engineering',
@@ -18,6 +20,40 @@ export default function ClientJobPosting() {
   const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Operations', 'Finance']
   const experienceLevels = ['Entry', 'Mid', 'Senior', 'Lead']
   const employmentTypes = ['Full-time', 'Part-time', 'Contract', 'Intern']
+
+  // Fetch client profile on component mount
+  useEffect(() => {
+    const fetchClientProfile = async () => {
+      try {
+        // First try to get from auth storage (faster)
+        const userData = authStorage.getItem('user_data');
+        if (userData) {
+          const parsed = JSON.parse(userData);
+          if (parsed.company) {
+            setClientCompany(parsed.company);
+            return;
+          }
+        }
+        
+        // Fallback to API call
+        const profile = await getClientProfile();
+        if (profile) {
+          setClientCompany(profile.company_name);
+        } else {
+          // Fallback to auth storage name
+          const userName = authStorage.getItem('user_name') || 'Client';
+          setClientCompany(userName);
+        }
+      } catch (error) {
+        console.error('Error fetching client profile:', error);
+        // Use fallback values
+        const userName = authStorage.getItem('user_name') || 'Client';
+        setClientCompany(userName);
+      }
+    };
+
+    fetchClientProfile();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,7 +121,7 @@ export default function ClientJobPosting() {
         <p className="page-subtitle">Create and publish new job openings for your organization</p>
         <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
           <p className="text-sm text-blue-800 dark:text-blue-300">
-            Posting as: <span className="font-semibold">Demo Company</span> (ID: DEMO_CLIENT)
+            Posting as: <span className="font-semibold">{clientCompany || 'Loading...'}</span>
           </p>
         </div>
       </div>

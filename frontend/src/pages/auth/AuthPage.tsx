@@ -91,6 +91,11 @@ export default function AuthPage() {
         setIsLoading(false)
         return
       }
+      if (selectedRole === 'client' && !formData.company.trim()) {
+        toast.error('Please enter your company name')
+        setIsLoading(false)
+        return
+      }
       if (formData.password !== formData.confirmPassword) {
         toast.error('Passwords do not match')
         setIsLoading(false)
@@ -321,16 +326,22 @@ export default function AuthPage() {
                   {(selectedRole === 'recruiter' || selectedRole === 'client') && (
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Company Name
+                        Company Name {selectedRole === 'client' && <span className="text-red-400">*</span>}
                       </label>
                       <input
                         type="text"
                         name="company"
                         value={formData.company}
                         onChange={handleInputChange}
-                        placeholder="Acme Inc."
+                        placeholder={selectedRole === 'client' ? "Enter your company name" : "Acme Inc."}
                         className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                        required={selectedRole === 'client'}
                       />
+                      {selectedRole === 'client' && (
+                        <p className="mt-1 text-xs text-gray-400">
+                          Required for proper identification in job postings
+                        </p>
+                      )}
                     </div>
                   )}
 

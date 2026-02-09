@@ -4,6 +4,8 @@ import toast from 'react-hot-toast'
 import { createJob, getClientByConnectionId, confirmRecruiterConnection, RECRUITER_LAST_CONNECTION_KEY } from '../../services/api'
 import { useRecruiterConnection } from '../../context/RecruiterConnectionContext'
 import FormInput from '../../components/FormInput'
+import { useAuth } from '../../context/AuthContext'
+import { authStorage } from '../../utils/authStorage'
 
 const CONNECTION_ID_LENGTH = 24
 const CONNECTION_ID_REGEX = /^[0-9a-fA-F]+$/
@@ -39,7 +41,9 @@ function clearLastConnection() {
 export default function JobCreation() {
   const navigate = useNavigate()
   const { status: connectionStatus, setConnection: setRecruiterConnection, clearConnection: clearRecruiterConnection } = useRecruiterConnection()
+  const { user, userName: authUserName } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [recruiterName, setRecruiterName] = useState<string>('')
   const [connectionIdError, setConnectionIdError] = useState<string | null>(null)
   const [linkedCompany, setLinkedCompany] = useState<string | null>(null)
   const [showConfirmConnection, setShowConfirmConnection] = useState(false)
@@ -51,10 +55,62 @@ export default function JobCreation() {
     location: '',
     experience_level: 'Entry',
     employment_type: 'Full-time',
+    salary_range: '',
     connection_id: '',
     description: '',
     requirements: '',
   })
+
+  // Load recruiter name on component mount
+  useEffect(() => {
+    const fetchRecruiterName = () => {
+      try {
+        // First try to get from auth context (current user)
+        if (user?.name) {
+          setRecruiterName(user.name);
+          return;
+        }
+        
+        // Try to get from auth storage
+        const userData = authStorage.getItem('user_data');
+        if (userData) {
+          const parsed = JSON.parse(userData);
+          if (parsed.name) {
+            setRecruiterName(parsed.name);
+            return;
+          }
+        }
+        
+        // Fallback to auth context userName
+        if (authUserName) {
+          setRecruiterName(authUserName);
+          return;
+        }
+        
+        // Final fallback to user email
+        if (user?.email) {
+          setRecruiterName(user.email);
+          return;
+        }
+        
+        const userEmail = authStorage.getItem('user_email');
+        if (userEmail) {
+          setRecruiterName(userEmail);
+          return;
+        }
+        
+        // Ultimate fallback
+        setRecruiterName('Recruiter');
+      } catch (error) {
+        console.error('Error fetching recruiter name:', error);
+        // Fallback to user email or default
+        const userEmail = user?.email || authStorage.getItem('user_email') || 'Recruiter';
+        setRecruiterName(userEmail);
+      }
+    };
+
+    fetchRecruiterName();
+  }, [user, authUserName]);
 
   // Load persisted connection_id (locked from previous session)
   useEffect(() => {
@@ -218,7 +274,7 @@ export default function JobCreation() {
     setConnectionIdError(null)
 
     try {
-      const jobData = {
+      const jobData: Record<string, any> = {
         title: formData.title,
         department: formData.department,
         location: formData.location,
@@ -227,6 +283,13 @@ export default function JobCreation() {
         description: formData.description,
         requirements: formData.requirements,
         connection_id: id,
+      }
+
+      // Add salary range if provided
+      if (formData.salary_range) {
+        const [min, max] = formData.salary_range.split('-').map(s => parseInt(s.trim()))
+        if (min) jobData.salary_min = min
+        if (max) jobData.salary_max = max
       }
 
       await createJob(jobData)
@@ -238,6 +301,7 @@ export default function JobCreation() {
         location: '',
         experience_level: 'Entry',
         employment_type: 'Full-time',
+        salary_range: '',
         connection_id: prev.connection_id,
         description: '',
         requirements: '',
@@ -263,6 +327,11 @@ export default function JobCreation() {
       <div className="mb-6 sm:mb-8 p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-green-500/5 to-emerald-500/5 dark:from-green-500/10 dark:to-emerald-500/10 backdrop-blur-xl border border-green-300/20 dark:border-green-500/20">
         <h1 className="text-2xl sm:text-3xl font-heading font-bold text-gray-900 dark:text-white mb-2">Create New Job Position</h1>
         <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400">Fill in the details to post a new job opening</p>
+        <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+          <p className="text-sm text-green-800 dark:text-green-300">
+            Posting as: <span className="font-semibold">{recruiterName || 'Loading...'}</span>
+          </p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="card max-w-4xl">
@@ -327,6 +396,23 @@ export default function JobCreation() {
               { value: 'Intern', label: 'Intern' },
             ]}
           />
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Salary Range (Optional)
+            </label>
+            <input
+              type="text"
+              name="salary_range"
+              value={formData.salary_range}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              placeholder="e.g., 80000 - 120000"
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Enter minimum and maximum salary separated by a dash
+            </p>
+          </div>
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

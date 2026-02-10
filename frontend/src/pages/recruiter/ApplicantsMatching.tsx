@@ -513,7 +513,7 @@ export default function ApplicantsMatching() {
       
       {/* Full-screen Loading Overlay */}
       {showLoadingOverlay && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-[9999] w-full h-full top-0 left-0">
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-lg flex items-center justify-center z-[9999] w-full h-full top-0 left-0">
           <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col items-center gap-6 max-w-md w-full mx-4 relative z-[10000]">
             <div className="relative">
               <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>

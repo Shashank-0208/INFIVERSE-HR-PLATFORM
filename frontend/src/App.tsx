@@ -31,7 +31,7 @@ import BatchUpload from './pages/recruiter/BatchUpload'
 import BatchOperations from './pages/recruiter/BatchOperations'
 import InterviewScheduling from './pages/recruiter/InterviewScheduling'
 import ExportReports from './pages/recruiter/ExportReports'
-import ClientJobsMonitor from './pages/recruiter/ClientJobsMonitor'
+
 import ValuesAssessment from './pages/recruiter/ValuesAssessment'
 
 // Client Pages
@@ -103,7 +103,7 @@ function App() {
                 <Route path="values-assessment" element={<ValuesAssessment />} />
                 <Route path="feedback/:candidateId" element={<FeedbackForm />} />
                 <Route path="export-reports" element={<ExportReports />} />
-                <Route path="client-jobs" element={<ClientJobsMonitor />} />
+
                 <Route path="batch-operations" element={<BatchOperations />} />
                 <Route path="automation" element={<AutomationPanel />} />
                 <Route path="reports" element={<ExportReports />} />

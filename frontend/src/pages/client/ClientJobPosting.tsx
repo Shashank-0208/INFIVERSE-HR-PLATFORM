@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { createJob, getClientProfile } from '../../services/api'
 import { toast } from 'react-hot-toast'
 import { authStorage } from '../../utils/authStorage'
+import SalaryRangeInput from '../../components/SalaryRangeInput'
 
 export default function ClientJobPosting() {
   const [loading, setLoading] = useState(false)
@@ -221,13 +222,13 @@ export default function ClientJobPosting() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Salary Range (Optional)
               </label>
-              <input
-                type="text"
+              <SalaryRangeInput
                 name="salary_range"
                 value={formData.salary_range}
-                onChange={handleChange}
+                onChange={(value) => setFormData(prev => ({ ...prev, salary_range: value }))}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 placeholder="e.g., 80000 - 120000"
+                required={false}
               />
             </div>
           </div>

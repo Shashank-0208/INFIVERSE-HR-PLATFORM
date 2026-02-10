@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { useLocation } from 'react-router-dom'
 import { updateCandidateProfile, getCandidateProfile } from '../../services/api'
 import FormInput from '../../components/FormInput'
+import SalaryRangeInput from '../../components/SalaryRangeInput'
 import { useAuth } from '../../context/AuthContext'
 import { authStorage } from '../../utils/authStorage'
 
@@ -532,15 +533,19 @@ export default function CandidateProfile() {
             required
           />
 
-          <FormInput
-            label="Expected Salary (₹ per annum)"
-            name="expectedSalary"
-            type="number"
-            value={formData.expectedSalary}
-            onChange={handleChange}
-            placeholder="1500000"
-            required
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Expected Salary (₹ per annum) *
+            </label>
+            <SalaryRangeInput
+              name="expectedSalary"
+              value={formData.expectedSalary}
+              onChange={(value) => setFormData(prev => ({ ...prev, expectedSalary: value }))}
+              className="input-field"
+              placeholder="e.g., 800000 - 1200000"
+              required={true}
+            />
+          </div>
 
           <FormInput
             label="Education Level"

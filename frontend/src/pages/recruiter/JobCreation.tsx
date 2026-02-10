@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { createJob, getClientByConnectionId, confirmRecruiterConnection, RECRUITER_LAST_CONNECTION_KEY } from '../../services/api'
 import { useRecruiterConnection } from '../../context/RecruiterConnectionContext'
 import FormInput from '../../components/FormInput'
+import SalaryRangeInput from '../../components/SalaryRangeInput'
 import { useAuth } from '../../context/AuthContext'
 import { authStorage } from '../../utils/authStorage'
 
@@ -401,17 +402,14 @@ export default function JobCreation() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Salary Range (Optional)
             </label>
-            <input
-              type="text"
+            <SalaryRangeInput
               name="salary_range"
               value={formData.salary_range}
-              onChange={handleChange}
+              onChange={(value) => setFormData(prev => ({ ...prev, salary_range: value }))}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
               placeholder="e.g., 80000 - 120000"
+              required={false}
             />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Enter minimum and maximum salary separated by a dash
-            </p>
           </div>
 
           <div className="mb-4">

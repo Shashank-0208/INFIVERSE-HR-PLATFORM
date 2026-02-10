@@ -28,8 +28,7 @@ export default function ApplicantsMatching() {
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [selectedCandidate, setSelectedCandidate] = useState<MatchResult | null>(null)
-  const [aiAnalysis, setAiAnalysis] = useState<string>('')
-  const [algorithmVersion, setAlgorithmVersion] = useState<string>('')
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(false)
 
   useEffect(() => {
     setJobId(effectiveJobId)
@@ -117,6 +116,7 @@ export default function ApplicantsMatching() {
     }
 
     setGenerating(true)
+    setShowLoadingOverlay(true)
     try {
       // Use gateway /v1/match/{jobId}/top (AI or DB fallback) instead of calling agent directly
       const [jobData, matchResults] = await Promise.all([
@@ -125,8 +125,6 @@ export default function ApplicantsMatching() {
       ])
       setJob(jobData)
       setCandidates(matchResults)
-      setAiAnalysis('Matched via gateway (AI semantic or DB fallback).')
-      setAlgorithmVersion('2.0')
       if (matchResults.length === 0) {
         toast('No candidates found for this job. Try uploading candidates or check back later.', { icon: '⚠' })
       } else {
@@ -137,6 +135,7 @@ export default function ApplicantsMatching() {
       toast.error('Failed to generate AI shortlist')
     } finally {
       setGenerating(false)
+      setShowLoadingOverlay(false)
     }
   }
 
@@ -209,7 +208,6 @@ export default function ApplicantsMatching() {
                   setJobId(e.target.value)
                   setJob(null)
                   setCandidates([])
-                  setAiAnalysis('')
                 }}
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
@@ -261,24 +259,6 @@ export default function ApplicantsMatching() {
             </button>
           </div>
         </div>
-
-        {/* AI Analysis Info */}
-        {aiAnalysis && (
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg mb-4">
-            <div className="flex items-start gap-2">
-              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-1">AI Analysis</p>
-                <p className="text-sm text-blue-800 dark:text-blue-400">{aiAnalysis}</p>
-                {algorithmVersion && (
-                  <p className="text-xs text-blue-600 dark:text-blue-500 mt-1">Algorithm Version: {algorithmVersion}</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Job Info */}
         {job && (
@@ -526,6 +506,25 @@ export default function ApplicantsMatching() {
                   <span>Feedback</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Full-screen Loading Overlay */}
+      {showLoadingOverlay && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-lg flex items-center justify-center z-[9999] w-full h-full top-0 left-0">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col items-center gap-6 max-w-md w-full mx-4 relative z-[10000]">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="absolute inset-0 w-16 h-16 border-4 border-emerald-300 border-b-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+            </div>
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Generating AI Shortlist</h3>
+              <p className="text-gray-600 dark:text-gray-400">Analyzing candidates and matching with job requirements...</p>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full animate-pulse"></div>
             </div>
           </div>
         </div>

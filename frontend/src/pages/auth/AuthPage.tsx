@@ -55,6 +55,7 @@ export default function AuthPage() {
     setSearchParams({ mode: newMode }, { replace: true })
   }
   
+  // State for form data
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -64,12 +65,79 @@ export default function AuthPage() {
     phone: '',
   })
 
+  // State for validation errors
+  const [errors, setErrors] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    fullName: '',
+    company: '',
+    phone: '',
+  });
+
+  // Validation functions
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password: string): { isValid: boolean; message: string } => {
+    if (password.length < 6) {
+      return { isValid: false, message: 'Password must be at least 6 characters' };
+    }
+    if (!/(?=.*[a-z])(?=.*[A-Z])/.test(password)) {
+      return { isValid: false, message: 'Password must contain at least one uppercase and one lowercase letter' };
+    }
+    if (!/(?=.*\d)/.test(password)) {
+      return { isValid: false, message: 'Password must contain at least one number' };
+    }
+    if (!/(?=.*[@$!%*?&])/.test(password)) {
+      return { isValid: false, message: 'Password must contain at least one special character (@$!%*?&)' };
+    }
+    return { isValid: true, message: '' };
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     if (name === 'role') {
       setSelectedRole(value as UserRole)
+      // Clear company error when role changes
+      if (name === 'role' && value !== 'client') {
+        setErrors(prev => ({ ...prev, company: '' }));
+      }
     } else {
-      setFormData({ ...formData, [name]: value })
+      setFormData({ ...formData, [name]: value });
+      
+      // Clear specific error when user starts typing
+      if (errors[name as keyof typeof errors]) {
+        setErrors(prev => ({ ...prev, [name]: '' }));
+      }
+      
+      // Real-time validation
+      if (name === 'email') {
+        if (value && !validateEmail(value)) {
+          setErrors(prev => ({ ...prev, email: 'Please enter a valid email address' }));
+        } else {
+          setErrors(prev => ({ ...prev, email: '' }));
+        }
+      } else if (name === 'password') {
+        if (value) {
+          const passwordValidation = validatePassword(value);
+          if (!passwordValidation.isValid) {
+            setErrors(prev => ({ ...prev, password: passwordValidation.message }));
+          } else {
+            setErrors(prev => ({ ...prev, password: '' }));
+          }
+        } else {
+          setErrors(prev => ({ ...prev, password: '' }));
+        }
+      } else if (name === 'confirmPassword') {
+        if (value && value !== formData.password) {
+          setErrors(prev => ({ ...prev, confirmPassword: 'Passwords do not match' }));
+        } else {
+          setErrors(prev => ({ ...prev, confirmPassword: '' }));
+        }
+      }
     }
   }
 
@@ -79,33 +147,70 @@ export default function AuthPage() {
     e.preventDefault()
     setIsLoading(true)
 
-    if (!formData.email.trim() || !formData.password.trim()) {
-      toast.error('Please fill in all required fields')
-      setIsLoading(false)
-      return
+    // Clear previous errors
+    setErrors({
+      email: '',
+      password: '',
+      confirmPassword: '',
+      fullName: '',
+      company: '',
+      phone: '',
+    });
+
+    // Perform comprehensive validation
+    let hasErrors = false;
+    const newErrors = { ...errors };
+
+    // Validate email format
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+      hasErrors = true;
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+      hasErrors = true;
+    }
+
+    // Validate password
+    if (!formData.password.trim()) {
+      newErrors.password = 'Password is required';
+      hasErrors = true;
+    } else {
+      const passwordValidation = validatePassword(formData.password);
+      if (!passwordValidation.isValid) {
+        newErrors.password = passwordValidation.message;
+        hasErrors = true;
+      }
     }
 
     if (mode === 'signup') {
+      // Validate full name
       if (!formData.fullName.trim()) {
-        toast.error('Please enter your full name')
-        setIsLoading(false)
-        return
+        newErrors.fullName = 'Full name is required';
+        hasErrors = true;
       }
+
+      // Validate company for client
       if (selectedRole === 'client' && !formData.company.trim()) {
-        toast.error('Please enter your company name')
-        setIsLoading(false)
-        return
+        newErrors.company = 'Company name is required for clients';
+        hasErrors = true;
       }
-      if (formData.password !== formData.confirmPassword) {
-        toast.error('Passwords do not match')
-        setIsLoading(false)
-        return
+
+      // Validate confirm password
+      if (!formData.confirmPassword.trim()) {
+        newErrors.confirmPassword = 'Please confirm your password';
+        hasErrors = true;
+      } else if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+        hasErrors = true;
       }
-      if (formData.password.length < 6) {
-        toast.error('Password must be at least 6 characters')
-        setIsLoading(false)
-        return
-      }
+    }
+
+    // Set errors if any
+    if (hasErrors) {
+      setErrors(newErrors);
+      toast.error('Please fix the validation errors before submitting');
+      setIsLoading(false);
+      return;
     }
 
     try {
@@ -119,46 +224,70 @@ export default function AuthPage() {
         })
         
         if (error) {
-          const errorMsg = error || ''
+          const errorMsg = error || '';
           
-          if (errorMsg.includes('already registered') || 
-              errorMsg.includes('User already registered') ||
-              errorMsg.includes('already exists') ||
-              errorMsg.includes('email address is already') ||
-              errorMsg.includes('already been registered')) {
-            toast.error('This email is already registered. Please use the login page to sign in.')
+          // Handle duplicate email errors
+          if (errorMsg.toLowerCase().includes('already registered') || 
+              errorMsg.toLowerCase().includes('user already registered') ||
+              errorMsg.toLowerCase().includes('already exists') ||
+              errorMsg.toLowerCase().includes('email address is already') ||
+              errorMsg.toLowerCase().includes('already been registered') ||
+              errorMsg.toLowerCase().includes('duplicate') ||
+              errorMsg.toLowerCase().includes('unique constraint')) {
+            setErrors(prev => ({ ...prev, email: 'This email is already registered. Please use a different email or login instead.' }));
+            toast.error('This email is already registered. Please use a different email or login instead.');
+          } else if (errorMsg.toLowerCase().includes('network') || 
+                     errorMsg.toLowerCase().includes('timeout') ||
+                     errorMsg.toLowerCase().includes('server') ||
+                     errorMsg.toLowerCase().includes('connection')) {
+            toast.error('Network error. Please check your connection and try again.');
           } else {
-            toast.error(errorMsg || 'Signup failed. Please try again.')
+            toast.error(errorMsg || 'Signup failed. Please try again.');
           }
-          setIsLoading(false)
-          return
+          setIsLoading(false);
+          return;
         }
         
         // Role is already stored by AuthContext - just verify
-        const storedRole = authStorage.getItem('user_role') || selectedRole
+        const storedRole = authStorage.getItem('user_role') || selectedRole;
         
-        console.log('✅ Signup successful! Role:', storedRole, 'Redirecting to:', roleConfig[storedRole as UserRole]?.redirectPath)
-        toast.success(`Account created successfully as ${roleConfig[storedRole as UserRole]?.title || selectedRole}!`)
-        setIsLoading(false)
-        navigate(roleConfig[storedRole as UserRole]?.redirectPath || roleConfig[selectedRole].redirectPath)
+        console.log('✅ Signup successful! Role:', storedRole, 'Redirecting to:', roleConfig[storedRole as UserRole]?.redirectPath);
+        toast.success(`Account created successfully as ${roleConfig[storedRole as UserRole]?.title || selectedRole}!`);
+        setIsLoading(false);
+        navigate(roleConfig[storedRole as UserRole]?.redirectPath || roleConfig[selectedRole].redirectPath);
       } else {
         // LOGIN: Authenticate and redirect based on user's role
-        const { error } = await signIn(formData.email, formData.password)
+        const { error } = await signIn(formData.email, formData.password);
         
         if (error) {
-          toast.error(error || 'Login failed. Please check your credentials.')
-          setIsLoading(false)
-          return
+          const errorMsg = error || '';
+          
+          if (errorMsg.toLowerCase().includes('invalid credentials') || 
+              errorMsg.toLowerCase().includes('incorrect') ||
+              errorMsg.toLowerCase().includes('wrong') ||
+              errorMsg.toLowerCase().includes('failed')) {
+            setErrors(prev => ({ ...prev, email: 'Invalid email or password', password: 'Invalid email or password' }));
+            toast.error('Invalid email or password. Please try again.');
+          } else if (errorMsg.toLowerCase().includes('network') || 
+                     errorMsg.toLowerCase().includes('timeout') ||
+                     errorMsg.toLowerCase().includes('server') ||
+                     errorMsg.toLowerCase().includes('connection')) {
+            toast.error('Network error. Please check your connection and try again.');
+          } else {
+            toast.error(errorMsg || 'Login failed. Please check your credentials.');
+          }
+          setIsLoading(false);
+          return;
         }
         
         // Get user's role from JWT token (stored by AuthContext during login)
         // AuthContext extracts role from token and stores it in localStorage
-        const roleFromStorage = authStorage.getItem('user_role') as UserRole
-        const roleFromContext = userRole as UserRole
+        const roleFromStorage = authStorage.getItem('user_role') as UserRole;
+        const roleFromContext = userRole as UserRole;
         
         // Prioritize role from context (from JWT token), then localStorage
         // Only default to candidate if neither is available
-        let finalRole: UserRole = (roleFromContext || roleFromStorage) as UserRole
+        let finalRole: UserRole = (roleFromContext || roleFromStorage) as UserRole;
         
         // Ensure role is valid (must be one of the three roles)
         if (!finalRole || !['candidate', 'recruiter', 'client'].includes(finalRole)) {
@@ -166,14 +295,20 @@ export default function AuthPage() {
           finalRole = 'candidate';
         }
         
-        console.log('🚀 Login: User role from token:', finalRole, 'Redirecting to:', roleConfig[finalRole].redirectPath)
-        toast.success(`Login successful as ${roleConfig[finalRole].title}!`)
-        setIsLoading(false)
-        navigate(roleConfig[finalRole].redirectPath)
+        console.log('🚀 Login: User role from token:', finalRole, 'Redirecting to:', roleConfig[finalRole].redirectPath);
+        toast.success(`Login successful as ${roleConfig[finalRole].title}!`);
+        setIsLoading(false);
+        navigate(roleConfig[finalRole].redirectPath);
       }
     } catch (err: any) {
-      toast.error(err.message || 'An error occurred')
-      setIsLoading(false)
+      console.error('Authentication error:', err);
+      
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        toast.error('Network error. Please check your connection and try again.');
+      } else {
+        toast.error(err.message || 'An unexpected error occurred. Please try again.');
+      }
+      setIsLoading(false);
     }
   }
 
@@ -286,9 +421,14 @@ export default function AuthPage() {
                       value={formData.fullName}
                       onChange={handleInputChange}
                       placeholder="John Doe"
-                      className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                      className={`w-full px-4 py-3 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
+                        errors.fullName ? 'border-red-500' : 'border-slate-700'
+                      }`}
                       required
                     />
+                    {errors.fullName && (
+                      <p className="mt-1 text-sm text-red-400">{errors.fullName}</p>
+                    )}
                   </div>
 
                   {/* Email */}
@@ -302,9 +442,14 @@ export default function AuthPage() {
                       value={formData.email}
                       onChange={handleInputChange}
                       placeholder="john@example.com"
-                      className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                      className={`w-full px-4 py-3 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
+                        errors.email ? 'border-red-500' : 'border-slate-700'
+                      }`}
                       required
                     />
+                    {errors.email && (
+                      <p className="mt-1 text-sm text-red-400">{errors.email}</p>
+                    )}
                   </div>
 
                   {/* Phone */}
@@ -318,8 +463,13 @@ export default function AuthPage() {
                       value={formData.phone}
                       onChange={handleInputChange}
                       placeholder="+1 (555) 123-4567"
-                      className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                      className={`w-full px-4 py-3 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
+                        errors.phone ? 'border-red-500' : 'border-slate-700'
+                      }`}
                     />
+                    {errors.phone && (
+                      <p className="mt-1 text-sm text-red-400">{errors.phone}</p>
+                    )}
                   </div>
 
                   {/* Company - Only for recruiter/client */}
@@ -334,9 +484,14 @@ export default function AuthPage() {
                         value={formData.company}
                         onChange={handleInputChange}
                         placeholder={selectedRole === 'client' ? "Enter your company name" : "Acme Inc."}
-                        className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                        className={`w-full px-4 py-3 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
+                          errors.company ? 'border-red-500' : 'border-slate-700'
+                        }`}
                         required={selectedRole === 'client'}
                       />
+                      {errors.company && (
+                        <p className="mt-1 text-sm text-red-400">{errors.company}</p>
+                      )}
                       {selectedRole === 'client' && (
                         <p className="mt-1 text-xs text-gray-400">
                           Required for proper identification in job postings
@@ -356,9 +511,14 @@ export default function AuthPage() {
                       value={formData.password}
                       onChange={handleInputChange}
                       placeholder="••••••••"
-                      className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                      className={`w-full px-4 py-3 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
+                        errors.password ? 'border-red-500' : 'border-slate-700'
+                      }`}
                       required
                     />
+                    {errors.password && (
+                      <p className="mt-1 text-sm text-red-400">{errors.password}</p>
+                    )}
                   </div>
 
                   {/* Confirm Password */}
@@ -372,9 +532,14 @@ export default function AuthPage() {
                       value={formData.confirmPassword}
                       onChange={handleInputChange}
                       placeholder="••••••••"
-                      className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                      className={`w-full px-4 py-3 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
+                        errors.confirmPassword ? 'border-red-500' : 'border-slate-700'
+                      }`}
                       required
                     />
+                    {errors.confirmPassword && (
+                      <p className="mt-1 text-sm text-red-400">{errors.confirmPassword}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -394,9 +559,14 @@ export default function AuthPage() {
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder="john@example.com"
-                    className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                    className={`w-full px-4 py-3 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
+                      errors.email ? 'border-red-500' : 'border-slate-700'
+                    }`}
                     required
                   />
+                  {errors.email && (
+                    <p className="mt-1 text-sm text-red-400">{errors.email}</p>
+                  )}
                 </div>
 
                 {/* Password */}
@@ -410,9 +580,14 @@ export default function AuthPage() {
                     value={formData.password}
                     onChange={handleInputChange}
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all"
+                    className={`w-full px-4 py-3 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
+                      errors.password ? 'border-red-500' : 'border-slate-700'
+                    }`}
                     required
                   />
+                  {errors.password && (
+                    <p className="mt-1 text-sm text-red-400">{errors.password}</p>
+                  )}
                 </div>
 
                 {/* Forgot Password */}

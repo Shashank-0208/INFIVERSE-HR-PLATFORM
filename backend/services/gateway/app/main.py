@@ -3166,6 +3166,44 @@ async def recruiter_disconnect(auth=Depends(get_auth)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/v1/recruiter/current-connection", tags=["Recruiter API"])
+async def get_recruiter_current_connection(auth=Depends(get_auth)):
+    """Get recruiter's current active connection from database. Returns connection_id and company_name if connected, null otherwise. Used on login to restore connection state across devices/browsers."""
+    if auth.get("type") != "jwt_token" or auth.get("role") not in ("recruiter", "admin"):
+        raise HTTPException(status_code=403, detail="This endpoint is only available for recruiters")
+    recruiter_id = str(auth.get("user_id", ""))
+    if not recruiter_id:
+        raise HTTPException(status_code=400, detail="Invalid recruiter")
+    try:
+        db = await get_mongo_db()
+        # Find the recruiter's current connection
+        doc = await db.client_connected_recruiter.find_one({"recruiter_id": recruiter_id})
+        if not doc:
+            return {"connection_id": None, "company_name": None}
+        
+        # Get client details
+        client_id = str(doc.get("client_id", ""))
+        if not client_id:
+            return {"connection_id": None, "company_name": None}
+        
+        client = await db.clients.find_one({"client_id": client_id})
+        if not client:
+            # Connection exists but client not found - cleanup
+            await db.client_connected_recruiter.delete_many({"recruiter_id": recruiter_id})
+            return {"connection_id": None, "company_name": None}
+        
+        connection_id = client.get("connection_id", "")
+        company_name = client.get("company_name", "")
+        
+        return {
+            "connection_id": connection_id if connection_id else None,
+            "company_name": company_name if company_name else None
+        }
+    except Exception as e:
+        logger.exception("get_recruiter_current_connection failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/v1/client/jobs", tags=["Client Portal API"])
 async def get_client_jobs(auth=Depends(get_auth)):
     """List jobs for the authenticated client only (data isolation). Like GET /v1/recruiter/jobs for clients."""

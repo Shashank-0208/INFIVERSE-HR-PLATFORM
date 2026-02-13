@@ -864,6 +864,12 @@ export const disconnectRecruiterConnection = async (): Promise<void> => {
   await api.post('/v1/recruiter/disconnect')
 }
 
+/** Fetch recruiter's current active connection from database. Returns connection_id and company_name if connected, null otherwise. Used on login to restore connection state across devices/browsers. */
+export const getRecruiterCurrentConnection = async (): Promise<{ connection_id: string | null; company_name: string | null }> => {
+  const res = await api.get<{ connection_id: string | null; company_name: string | null }>('/v1/recruiter/current-connection')
+  return res.data
+}
+
 export type ConnectionEvent = {
   event: 'connected' | 'disconnected'
   recruiter_name?: string

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import {
   disconnectRecruiterConnection,
   subscribeRecruiterConnectionEvents,
+  getRecruiterCurrentConnection,
   RECRUITER_LAST_CONNECTION_KEY,
 } from '../services/api'
 
@@ -70,6 +71,38 @@ export function RecruiterConnectionProvider({ children }: { children: React.Reac
     }
     return initialState
   })
+
+  // Fetch current connection from database on mount - ensures connection persists across browsers/devices
+  useEffect(() => {
+    let mounted = true
+    getRecruiterCurrentConnection()
+      .then((data) => {
+        if (!mounted) return
+        if (data.connection_id && data.company_name) {
+          // Database has connection - update state and localStorage
+          setState({
+            connectionId: data.connection_id,
+            companyName: data.company_name,
+            status: 'connected',
+          })
+          saveToStorage(data.connection_id, data.company_name)
+        } else {
+          // No connection in database - clear localStorage if any
+          const stored = loadFromStorage()
+          if (stored) {
+            clearStorage()
+            setState(initialState)
+          }
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch recruiter connection from database:', err)
+        // Keep localStorage state on error - fallback behavior
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   // Synchronized updates via SSE - no per-user polling; both parties get same events
   useEffect(() => {

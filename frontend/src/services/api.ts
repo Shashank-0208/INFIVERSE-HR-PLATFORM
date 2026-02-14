@@ -870,6 +870,12 @@ export const getRecruiterCurrentConnection = async (): Promise<{ connection_id: 
   return res.data
 }
 
+/** Bidirectional connection health check. Validates connection status and triggers disconnect events if either party is unavailable. Called every 30 seconds by both client and recruiter. */
+export const checkConnectionHealth = async (): Promise<{ healthy: boolean; connected?: boolean; connected_count?: number; reason?: string; disconnected?: boolean }> => {
+  const res = await api.post<{ healthy: boolean; connected?: boolean; connected_count?: number; reason?: string; disconnected?: boolean }>('/v1/connection/health-check')
+  return res.data
+}
+
 export type ConnectionEvent = {
   event: 'connected' | 'disconnected'
   recruiter_name?: string

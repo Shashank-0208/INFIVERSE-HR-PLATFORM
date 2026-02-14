@@ -3,6 +3,7 @@ import {
   disconnectRecruiterConnection,
   subscribeRecruiterConnectionEvents,
   getRecruiterCurrentConnection,
+  checkConnectionHealth,
   RECRUITER_LAST_CONNECTION_KEY,
 } from '../services/api'
 
@@ -127,6 +128,62 @@ export function RecruiterConnectionProvider({ children }: { children: React.Reac
       abort.abort()
     }
   }, [])
+
+  // Bidirectional health check - runs every 30 seconds when connected
+  useEffect(() => {
+    if (state.status !== 'connected' || !state.connectionId) {
+      return
+    }
+
+    let intervalId: number | undefined
+    let mounted = true
+
+    const performHealthCheck = async () => {
+      if (!mounted) return
+      try {
+        console.log('[Recruiter Health Check] Starting check for connection:', state.connectionId)
+        const result = await checkConnectionHealth()
+        if (!mounted) return
+        
+        console.log('[Recruiter Health Check] Result:', result)
+        
+        // If health check indicates disconnection, clear connection state
+        if (!result.healthy || result.disconnected) {
+          console.warn('[Recruiter Health Check] Connection unhealthy - disconnecting:', result.reason || 'unknown')
+          clearStorage()
+          setState(initialState)
+        } else if (result.connected === false) {
+          // Connection was removed from database
+          console.warn('[Recruiter Health Check] Connection no longer exists - disconnecting')
+          clearStorage()
+          setState(initialState)
+        } else {
+          console.log('[Recruiter Health Check] Connection healthy')
+        }
+      } catch (err) {
+        console.error('[Recruiter Health Check] Error:', err)
+        // Don't disconnect on network errors - SSE will handle actual disconnects
+      }
+    }
+
+    // Initial health check after 5 seconds (give time for initial setup)
+    const timeoutId = window.setTimeout(() => {
+      performHealthCheck()
+    }, 5000)
+
+    // Periodic health check every 30 seconds
+    intervalId = window.setInterval(() => {
+      performHealthCheck()
+    }, 30000)
+
+    return () => {
+      mounted = false
+      window.clearTimeout(timeoutId)
+      if (intervalId) {
+        window.clearInterval(intervalId)
+      }
+    }
+  }, [state.status, state.connectionId])
 
   const setConnection = useCallback((connectionId: string, companyName: string) => {
     clearStorage()

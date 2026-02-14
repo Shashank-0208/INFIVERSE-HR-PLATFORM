@@ -123,9 +123,12 @@ export default function JobCreation() {
     }
   }, [])
 
-  // When sidebar context marks connection invalid (e.g. after 1hr revalidation), unlock form and reset sidebar
+  // When health check or SSE detects disconnection, unlock form and clear connection
   useEffect(() => {
-    if (connectionStatus === 'invalid' && isConnectionIdLocked) {
+    // Unlock form when connection status becomes 'none' or 'invalid' while form was locked
+    if ((connectionStatus === 'invalid' || connectionStatus === 'none') && isConnectionIdLocked) {
+      console.log('Connection lost - unlocking job creation form')
+      toast.error('Connection to client lost. Please reconnect.')
       setFormData(prev => ({ ...prev, connection_id: '' }))
       setLinkedCompany(null)
       setConnectionIdError(null)
@@ -417,15 +420,29 @@ export default function JobCreation() {
               Connection ID <span className="text-red-500">*</span>
             </label>
             {isConnectionIdLocked && formData.connection_id ? (
-              <div className="flex items-center gap-2 w-full h-11 sm:h-12 rounded-lg sm:rounded-xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-2 border-gray-200 dark:border-gray-700 px-3 sm:px-4">
-                <code className="font-mono text-sm sm:text-base font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0" title={formData.connection_id}>{formData.connection_id}</code>
-                <button
-                  type="button"
-                  onClick={handleUnlockConnectionId}
-                  className="inline-flex items-center justify-center shrink-0 rounded-lg h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
-                >
-                  Edit
-                </button>
+              <div>
+                <div className="flex items-center gap-2 w-full h-11 sm:h-12 rounded-lg sm:rounded-xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-2 border-gray-200 dark:border-gray-700 px-3 sm:px-4">
+                  <code className="font-mono text-sm sm:text-base font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0" title={formData.connection_id}>{formData.connection_id}</code>
+                  <button
+                    type="button"
+                    onClick={handleUnlockConnectionId}
+                    className="inline-flex items-center justify-center shrink-0 rounded-lg h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                  >
+                    Edit
+                  </button>
+                </div>
+                {linkedCompany && connectionStatus === 'connected' && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <span>Connected to {linkedCompany} • Health check active</span>
+                  </div>
+                )}
+                {connectionStatus === 'none' && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
+                    <span>Connection monitoring paused</span>
+                  </div>
+                )}
               </div>
             ) : showConfirmConnection && linkedCompany ? (
               <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">

@@ -6,6 +6,7 @@ import { authStorage, clearAuthStorage } from '../../utils/authStorage'
 import {
   getClientConnectedRecruiter,
   subscribeClientConnectionEvents,
+  checkConnectionHealth,
   type ClientConnectedRecruiter,
 } from '../../services/api'
 import ApiStatus from '../ApiStatus'
@@ -14,6 +15,7 @@ function ClientConnectedRecruiterStatusBlock() {
   const { isCollapsed } = useSidebar()
   const [data, setData] = useState<ClientConnectedRecruiter | null>(null)
 
+  // Initial fetch and SSE subscription
   useEffect(() => {
     let cancelled = false
     const abort = new AbortController()
@@ -36,12 +38,64 @@ function ClientConnectedRecruiterStatusBlock() {
         })
       }
     }, abort.signal)
+    
     return () => {
       cancelled = true
       unsubscribe()
       abort.abort()
     }
   }, [])
+
+  // Bidirectional health check - runs every 30 seconds ONLY when recruiters are connected
+  useEffect(() => {
+    const count = data?.connected_count ?? 0
+    if (count === 0 || data?.status !== 'connected') {
+      return
+    }
+
+    let cancelled = false
+
+    const performHealthCheck = async () => {
+      if (cancelled) return
+      try {
+        console.log('[Client Health Check] Starting check - recruiters connected:', count)
+        const result = await checkConnectionHealth()
+        if (cancelled) return
+        
+        console.log('[Client Health Check] Result:', result)
+        
+        // Update connection count if returned by health check
+        if (result.healthy && typeof result.connected_count === 'number') {
+          setData({
+            connected_count: result.connected_count,
+            status: result.connected_count > 0 ? 'connected' : 'none',
+          })
+          console.log('[Client Health Check] Updated connection count:', result.connected_count)
+        } else if (!result.healthy) {
+          console.warn('[Client Health Check] Connection unhealthy:', result.reason)
+        }
+      } catch (err) {
+        console.error('[Client Health Check] Error:', err)
+        // Don't disconnect on network errors - SSE will handle actual disconnects
+      }
+    }
+    
+    // Initial health check after 5 seconds (give time for initial setup)
+    const timeoutId = window.setTimeout(() => {
+      performHealthCheck()
+    }, 5000)
+    
+    // Periodic health check every 30 seconds
+    const intervalId = window.setInterval(() => {
+      performHealthCheck()
+    }, 30000)
+    
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+      window.clearInterval(intervalId)
+    }
+  }, [data?.connected_count, data?.status])
 
   const count = data?.connected_count ?? 0
   if (data?.status === 'none' || count === 0) {

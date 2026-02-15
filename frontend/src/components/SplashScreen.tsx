@@ -74,13 +74,12 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
         {/* Brand Name */}
         <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 tracking-tight">
           <span className="bg-gradient-to-r from-emerald-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Infiverse
+            Sampada
           </span>
-          <span className="text-white"> HR</span>
         </h1>
         
         <p className="text-gray-400 text-lg mb-8 animate-fade-in-up">
-          Intelligent Hiring Platform
+          HR Recruitment System
         </p>
 
         {/* Progress Bar */}

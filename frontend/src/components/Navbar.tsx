@@ -8,9 +8,12 @@ export default function Navbar() {
       <div className="flex items-center justify-between h-full px-6">
         <Link to="/" className="flex items-center space-x-3 group">
           <div className="w-10 h-10 bg-gradient-to-br from-[#667eea] to-[#764ba2] rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-            <span className="text-white font-bold text-xl">BH</span>
+            <span className="text-white font-bold text-xl">S</span>
           </div>
-          <span className="text-2xl font-heading font-bold bg-gradient-to-r from-purple-600 to-purple-800 dark:from-purple-400 dark:to-purple-600 bg-clip-text text-transparent">BHIV HR</span>
+          <div>
+            <span className="text-2xl font-heading font-bold bg-gradient-to-r from-purple-600 to-purple-800 dark:from-purple-400 dark:to-purple-600 bg-clip-text text-transparent block">Sampada</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">HR Recruitment System</span>
+          </div>
         </Link>
         
         <div className="flex items-center space-x-4">
@@ -43,7 +46,7 @@ export default function Navbar() {
             </div>
             <div>
               <p className="text-sm font-bold text-gray-900 dark:text-white">Admin User</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">admin@bhiv.hr</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">admin@sampada.hr</p>
             </div>
           </div>
         </div>

@@ -90,14 +90,11 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
               {config.icon}
             </div>
             <div className="hidden sm:block text-left">
-              <span className="text-xl font-bold">
-                <span className={`bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent`}>
-                  Infiverse
-                </span>
-                <span className="text-gray-900 dark:text-white"> HR</span>
+              <span className={`text-xl font-bold bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent`}>
+                Sampada
               </span>
-              <p className={`text-xs bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent font-medium`}>
-                {config.title}
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                HR Recruitment System
               </p>
             </div>
           </button>
@@ -106,10 +103,8 @@ export default function RoleNavbar({ role }: RoleNavbarProps) {
             <div className={`w-8 h-8 bg-gradient-to-br ${config.gradient} rounded-lg flex items-center justify-center shadow-md`}>
               {config.icon}
             </div>
-            <span className="text-lg font-bold">
-              <span className={`bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent`}>
-                Infiverse
-              </span>
+            <span className={`text-lg font-bold bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent`}>
+              Sampada
             </span>
           </div>
         </div>

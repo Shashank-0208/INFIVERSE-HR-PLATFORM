@@ -138,7 +138,7 @@ export default function CandidateSidebar() {
                   {authStorage.getItem('user_name') || 'Candidate'}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {authStorage.getItem('user_email') || 'candidate@infiverse.hr'}
+                  {authStorage.getItem('user_email') || 'candidate@sampada.hr'}
                 </p>
               </div>
             )}

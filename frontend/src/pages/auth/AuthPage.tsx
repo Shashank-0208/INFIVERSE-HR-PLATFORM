@@ -336,11 +336,11 @@ export default function AuthPage() {
                 </svg>
               </div>
             </div>
-            <span className="text-2xl font-bold">
+            <span className="text-2xl font-bold block">
               <span className={`bg-gradient-to-r ${fixedGradient} bg-clip-text text-transparent`}>
-                Infiverse
+                Sampada
               </span>
-              <span className="text-white"> HR</span>
+              <span className="text-gray-400 text-sm font-normal block mt-0.5">HR Recruitment System</span>
             </span>
           </div>
 

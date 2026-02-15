@@ -262,7 +262,7 @@ export default function ClientSidebar() {
                   {authStorage.getItem('user_name') || 'Client'}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {authStorage.getItem('user_email') || 'client@infiverse.hr'}
+                  {authStorage.getItem('user_email') || 'client@sampada.hr'}
                 </p>
               </div>
             )}

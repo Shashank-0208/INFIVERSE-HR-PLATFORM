@@ -1,4 +1,4 @@
-# BHIV HR Platform - Frontend
+# Sampada - HR Recruitment System (Frontend)
 
 A modern, production-ready HR SaaS platform built with React, TypeScript, and Tailwind CSS.
 
@@ -204,4 +204,4 @@ For issues or questions, please create an issue in the repository.
 
 ---
 
-**Built with ❤️ for BHIV HR Platform**
+**Built with ❤️ for Sampada - HR Recruitment System**

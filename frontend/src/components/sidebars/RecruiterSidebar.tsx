@@ -226,7 +226,7 @@ export default function RecruiterSidebar() {
                   {authStorage.getItem('user_name') || 'Recruiter'}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {authStorage.getItem('user_email') || 'recruiter@infiverse.hr'}
+                  {authStorage.getItem('user_email') || 'recruiter@sampada.hr'}
                 </p>
               </div>
             )}

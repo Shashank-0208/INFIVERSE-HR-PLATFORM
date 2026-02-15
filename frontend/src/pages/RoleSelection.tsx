@@ -69,10 +69,10 @@ export default function RoleSelection() {
           </div>
           <h1 className="text-3xl font-bold">
             <span className="bg-gradient-to-r from-emerald-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Infiverse
+              Sampada
             </span>
-            <span className="text-white"> HR</span>
           </h1>
+          <p className="text-gray-400 text-sm mt-1">HR Recruitment System</p>
         </div>
         <h2 className="text-2xl md:text-3xl font-semibold text-white mb-2">
           Welcome to the Future of Hiring
@@ -137,7 +137,7 @@ export default function RoleSelection() {
       {/* Footer */}
       <footer className="relative z-10 py-6 text-center">
         <p className="text-gray-600 text-sm">
-          © 2024 Infiverse HR. Powered by AI • Built for Modern Recruitment
+          © 2024 Sampada. Powered by AI • Built for Modern Recruitment
         </p>
       </footer>
     </div>

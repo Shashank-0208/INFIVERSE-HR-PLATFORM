@@ -1,6 +1,6 @@
-# Vercel Deployment Guide for BHIV HR Platform Frontend
+# Vercel Deployment Guide for Sampada (HR Recruitment System) Frontend
 
-This guide will walk you through deploying the BHIV HR Platform frontend to Vercel.
+This guide will walk you through deploying the Sampada frontend to Vercel.
 
 ## Prerequisites
 

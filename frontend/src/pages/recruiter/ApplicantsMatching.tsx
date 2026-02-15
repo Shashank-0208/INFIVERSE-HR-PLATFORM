@@ -13,6 +13,7 @@ import {
 } from '../../services/api'
 import Table from '../../components/Table'
 import Loading from '../../components/Loading'
+import BlobLoadingOverlay from '../../components/BlobLoadingOverlay'
 
 export default function ApplicantsMatching() {
   const { jobId: urlJobId } = useParams()
@@ -511,23 +512,13 @@ export default function ApplicantsMatching() {
         </div>
       )}
       
-      {/* Full-screen Loading Overlay */}
+      {/* Full-screen Loading Overlay with animated gradient blobs */}
       {showLoadingOverlay && (
-        <div className="fixed inset-0 bg-black/65 backdrop-blur-lg flex items-center justify-center z-[9999] w-full h-full top-0 left-0">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col items-center gap-6 max-w-md w-full mx-4 relative z-[10000]">
-            <div className="relative">
-              <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-              <div className="absolute inset-0 w-16 h-16 border-4 border-emerald-300 border-b-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-            </div>
-            <div className="text-center">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Generating AI Shortlist</h3>
-              <p className="text-gray-600 dark:text-gray-400">Analyzing candidates and matching with job requirements...</p>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full animate-pulse"></div>
-            </div>
-          </div>
-        </div>
+        <BlobLoadingOverlay
+          title="Generating AI Shortlist"
+          description="Analyzing candidates and matching with job requirements..."
+          variant="recruiter"
+        />
       )}
     </div>
   )

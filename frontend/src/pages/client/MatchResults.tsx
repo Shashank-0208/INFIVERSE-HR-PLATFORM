@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { getClientJobs, getTopMatches, getJobById, shortlistCandidate, rejectCandidate, scheduleInterview, Job, MatchResult } from '../../services/api'
 import Loading from '../../components/Loading'
+import BlobLoadingOverlay from '../../components/BlobLoadingOverlay'
 import { toast } from 'react-hot-toast'
 
 export default function MatchResults() {
@@ -38,14 +39,13 @@ export default function MatchResults() {
     if (jobId) loadJobDetails()
   }, [jobId])
 
-  // Auto-refresh every 30 seconds for real-time data
+  // Auto-refresh match list every 30 seconds (background only; no overlay or generating state)
   useEffect(() => {
-    if (jobId) {
-      const interval = setInterval(() => {
-        loadMatches(jobId)
-      }, 30000)
-      return () => clearInterval(interval)
-    }
+    if (!jobId) return
+    const interval = setInterval(() => {
+      loadMatches(jobId, false)
+    }, 30000)
+    return () => clearInterval(interval)
   }, [jobId])
 
   const loadJobs = async () => {
@@ -112,22 +112,24 @@ export default function MatchResults() {
     }
   }
 
-  const loadMatches = async (jobId: string) => {
+  const loadMatches = async (jobIdParam: string, showOverlay = true) => {
+    if (showOverlay) setGenerating(true)
     try {
-      setGenerating(true)
-      const matchResults = await getTopMatches(jobId, 20)
+      const matchResults = await getTopMatches(jobIdParam, 20)
       setCandidates(matchResults)
-      if (matchResults.length === 0) {
-        toast('No candidates found for this job. Try uploading candidates or check back later.', { icon: '⚠' })
-      } else {
-        toast.success(`Found ${matchResults.length} matched candidates`)
+      if (showOverlay) {
+        if (matchResults.length === 0) {
+          toast('No candidates found for this job. Try uploading candidates or check back later.', { icon: '⚠' })
+        } else {
+          toast.success(`Found ${matchResults.length} matched candidates`)
+        }
       }
     } catch (error) {
       console.error('Failed to load matches:', error)
-      toast.error('Failed to load AI matches')
+      if (showOverlay) toast.error('Failed to load AI matches')
       setCandidates([])
     } finally {
-      setGenerating(false)
+      if (showOverlay) setGenerating(false)
     }
   }
 
@@ -169,7 +171,7 @@ export default function MatchResults() {
 
   const handleGetMatches = () => {
     if (jobId) {
-      loadMatches(jobId)
+      loadMatches(jobId, true)
     } else {
       toast.error('Please select a job first')
     }
@@ -390,6 +392,15 @@ export default function MatchResults() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Full-screen Loading Overlay with animated gradient blobs (same as AI Shortlist page) */}
+      {generating && (
+        <BlobLoadingOverlay
+          title="Getting AI Matches"
+          description="Finding the best candidates for your job..."
+          variant="recruiter"
+        />
       )}
 
       {/* Candidate Detail Modal */}

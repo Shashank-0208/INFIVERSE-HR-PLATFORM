@@ -26,6 +26,9 @@ const roleConfig = {
 }
 
 export default function AuthPage() {
+  // ...existing code...
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   
@@ -505,17 +508,32 @@ export default function AuthPage() {
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Password <span className="text-red-400">*</span>
                     </label>
-                    <input
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      placeholder="••••••••"
-                      className={`w-full px-4 py-3 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
-                        errors.password ? 'border-red-500' : 'border-slate-700'
-                      }`}
-                      required
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        placeholder="••••••••"
+                        className={`w-full px-4 py-3 pr-10 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
+                          errors.password ? 'border-red-500' : 'border-slate-700'
+                        }`}
+                        required
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 focus:outline-none"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.657.402-3.22 1.125-4.575M15 12a3 3 0 11-6 0 3 3 0 016 0zm6.875-4.575A9.956 9.956 0 0122 9c0 5.523-4.477 10-10 10a9.956 9.956 0 01-4.575-1.125" /></svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0zm2.828-2.828A9.956 9.956 0 0122 12c0 5.523-4.477 10-10 10S2 17.523 2 12c0-2.21.896-4.21 2.343-5.657M9.88 9.88a3 3 0 104.24 4.24" /></svg>
+                        )}
+                      </button>
+                    </div>
                     {errors.password && (
                       <p className="mt-1 text-sm text-red-400">{errors.password}</p>
                     )}
@@ -526,17 +544,32 @@ export default function AuthPage() {
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Confirm Password <span className="text-red-400">*</span>
                     </label>
-                    <input
-                      type="password"
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      placeholder="••••••••"
-                      className={`w-full px-4 py-3 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
-                        errors.confirmPassword ? 'border-red-500' : 'border-slate-700'
-                      }`}
-                      required
-                    />
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        name="confirmPassword"
+                        value={formData.confirmPassword}
+                        onChange={handleInputChange}
+                        placeholder="••••••••"
+                        className={`w-full px-4 py-3 pr-10 bg-slate-900/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 transition-all ${
+                          errors.confirmPassword ? 'border-red-500' : 'border-slate-700'
+                        }`}
+                        required
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 focus:outline-none"
+                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showConfirmPassword ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.657.402-3.22 1.125-4.575M15 12a3 3 0 11-6 0 3 3 0 016 0zm6.875-4.575A9.956 9.956 0 0122 9c0 5.523-4.477 10-10 10a9.956 9.956 0 01-4.575-1.125" /></svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0zm2.828-2.828A9.956 9.956 0 0122 12c0 5.523-4.477 10-10 10S2 17.523 2 12c0-2.21.896-4.21 2.343-5.657M9.88 9.88a3 3 0 104.24 4.24" /></svg>
+                        )}
+                      </button>
+                    </div>
                     {errors.confirmPassword && (
                       <p className="mt-1 text-sm text-red-400">{errors.confirmPassword}</p>
                     )}

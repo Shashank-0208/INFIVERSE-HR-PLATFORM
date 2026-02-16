@@ -6,15 +6,20 @@ import { authStorage } from '../../utils/authStorage'
 export default function CandidateLogin() {
   const navigate = useNavigate()
   const [loginId, setLoginId] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
-    
     if (!loginId.trim()) {
       toast.error('Please enter your Email or Candidate ID')
       return
     }
-
+    if (!password) {
+      toast.error('Please enter your password')
+      return
+    }
+    // TODO: Add real password check here
     authStorage.setItem('candidate_id', loginId)
     toast.success('Login successful!')
     navigate('/candidate/profile')
@@ -49,6 +54,33 @@ export default function CandidateLogin() {
             <p className="text-gray-500 text-xs mt-2">
               Demo: Use any email or ID to login
             </p>
+          </div>
+
+          <div className="mb-6 relative">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Password
+            </label>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              className="input-field pr-10"
+              required
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              className="absolute right-3 top-9 text-gray-400 hover:text-gray-200 focus:outline-none"
+              onClick={() => setShowPassword((prev) => !prev)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.657.402-3.22 1.125-4.575M15 12a3 3 0 11-6 0 3 3 0 016 0zm6.875-4.575A9.956 9.956 0 0122 9c0 5.523-4.477 10-10 10a9.956 9.956 0 01-4.575-1.125" /></svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0zm2.828-2.828A9.956 9.956 0 0122 12c0 5.523-4.477 10-10 10S2 17.523 2 12c0-2.21.896-4.21 2.343-5.657M9.88 9.88a3 3 0 104.24 4.24" /></svg>
+              )}
+            </button>
           </div>
 
           <button type="submit" className="w-full btn-primary mb-4">

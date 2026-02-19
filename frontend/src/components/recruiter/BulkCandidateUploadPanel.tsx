@@ -246,6 +246,13 @@ export default function BulkCandidateUploadPanel({
       const next = [...prev]
       if (!next[rowIndex]) return next
       next[rowIndex] = { ...next[rowIndex], [key]: value }
+      
+      // Run duplicate check immediately with the updated data
+      setTimeout(() => {
+        checkInternalDuplicates(next)
+        checkForDuplicates(next)
+      }, 0)
+      
       return next
     })
     setValidationErrors((prev) => prev.filter((e) => !e.startsWith(`Row ${rowIndex + 1}:`)))
@@ -286,13 +293,6 @@ export default function BulkCandidateUploadPanel({
       setCheckingDuplicates(true)
       const result = await checkDuplicateCandidates(emails)
       setDuplicateEmails(new Set(result.duplicates.map(e => e.toLowerCase())))
-      
-      if (result.count > 0) {
-        toast.error(
-          `${result.count} duplicate email(s) found in database. Rows highlighted in red.`,
-          { duration: 4000 }
-        )
-      }
     } catch (error) {
       console.error('Error checking duplicates:', error)
       // Don't show error toast, silently continue
@@ -305,20 +305,15 @@ export default function BulkCandidateUploadPanel({
   useEffect(() => {
     if (editableRows.length > 0) {
       // Check internal duplicates immediately (synchronous)
-      const internalCount = checkInternalDuplicates(editableRows)
-      if (internalCount > 0) {
-        toast.error(
-          `${internalCount} duplicate email(s) found within preview table. Remove duplicates before uploading.`,
-          { duration: 4000, id: 'internal-duplicates' }
-        )
-      }
+      checkInternalDuplicates(editableRows)
       // Check database duplicates (asynchronous)
       checkForDuplicates(editableRows)
     } else {
       setDuplicateEmails(new Set())
       setInternalDuplicates(new Set())
     }
-  }, [editableRows]) // Check whenever editableRows changes (real-time detection)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editableRows.length]) // Only check when length changes to avoid excessive calls
 
   const manualCheckDuplicates = () => {
     checkInternalDuplicates(editableRows)
@@ -364,7 +359,15 @@ export default function BulkCandidateUploadPanel({
   }
 
   const removeRow = (rowIndex: number) => {
-    setEditableRows((prev) => prev.filter((_, i) => i !== rowIndex))
+    setEditableRows((prev) => {
+      const next = prev.filter((_, i) => i !== rowIndex)
+      // Check duplicates with updated data
+      setTimeout(() => {
+        checkInternalDuplicates(next)
+        checkForDuplicates(next)
+      }, 0)
+      return next
+    })
     setValidationErrors((prev) => prev.filter((e) => {
       const m = e.match(/^Row (\d+):/)
       const row = m ? Number(m[1]) : 0
@@ -385,18 +388,19 @@ export default function BulkCandidateUploadPanel({
       return
     }
     
+    // CRITICAL: Re-check for duplicates immediately before upload as final safeguard
+    const finalInternalDuplicateCount = checkInternalDuplicates(editableRows)
+    
     // Check for duplicates - block upload entirely if any exist
     const dbDuplicateCount = editableRows.filter(row => {
       const email = (row.email || '').trim().toLowerCase()
       return duplicateEmails.has(email)
     }).length
     
-    const internalDuplicateCount = internalDuplicates.size
-    
-    if (dbDuplicateCount > 0 || internalDuplicateCount > 0) {
+    if (dbDuplicateCount > 0 || finalInternalDuplicateCount > 0) {
       const messages = []
       if (dbDuplicateCount > 0) messages.push(`${dbDuplicateCount} database duplicate(s)`)
-      if (internalDuplicateCount > 0) messages.push(`${internalDuplicateCount} preview table duplicate(s)`)
+      if (finalInternalDuplicateCount > 0) messages.push(`${finalInternalDuplicateCount} preview table duplicate(s)`)
       
       toast.error(
         `Cannot upload: ${messages.join(' and ')} detected. Please remove all duplicates before uploading.`,
@@ -538,7 +542,7 @@ export default function BulkCandidateUploadPanel({
           <div className="mt-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                {files.length} file(s): {files.map((f) => f.name).join(', ')}
+                {files.length} file(s) processed
               </span>
               <button type="button" onClick={clearAllFiles} className="text-red-500 hover:text-red-700 dark:text-red-400 font-medium">Clear all & start over</button>
             </div>
@@ -566,21 +570,8 @@ export default function BulkCandidateUploadPanel({
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
-                ⚠️ Upload Blocked - Duplicate Candidates Detected
+                Duplicate data found, remove to upload
               </h3>
-              {duplicateEmails.size > 0 && (
-                <p className="text-sm text-red-700 dark:text-red-300 mb-1">
-                  🔴 <strong>Database Duplicates:</strong> {duplicateEmails.size} candidate email(s) already exist in the database.
-                </p>
-              )}
-              {internalDuplicates.size > 0 && (
-                <p className="text-sm text-red-700 dark:text-red-300 mb-1">
-                  🟠 <strong>Preview Table Duplicates:</strong> {internalDuplicates.size} duplicate email(s) found within the current upload (same email appears multiple times).
-                </p>
-              )}
-              <p className="text-sm font-semibold text-red-800 dark:text-red-200 mt-2">
-                ⛔ You must remove ALL duplicate candidates before uploading.
-              </p>
             </div>
             <button 
               type="button" 
@@ -616,32 +607,6 @@ export default function BulkCandidateUploadPanel({
             </div>
           </div>
           
-          {(duplicateEmails.size > 0 || internalDuplicates.size > 0) && (
-            <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Duplicate Color Legend:</p>
-              <div className="flex flex-wrap gap-4 text-xs text-gray-600 dark:text-gray-400">
-                {duplicateEmails.size > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 bg-red-100 dark:bg-red-900/30 border-l-2 border-red-500 rounded"></div>
-                    <span>🔴 Database Duplicate (exists in system)</span>
-                  </div>
-                )}
-                {internalDuplicates.size > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 bg-orange-100 dark:bg-orange-900/30 border-l-2 border-orange-500 rounded"></div>
-                    <span>🟠 Preview Table Duplicate (appears multiple times)</span>
-                  </div>
-                )}
-                {duplicateEmails.size > 0 && internalDuplicates.size > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 bg-red-200 dark:bg-red-900/50 border-l-2 border-red-600 rounded"></div>
-                    <span>🔴🟠 Both Types</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          
           <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-800">
@@ -666,13 +631,13 @@ export default function BulkCandidateUploadPanel({
                   
                   if (duplicateType === 'both') {
                     rowClassName = 'bg-red-200 dark:bg-red-900/50 border-l-4 border-red-600'
-                    tooltipText = 'This email exists in database AND appears multiple times in preview table'
+                    tooltipText = 'Duplicate data found, remove to upload'
                   } else if (duplicateType === 'database') {
                     rowClassName = 'bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500'
-                    tooltipText = 'This email already exists in the database'
+                    tooltipText = 'Duplicate data found, remove to upload'
                   } else if (duplicateType === 'internal') {
                     rowClassName = 'bg-orange-100 dark:bg-orange-900/30 border-l-4 border-orange-500'
-                    tooltipText = 'This email appears multiple times in the preview table'
+                    tooltipText = 'Duplicate data found, remove to upload'
                   } else if (rowErrs.length) {
                     rowClassName = 'bg-red-50/50 dark:bg-red-900/10'
                   } else {

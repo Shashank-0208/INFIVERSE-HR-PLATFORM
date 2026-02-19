@@ -1812,6 +1812,34 @@ async def parse_pdf_candidates(file: UploadFile = File(...), auth=Depends(get_au
         raise HTTPException(status_code=400, detail=f"Failed to parse PDF: {str(e)[:200]}")
 
 
+@app.post("/v1/candidates/check-duplicates", tags=["Candidate Management"])
+async def check_duplicate_candidates(emails: List[str], auth=Depends(get_auth)):
+    """Check which emails already exist in the candidates database. Returns list of duplicate emails."""
+    try:
+        db = await get_mongo_db()
+        # Normalize emails to lowercase for comparison
+        normalized_emails = [email.strip().lower() for email in emails if email and email.strip()]
+        
+        if not normalized_emails:
+            return {"duplicates": [], "count": 0}
+        
+        # Find existing candidates with matching emails
+        existing_candidates = await db.candidates.find(
+            {"email": {"$in": normalized_emails}},
+            {"email": 1}
+        ).to_list(length=None)
+        
+        duplicate_emails = [doc["email"].lower() for doc in existing_candidates]
+        
+        return {
+            "duplicates": duplicate_emails,
+            "count": len(duplicate_emails)
+        }
+    except Exception as e:
+        logger.error(f"Error checking duplicate candidates: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to check duplicates: {str(e)[:200]}")
+
+
 @app.post("/v1/candidates/bulk", tags=["Candidate Management"])
 async def bulk_upload_candidates(candidates: CandidateBulk, auth=Depends(get_auth)):
     """Bulk Upload Candidates (recruiter JWT or API key). Inserts into candidates and, when job_id is provided, creates job_applications so dashboard stats stay in sync."""

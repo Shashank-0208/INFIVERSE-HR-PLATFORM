@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
-import { bulkUploadCandidates, getRecruiterJobs, parsePdfCandidates, type Job } from '../../services/api'
+import { bulkUploadCandidates, checkDuplicateCandidates, getRecruiterJobs, parsePdfCandidates, type Job } from '../../services/api'
 import Loading from '../Loading'
 
 const ACCEPTED_EXTENSIONS = '.csv,.xlsx,.xls,.pdf'
@@ -95,6 +95,9 @@ export default function BulkCandidateUploadPanel({
   const [files, setFiles] = useState<File[]>([])
   const [editableRows, setEditableRows] = useState<EditableCandidateRow[]>([])
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [duplicateEmails, setDuplicateEmails] = useState<Set<string>>(new Set())
+  const [internalDuplicates, setInternalDuplicates] = useState<Set<string>>(new Set())
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -232,6 +235,8 @@ export default function BulkCandidateUploadPanel({
     setFiles([])
     setEditableRows([])
     setValidationErrors([])
+    setDuplicateEmails(new Set())
+    setInternalDuplicates(new Set())
     if (fileInputRef.current) fileInputRef.current.value = ''
     setFileInputKey((k) => k + 1)
   }
@@ -244,6 +249,118 @@ export default function BulkCandidateUploadPanel({
       return next
     })
     setValidationErrors((prev) => prev.filter((e) => !e.startsWith(`Row ${rowIndex + 1}:`)))
+  }
+
+  // Check for duplicate emails within the preview table itself
+  const checkInternalDuplicates = (rows: EditableCandidateRow[]) => {
+    const emailCounts = new Map<string, number>()
+    const duplicateSet = new Set<string>()
+    
+    rows.forEach(row => {
+      const email = (row.email || '').trim().toLowerCase()
+      if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        const count = emailCounts.get(email) || 0
+        emailCounts.set(email, count + 1)
+        if (count >= 1) {
+          duplicateSet.add(email)
+        }
+      }
+    })
+    
+    setInternalDuplicates(duplicateSet)
+    return duplicateSet.size
+  }
+
+  // Check for duplicate emails in database
+  const checkForDuplicates = async (rows: EditableCandidateRow[]) => {
+    const emails = rows
+      .map(row => (row.email || '').trim().toLowerCase())
+      .filter(email => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    
+    if (emails.length === 0) {
+      setDuplicateEmails(new Set())
+      return
+    }
+
+    try {
+      setCheckingDuplicates(true)
+      const result = await checkDuplicateCandidates(emails)
+      setDuplicateEmails(new Set(result.duplicates.map(e => e.toLowerCase())))
+      
+      if (result.count > 0) {
+        toast.error(
+          `${result.count} duplicate email(s) found in database. Rows highlighted in red.`,
+          { duration: 4000 }
+        )
+      }
+    } catch (error) {
+      console.error('Error checking duplicates:', error)
+      // Don't show error toast, silently continue
+    } finally {
+      setCheckingDuplicates(false)
+    }
+  }
+
+  // Auto-check duplicates when rows change (both database and internal)
+  useEffect(() => {
+    if (editableRows.length > 0) {
+      // Check internal duplicates immediately (synchronous)
+      const internalCount = checkInternalDuplicates(editableRows)
+      if (internalCount > 0) {
+        toast.error(
+          `${internalCount} duplicate email(s) found within preview table. Remove duplicates before uploading.`,
+          { duration: 4000, id: 'internal-duplicates' }
+        )
+      }
+      // Check database duplicates (asynchronous)
+      checkForDuplicates(editableRows)
+    } else {
+      setDuplicateEmails(new Set())
+      setInternalDuplicates(new Set())
+    }
+  }, [editableRows]) // Check whenever editableRows changes (real-time detection)
+
+  const manualCheckDuplicates = () => {
+    checkInternalDuplicates(editableRows)
+    checkForDuplicates(editableRows)
+  }
+
+  const removeAllDuplicates = () => {
+    // Remove rows that are duplicates (either database or internal)
+    const seenEmails = new Set<string>()
+    const uniqueRows = editableRows.filter(row => {
+      const email = (row.email || '').trim().toLowerCase()
+      if (duplicateEmails.has(email)) {
+        return false // Remove database duplicates
+      }
+      if (seenEmails.has(email)) {
+        return false // Remove internal duplicates (keep first occurrence)
+      }
+      if (email) {
+        seenEmails.add(email)
+      }
+      return true
+    })
+    setEditableRows(uniqueRows)
+    setDuplicateEmails(new Set())
+    setInternalDuplicates(new Set())
+    toast.success(`Removed ${editableRows.length - uniqueRows.length} duplicate row(s)`)
+  }
+
+  const isDuplicateRow = (row: EditableCandidateRow): boolean => {
+    const email = (row.email || '').trim().toLowerCase()
+    return duplicateEmails.has(email) || internalDuplicates.has(email)
+  }
+
+  const getDuplicateType = (row: EditableCandidateRow): 'database' | 'internal' | 'both' | null => {
+    const email = (row.email || '').trim().toLowerCase()
+    const isDbDuplicate = duplicateEmails.has(email)
+    const isInternalDuplicate = internalDuplicates.has(email)
+    
+    if (isDbDuplicate && isInternalDuplicate) return 'both'
+    if (isDbDuplicate) return 'database'
+    if (isInternalDuplicate) return 'internal'
+    return null
   }
 
   const removeRow = (rowIndex: number) => {
@@ -267,7 +384,29 @@ export default function BulkCandidateUploadPanel({
       toast.error('Please select a job')
       return
     }
+    
+    // Check for duplicates - block upload entirely if any exist
+    const dbDuplicateCount = editableRows.filter(row => {
+      const email = (row.email || '').trim().toLowerCase()
+      return duplicateEmails.has(email)
+    }).length
+    
+    const internalDuplicateCount = internalDuplicates.size
+    
+    if (dbDuplicateCount > 0 || internalDuplicateCount > 0) {
+      const messages = []
+      if (dbDuplicateCount > 0) messages.push(`${dbDuplicateCount} database duplicate(s)`)
+      if (internalDuplicateCount > 0) messages.push(`${internalDuplicateCount} preview table duplicate(s)`)
+      
+      toast.error(
+        `Cannot upload: ${messages.join(' and ')} detected. Please remove all duplicates before uploading.`,
+        { duration: 5000 }
+      )
+      return
+    }
+    
     const rowsToSubmit = editableRows.filter((r) => (r.name || '').trim() || (r.email || '').trim())
+    
     if (rowsToSubmit.length === 0) {
       toast.error('No candidate data to upload. Add or keep at least one row with name and email.')
       return
@@ -295,11 +434,18 @@ export default function BulkCandidateUploadPanel({
       }))
       const result = await bulkUploadCandidates(candidates, jobId)
       const inserted = result?.candidates_inserted ?? candidates.length
-      toast.success(`Uploaded ${inserted} candidate(s) for this job. Dashboard counts are updated.`)
+      
+      // Clear all data after successful upload
       setFiles([])
       setEditableRows([])
+      setDuplicateEmails(new Set())
+      setInternalDuplicates(new Set())
       if (fileInputRef.current) fileInputRef.current.value = ''
       setFileInputKey((k) => k + 1)
+      
+      // Show success message
+      toast.success(`Uploaded ${inserted} candidate(s) for this job. Dashboard counts are updated.`)
+      
       if (result?.errors?.length) {
         toast.error(`Some rows had errors: ${(result.errors as string[]).slice(0, 3).join('; ')}`)
       }
@@ -412,14 +558,90 @@ export default function BulkCandidateUploadPanel({
         </div>
       )}
 
+      {(duplicateEmails.size > 0 || internalDuplicates.size > 0) && (
+        <div className="card border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2 flex items-center gap-2">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                ⚠️ Upload Blocked - Duplicate Candidates Detected
+              </h3>
+              {duplicateEmails.size > 0 && (
+                <p className="text-sm text-red-700 dark:text-red-300 mb-1">
+                  🔴 <strong>Database Duplicates:</strong> {duplicateEmails.size} candidate email(s) already exist in the database.
+                </p>
+              )}
+              {internalDuplicates.size > 0 && (
+                <p className="text-sm text-red-700 dark:text-red-300 mb-1">
+                  🟠 <strong>Preview Table Duplicates:</strong> {internalDuplicates.size} duplicate email(s) found within the current upload (same email appears multiple times).
+                </p>
+              )}
+              <p className="text-sm font-semibold text-red-800 dark:text-red-200 mt-2">
+                ⛔ You must remove ALL duplicate candidates before uploading.
+              </p>
+            </div>
+            <button 
+              type="button" 
+              onClick={removeAllDuplicates}
+              className="btn-outline border-red-500 text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-900/30 text-sm py-2 px-4 whitespace-nowrap"
+            >
+              Remove All Duplicates
+            </button>
+          </div>
+        </div>
+      )}
+
       {editableRows.length > 0 && (
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h2 className="section-title mb-0">Edit candidate data (required: Name, Email)</h2>
             <div className="flex gap-2">
+              {checkingDuplicates && (
+                <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                  <span className="animate-spin">⏳</span> Checking duplicates...
+                </span>
+              )}
+              <button 
+                type="button" 
+                onClick={manualCheckDuplicates} 
+                disabled={checkingDuplicates || editableRows.length === 0}
+                className="btn-outline text-sm py-1.5 px-3"
+                title="Re-check for duplicate emails in database"
+              >
+                🔄 Check Duplicates
+              </button>
               <button type="button" onClick={addEmptyRow} className="btn-outline text-sm py-1.5 px-3">Add row</button>
             </div>
           </div>
+          
+          {(duplicateEmails.size > 0 || internalDuplicates.size > 0) && (
+            <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Duplicate Color Legend:</p>
+              <div className="flex flex-wrap gap-4 text-xs text-gray-600 dark:text-gray-400">
+                {duplicateEmails.size > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 bg-red-100 dark:bg-red-900/30 border-l-2 border-red-500 rounded"></div>
+                    <span>🔴 Database Duplicate (exists in system)</span>
+                  </div>
+                )}
+                {internalDuplicates.size > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 bg-orange-100 dark:bg-orange-900/30 border-l-2 border-orange-500 rounded"></div>
+                    <span>🟠 Preview Table Duplicate (appears multiple times)</span>
+                  </div>
+                )}
+                {duplicateEmails.size > 0 && internalDuplicates.size > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-4 h-4 bg-red-200 dark:bg-red-900/50 border-l-2 border-red-600 rounded"></div>
+                    <span>🔴🟠 Both Types</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
           <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-800">
@@ -435,8 +657,30 @@ export default function BulkCandidateUploadPanel({
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                 {editableRows.map((row, rowIndex) => {
                   const rowErrs = validationErrors.filter((e) => e.startsWith(`Row ${rowIndex + 1}:`))
+                  const isDuplicate = isDuplicateRow(row)
+                  const duplicateType = getDuplicateType(row)
+                  
+                  // Different visual indicators for different duplicate types
+                  let rowClassName = ''
+                  let tooltipText = ''
+                  
+                  if (duplicateType === 'both') {
+                    rowClassName = 'bg-red-200 dark:bg-red-900/50 border-l-4 border-red-600'
+                    tooltipText = 'This email exists in database AND appears multiple times in preview table'
+                  } else if (duplicateType === 'database') {
+                    rowClassName = 'bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500'
+                    tooltipText = 'This email already exists in the database'
+                  } else if (duplicateType === 'internal') {
+                    rowClassName = 'bg-orange-100 dark:bg-orange-900/30 border-l-4 border-orange-500'
+                    tooltipText = 'This email appears multiple times in the preview table'
+                  } else if (rowErrs.length) {
+                    rowClassName = 'bg-red-50/50 dark:bg-red-900/10'
+                  } else {
+                    rowClassName = 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }
+                  
                   return (
-                    <tr key={rowIndex} className={rowErrs.length ? 'bg-red-50/50 dark:bg-red-900/10' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}>
+                    <tr key={rowIndex} className={rowClassName}>
                       {COLUMNS.map((col) => (
                         <td key={col.key} className="px-2 py-1">
                           <input
@@ -444,12 +688,26 @@ export default function BulkCandidateUploadPanel({
                             value={row[col.key] ?? ''}
                             onChange={(e) => updateRow(rowIndex, col.key, e.target.value)}
                             placeholder={col.required ? 'Required' : ''}
-                            className="w-full min-w-[80px] px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                            className={`w-full min-w-[80px] px-2 py-1.5 text-sm border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                              isDuplicate 
+                                ? duplicateType === 'internal' 
+                                  ? 'border-orange-400 dark:border-orange-500' 
+                                  : 'border-red-400 dark:border-red-500'
+                                : 'border-gray-300 dark:border-gray-600'
+                            }`}
+                            disabled={isDuplicate}
+                            title={tooltipText}
                           />
                         </td>
                       ))}
                       <td className="px-2 py-1">
-                        <button type="button" onClick={() => removeRow(rowIndex)} className="text-red-500 hover:text-red-700 dark:text-red-400 text-sm">Remove</button>
+                        <button 
+                          type="button" 
+                          onClick={() => removeRow(rowIndex)} 
+                          className="text-red-500 hover:text-red-700 dark:text-red-400 text-sm whitespace-nowrap"
+                        >
+                          {isDuplicate ? '✕ Remove' : 'Remove'}
+                        </button>
                       </td>
                     </tr>
                   )
@@ -459,11 +717,14 @@ export default function BulkCandidateUploadPanel({
           </div>
           <button
             onClick={handleUpload}
-            disabled={uploading || editableRows.length === 0}
+            disabled={uploading || editableRows.length === 0 || duplicateEmails.size > 0 || internalDuplicates.size > 0}
             className="btn-primary w-full mt-6"
+            title={(duplicateEmails.size > 0 || internalDuplicates.size > 0) ? 'Remove all duplicates before uploading' : ''}
           >
             {uploading ? (
               <><span className="animate-spin mr-2">⏳</span> Uploading…</>
+            ) : (duplicateEmails.size > 0 || internalDuplicates.size > 0) ? (
+              <>🔒 Upload Blocked ({duplicateEmails.size + internalDuplicates.size} Duplicate{(duplicateEmails.size + internalDuplicates.size) > 1 ? 's' : ''})</>
             ) : (
               <>Upload Candidates</>
             )}

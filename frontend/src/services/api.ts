@@ -1374,6 +1374,17 @@ export const parsePdfCandidates = async (file: File): Promise<{ rows: Record<str
   return { rows: response.data?.rows ?? [] }
 }
 
+/** Check which candidate emails already exist in the database */
+export const checkDuplicateCandidates = async (emails: string[]): Promise<{ duplicates: string[]; count: number }> => {
+  try {
+    const response = await api.post('/v1/candidates/check-duplicates', emails)
+    return response.data
+  } catch (error) {
+    console.error('Error checking duplicate candidates:', error)
+    throw error
+  }
+}
+
 /** Bulk upload candidates for a job. job_id links applicants to the job so dashboard stats stay in sync. */
 export const bulkUploadCandidates = async (candidates: BulkCandidate[], jobId: string) => {
   try {

@@ -103,9 +103,26 @@ export default function BulkCandidateUploadPanel({
   const [loading, setLoading] = useState(true)
   const [isDragging, setIsDragging] = useState(false)
   const [emailValidationErrors, setEmailValidationErrors] = useState<Map<number, string>>(new Map())
+  
+  // Refs for debouncing and request cancellation
+  const duplicateCheckTimeoutRef = useRef<number | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     loadRecruiterJobs()
+  }, [])
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      // Cancel any pending duplicate check requests
+      if (duplicateCheckTimeoutRef.current) {
+        clearTimeout(duplicateCheckTimeoutRef.current)
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
   }, [])
 
   const loadRecruiterJobs = async () => {
@@ -233,12 +250,21 @@ export default function BulkCandidateUploadPanel({
   }
 
   const clearAllFiles = () => {
+    // Cancel any pending checks
+    if (duplicateCheckTimeoutRef.current) {
+      clearTimeout(duplicateCheckTimeoutRef.current)
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    
     setFiles([])
     setEditableRows([])
     setValidationErrors([])
     setDuplicateEmails(new Set())
     setInternalDuplicates(new Set())
     setEmailValidationErrors(new Map())
+    setCheckingDuplicates(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
     setFileInputKey((k) => k + 1)
   }
@@ -267,10 +293,9 @@ export default function BulkCandidateUploadPanel({
         })
       }
       
-      // Run duplicate check immediately with the updated data
+      // Use debounced duplicate check to prevent excessive API calls
       setTimeout(() => {
-        checkInternalDuplicates(next)
-        checkForDuplicates(next)
+        debouncedCheckDuplicates(next)
       }, 0)
       
       return next
@@ -298,7 +323,7 @@ export default function BulkCandidateUploadPanel({
     return duplicateSet.size
   }
 
-  // Check for duplicate emails in database
+  // Check for duplicate emails in database with debouncing and cancellation
   const checkForDuplicates = async (rows: EditableCandidateRow[]) => {
     const emails = rows
       .map(row => (row.email || '').trim().toLowerCase())
@@ -309,16 +334,52 @@ export default function BulkCandidateUploadPanel({
       return
     }
 
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Create new abort controller for this request
+    const abortController = new AbortController()
+    abortControllerRef.current = abortController
+
     try {
       setCheckingDuplicates(true)
-      const result = await checkDuplicateCandidates(emails)
-      setDuplicateEmails(new Set(result.duplicates.map(e => e.toLowerCase())))
-    } catch (error) {
+      const result = await checkDuplicateCandidates(emails, abortController.signal)
+      
+      // Only update state if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        setDuplicateEmails(new Set(result.duplicates.map(e => e.toLowerCase())))
+      }
+    } catch (error: any) {
+      // Ignore aborted requests
+      if (error.name === 'AbortError' || error.name === 'CanceledError') {
+        console.log('Duplicate check request was cancelled')
+        return
+      }
       console.error('Error checking duplicates:', error)
-      // Don't show error toast, silently continue
+      // Don't show error toast for network errors during rapid typing
     } finally {
-      setCheckingDuplicates(false)
+      if (!abortController.signal.aborted) {
+        setCheckingDuplicates(false)
+      }
     }
+  }
+
+  // Debounced version of duplicate checking
+  const debouncedCheckDuplicates = (rows: EditableCandidateRow[]) => {
+    // Clear any existing timeout
+    if (duplicateCheckTimeoutRef.current) {
+      clearTimeout(duplicateCheckTimeoutRef.current)
+    }
+
+    // Check internal duplicates immediately (no API call)
+    checkInternalDuplicates(rows)
+
+    // Debounce the database check (API call)
+    duplicateCheckTimeoutRef.current = setTimeout(() => {
+      checkForDuplicates(rows)
+    }, 600) // Wait 600ms after user stops typing
   }
 
   // Auto-check duplicates when rows change (both database and internal)
@@ -336,6 +397,11 @@ export default function BulkCandidateUploadPanel({
   }, [editableRows.length]) // Only check when length changes to avoid excessive calls
 
   const manualCheckDuplicates = () => {
+    // Cancel any pending debounced checks
+    if (duplicateCheckTimeoutRef.current) {
+      clearTimeout(duplicateCheckTimeoutRef.current)
+    }
+    // Run checks immediately for manual button click
     checkInternalDuplicates(editableRows)
     checkForDuplicates(editableRows)
   }
@@ -381,10 +447,9 @@ export default function BulkCandidateUploadPanel({
   const removeRow = (rowIndex: number) => {
     setEditableRows((prev) => {
       const next = prev.filter((_, i) => i !== rowIndex)
-      // Check duplicates with updated data
+      // Use debounced duplicate check to prevent excessive API calls
       setTimeout(() => {
-        checkInternalDuplicates(next)
-        checkForDuplicates(next)
+        debouncedCheckDuplicates(next)
       }, 0)
       return next
     })

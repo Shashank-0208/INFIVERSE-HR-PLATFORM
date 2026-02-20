@@ -1375,9 +1375,14 @@ export const parsePdfCandidates = async (file: File): Promise<{ rows: Record<str
 }
 
 /** Check which candidate emails already exist in the database */
-export const checkDuplicateCandidates = async (emails: string[]): Promise<{ duplicates: string[]; count: number }> => {
+export const checkDuplicateCandidates = async (
+  emails: string[], 
+  signal?: AbortSignal
+): Promise<{ duplicates: string[]; count: number }> => {
   try {
-    const response = await api.post('/v1/candidates/check-duplicates', emails)
+    const response = await api.post('/v1/candidates/check-duplicates', emails, {
+      signal // Pass AbortSignal to axios for request cancellation
+    })
     return response.data
   } catch (error) {
     console.error('Error checking duplicate candidates:', error)

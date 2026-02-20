@@ -102,6 +102,7 @@ export default function BulkCandidateUploadPanel({
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isDragging, setIsDragging] = useState(false)
+  const [emailValidationErrors, setEmailValidationErrors] = useState<Map<number, string>>(new Map())
 
   useEffect(() => {
     loadRecruiterJobs()
@@ -237,6 +238,7 @@ export default function BulkCandidateUploadPanel({
     setValidationErrors([])
     setDuplicateEmails(new Set())
     setInternalDuplicates(new Set())
+    setEmailValidationErrors(new Map())
     if (fileInputRef.current) fileInputRef.current.value = ''
     setFileInputKey((k) => k + 1)
   }
@@ -246,6 +248,24 @@ export default function BulkCandidateUploadPanel({
       const next = [...prev]
       if (!next[rowIndex]) return next
       next[rowIndex] = { ...next[rowIndex], [key]: value }
+      
+      // Validate email field in real-time
+      if (key === 'email') {
+        const email = value.trim()
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        
+        setEmailValidationErrors((prevErrors) => {
+          const newErrors = new Map(prevErrors)
+          if (!email) {
+            newErrors.set(rowIndex, 'Email is required')
+          } else if (!emailRegex.test(email)) {
+            newErrors.set(rowIndex, 'Invalid email format')
+          } else {
+            newErrors.delete(rowIndex)
+          }
+          return newErrors
+        })
+      }
       
       // Run duplicate check immediately with the updated data
       setTimeout(() => {
@@ -373,6 +393,21 @@ export default function BulkCandidateUploadPanel({
       const row = m ? Number(m[1]) : 0
       return row !== rowIndex + 1
     }))
+    // Remove email validation error for this row
+    setEmailValidationErrors((prev) => {
+      const newErrors = new Map(prev)
+      newErrors.delete(rowIndex)
+      // Re-index remaining errors
+      const reindexed = new Map()
+      Array.from(newErrors.entries()).forEach(([idx, msg]) => {
+        if (idx > rowIndex) {
+          reindexed.set(idx - 1, msg)
+        } else {
+          reindexed.set(idx, msg)
+        }
+      })
+      return reindexed
+    })
   }
 
   const addEmptyRow = () => {
@@ -385,6 +420,29 @@ export default function BulkCandidateUploadPanel({
   const handleUpload = async () => {
     if (!jobId) {
       toast.error('Please select a job')
+      return
+    }
+    
+    // Validate all email fields before upload
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const rowsWithData = editableRows.filter((r) => (r.name || '').trim() || (r.email || '').trim())
+    const emailErrors = new Map<number, string>()
+    
+    rowsWithData.forEach((row, idx) => {
+      const email = (row.email || '').trim()
+      if (!email) {
+        emailErrors.set(idx, 'Email is required')
+      } else if (!emailRegex.test(email)) {
+        emailErrors.set(idx, 'Invalid email format')
+      }
+    })
+    
+    if (emailErrors.size > 0) {
+      setEmailValidationErrors(emailErrors)
+      toast.error(
+        `Cannot upload: ${emailErrors.size} row(s) have invalid or missing email addresses. Please fix all email errors.`,
+        { duration: 5000 }
+      )
       return
     }
     
@@ -444,6 +502,7 @@ export default function BulkCandidateUploadPanel({
       setEditableRows([])
       setDuplicateEmails(new Set())
       setInternalDuplicates(new Set())
+      setEmailValidationErrors(new Map())
       if (fileInputRef.current) fileInputRef.current.value = ''
       setFileInputKey((k) => k + 1)
       
@@ -624,20 +683,25 @@ export default function BulkCandidateUploadPanel({
                   const rowErrs = validationErrors.filter((e) => e.startsWith(`Row ${rowIndex + 1}:`))
                   const isDuplicate = isDuplicateRow(row)
                   const duplicateType = getDuplicateType(row)
+                  const emailError = emailValidationErrors.get(rowIndex)
+                  const hasEmailError = !!emailError
                   
-                  // Different visual indicators for different duplicate types
+                  // Different visual indicators for different duplicate types and validation errors
                   let rowClassName = ''
                   let tooltipText = ''
                   
-                  if (duplicateType === 'both') {
+                  if (hasEmailError) {
+                    rowClassName = 'bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400'
+                    tooltipText = emailError
+                  } else if (duplicateType === 'both') {
                     rowClassName = 'bg-red-200 dark:bg-red-900/50 border-l-4 border-red-600'
-                    tooltipText = 'Duplicate data found, remove to upload'
+                    tooltipText = 'Duplicate data found, edit to resolve'
                   } else if (duplicateType === 'database') {
                     rowClassName = 'bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500'
-                    tooltipText = 'Duplicate data found, remove to upload'
+                    tooltipText = 'Duplicate data found, edit to resolve'
                   } else if (duplicateType === 'internal') {
                     rowClassName = 'bg-orange-100 dark:bg-orange-900/30 border-l-4 border-orange-500'
-                    tooltipText = 'Duplicate data found, remove to upload'
+                    tooltipText = 'Duplicate data found, edit to resolve'
                   } else if (rowErrs.length) {
                     rowClassName = 'bg-red-50/50 dark:bg-red-900/10'
                   } else {
@@ -646,25 +710,34 @@ export default function BulkCandidateUploadPanel({
                   
                   return (
                     <tr key={rowIndex} className={rowClassName}>
-                      {COLUMNS.map((col) => (
-                        <td key={col.key} className="px-2 py-1">
-                          <input
-                            type="text"
-                            value={row[col.key] ?? ''}
-                            onChange={(e) => updateRow(rowIndex, col.key, e.target.value)}
-                            placeholder={col.required ? 'Required' : ''}
-                            className={`w-full min-w-[80px] px-2 py-1.5 text-sm border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
-                              isDuplicate 
-                                ? duplicateType === 'internal' 
-                                  ? 'border-orange-400 dark:border-orange-500' 
-                                  : 'border-red-400 dark:border-red-500'
-                                : 'border-gray-300 dark:border-gray-600'
-                            }`}
-                            disabled={isDuplicate}
-                            title={tooltipText}
-                          />
-                        </td>
-                      ))}
+                      {COLUMNS.map((col) => {
+                        const isEmailField = col.key === 'email'
+                        const hasError = isEmailField && hasEmailError
+                        
+                        return (
+                          <td key={col.key} className="px-2 py-1">
+                            <input
+                              type="text"
+                              value={row[col.key] ?? ''}
+                              onChange={(e) => updateRow(rowIndex, col.key, e.target.value)}
+                              placeholder={col.required ? 'Required' : ''}
+                              className={`w-full min-w-[80px] px-2 py-1.5 text-sm border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                hasError
+                                  ? 'border-red-500 dark:border-red-500 bg-red-50 dark:bg-red-900/20'
+                                  : isDuplicate 
+                                    ? duplicateType === 'internal' 
+                                      ? 'border-orange-400 dark:border-orange-500' 
+                                      : 'border-red-400 dark:border-red-500'
+                                    : 'border-gray-300 dark:border-gray-600'
+                              }`}
+                              title={isEmailField && hasError ? emailError : tooltipText}
+                            />
+                            {isEmailField && hasError && (
+                              <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{emailError}</p>
+                            )}
+                          </td>
+                        )
+                      })}
                       <td className="px-2 py-1">
                         <button 
                           type="button" 
@@ -682,12 +755,26 @@ export default function BulkCandidateUploadPanel({
           </div>
           <button
             onClick={handleUpload}
-            disabled={uploading || editableRows.length === 0 || duplicateEmails.size > 0 || internalDuplicates.size > 0}
+            disabled={
+              uploading || 
+              editableRows.length === 0 || 
+              duplicateEmails.size > 0 || 
+              internalDuplicates.size > 0 ||
+              emailValidationErrors.size > 0
+            }
             className="btn-primary w-full mt-6"
-            title={(duplicateEmails.size > 0 || internalDuplicates.size > 0) ? 'Remove all duplicates before uploading' : ''}
+            title={
+              emailValidationErrors.size > 0 
+                ? 'Fix all email validation errors before uploading'
+                : (duplicateEmails.size > 0 || internalDuplicates.size > 0) 
+                  ? 'Remove all duplicates before uploading' 
+                  : ''
+            }
           >
             {uploading ? (
               <><span className="animate-spin mr-2">⏳</span> Uploading…</>
+            ) : emailValidationErrors.size > 0 ? (
+              <>🔒 Upload Blocked ({emailValidationErrors.size} Email Error{emailValidationErrors.size > 1 ? 's' : ''})</>
             ) : (duplicateEmails.size > 0 || internalDuplicates.size > 0) ? (
               <>🔒 Upload Blocked ({duplicateEmails.size + internalDuplicates.size} Duplicate{(duplicateEmails.size + internalDuplicates.size) > 1 ? 's' : ''})</>
             ) : (

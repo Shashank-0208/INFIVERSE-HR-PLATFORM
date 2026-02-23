@@ -40,12 +40,13 @@ export default function BatchOperations() {
     try {
       const jobsData = await getRecruiterJobs()
       setJobs(jobsData)
-      if (jobsData.length > 0) {
-        setSelectedJobId(jobsData[0].id)
-      }
+      // Don't auto-select first job - keep it optional
+      setSelectedJobId('')
     } catch (error) {
       console.error('Failed to load jobs:', error)
+      toast.error('Failed to load jobs. You can still send notifications without job data.')
       setJobs([])
+      setSelectedJobId('')
     }
   }
 
@@ -61,7 +62,12 @@ export default function BatchOperations() {
       const API_KEY = import.meta.env.VITE_API_KEY || 'prod_api_key_XUqM2msdCa4CYIaRywRNXRVc477nlI3AQ-lr6cgTB2o'
       const langgraphUrl = import.meta.env.VITE_LANGGRAPH_URL || 'https://bhiv-hr-langgraph-luy9.onrender.com'
       
-      const response = await fetch(`${langgraphUrl}/bulk-notifications`, {
+      // Get job title if a job is selected, otherwise use generic title
+      const selectedJob = selectedJobId ? jobs.find(j => j.id === selectedJobId) : null
+      const jobTitle = selectedJob?.title || 'Position'
+      const jobIdForNotification = selectedJob?.id || null
+      
+      const response = await fetch(`${langgraphUrl}/automation/bulk-notifications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,7 +81,8 @@ export default function BatchOperations() {
             candidate_id: c.candidate_id
           })),
           sequence_type: notificationType,
-          job_title: jobs.find(j => j.id === selectedJobId)?.title || 'Software Engineer',
+          job_title: jobTitle,
+          job_id: jobIdForNotification,
           matching_score: 'High'
         })
       })
@@ -177,7 +184,40 @@ export default function BatchOperations() {
                 <option value="interview_scheduled">Interview Scheduled</option>
                 <option value="feedback_request">Feedback Request</option>
                 <option value="application_received">Application Received</option>
+                <option value="rejection_sent">Rejection Notification</option>
               </select>
+            </div>
+
+            {/* Job Selection (Optional) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Job Name-ID (Optional)
+              </label>
+              {jobs.length === 0 ? (
+                <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    No jobs available. You can still send notifications without job data.
+                  </p>
+                </div>
+              ) : (
+                <select
+                  value={selectedJobId}
+                  onChange={(e) => setSelectedJobId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                >
+                  <option value="">Select Job Title</option>
+                  {jobs.map((job) => (
+                    <option key={job.id} value={job.id}>
+                      {job.title} – Job ID {job.id}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {selectedJobId 
+                  ? 'Notifications will reference the selected job' 
+                  : 'Notifications will be sent without specific job information'}
+              </p>
             </div>
 
             {/* Candidates List */}

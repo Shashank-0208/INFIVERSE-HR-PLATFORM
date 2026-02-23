@@ -272,6 +272,14 @@ class CommunicationManager:
                     "body": f"""Dear {payload['candidate_name']},\n\nThank you for your interest in {payload['job_title']} at BHIV.\n\nWe'd love to hear about your experience with our recruitment process. Your feedback helps us improve.\n\nPlease take 2 minutes to share your thoughts:\n• How was the application process?\n• Was the communication clear and timely?\n• Any suggestions for improvement?\n\nReply to this email with your feedback.\n\nThank you for your time!\n\nBest regards,\nBHIV HR Team"""
                 },
                 "whatsapp": f"""📝 *Feedback Request*\n\n*Job:* {payload['job_title']}\n\nHow was your experience with BHIV?\n\n📋 *Quick feedback:*\n• Application process?\n• Communication quality?\n• Suggestions?\n\nReply with your thoughts!\n\n_Thank you! 🙏_"""
+            },
+            "rejection_sent": {
+                "email": {
+                    "subject": f"Application Update - {payload['job_title']} | BHIV HR",
+                    "body": f"""Dear {payload['candidate_name']},\n\nThank you for your interest in the {payload['job_title']} position at BHIV and for taking the time to apply.\n\nAfter careful consideration, we have decided to move forward with other candidates whose qualifications more closely match our current needs.\n\nWe were impressed by your background and encourage you to apply for future opportunities that align with your skills and experience.\n\nYour application will remain in our system for future consideration. We'll notify you when suitable positions become available.\n\nWe wish you all the best in your job search and future endeavors.\n\nBest regards,\nBHIV HR Team""",
+                    "html_body": f"""<html><body style='font-family: Arial, sans-serif; color: #333;'>\n<div style='max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;'>\n<h2 style='color: #6c757d;'>Application Update</h2>\n<p>Dear <strong>{payload['candidate_name']}</strong>,</p>\n<p>Thank you for your interest in the <strong>{payload['job_title']}</strong> position at BHIV and for taking the time to apply.</p>\n<div style='background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;'>\n<p>After careful consideration, we have decided to move forward with other candidates whose qualifications more closely match our current needs.</p>\n</div>\n<p>We were impressed by your background and encourage you to apply for future opportunities that align with your skills and experience.</p>\n<h3>💼 Future Opportunities:</h3>\n<ul>\n<li>Your application remains in our system</li>\n<li>We'll notify you of suitable positions</li>\n<li>Feel free to apply for other roles</li>\n</ul>\n<p>We wish you all the best in your job search and future endeavors.</p>\n<p>Best regards,<br><strong>BHIV HR Team</strong></p>\n</div></body></html>"""
+                },
+                "whatsapp": f"""📋 *Application Update*\n\n*Job:* {payload['job_title']}\n\nThank you for applying to BHIV. After careful review, we've decided to move forward with other candidates.\n\n💼 *Your profile remains active:*\n• We'll notify you of future opportunities\n• Feel free to apply for other roles\n\nWe wish you the best in your job search!\n\n_BHIV HR Team_"""
             }
         }
         
@@ -401,6 +409,12 @@ _Thank you for your interest in BHIV!_"""
                 automation_results.extend(results)
                 # Notify HR portal
                 await self._notify_portal_update("hr", "feedback_received", payload)
+            
+            elif event_type == "candidate_rejected" or event_type == "rejection_sent":
+                results = await self.send_automated_sequence(payload, "rejection_sent")
+                automation_results.extend(results)
+                # Notify HR portal
+                await self._notify_portal_update("hr", "candidate_rejected", payload)
             
             elif event_type == "status_inquiry":
                 # Handle candidate status inquiries via WhatsApp

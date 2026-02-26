@@ -466,9 +466,13 @@ async def list_workflows(status: str = None, limit: int = 50, api_key: str = Dep
             "status": "error"
         }
 
-@app.post("/tools/send-notification", tags=["Communication Tools"])
+@app.post("/automation/notifications/send", tags=["Automation - Notifications"])
 async def send_notification(notification_data: dict, api_key: str = Depends(get_api_key)):
-    """Multi-Channel Notification System with Interactive Features"""
+    """Multi-Channel Notification System with Interactive Features
+    
+    Send notifications to candidates via email, WhatsApp, and other channels.
+    Supports automatic template selection based on notification type.
+    """
     try:
         from .communication import comm_manager
         
@@ -524,7 +528,7 @@ class EmailTestRequest(BaseModel):
     subject: Optional[str] = "BHIV HR Test Email"
     message: Optional[str] = "This is a test email from BHIV HR Platform"
 
-@app.post("/test/send-email", tags=["Communication Tools"])
+@app.post("/automation/test/email", tags=["Automation - Testing"])
 async def test_send_email(
     request: EmailTestRequest = None,
     recipient_email: Optional[str] = None,
@@ -542,7 +546,7 @@ async def test_send_email(
             subj = request.subject or subject
             msg = request.message or message
         else:
-            email = recipient_email or "shashankmishra0411@gmail.com"
+            email = recipient_email
             subj = subject
             msg = message
         
@@ -555,7 +559,7 @@ class WhatsAppTestRequest(BaseModel):
     phone: str
     message: Optional[str] = "Test message from BHIV HR Platform"
 
-@app.post("/test/send-whatsapp", tags=["Communication Tools"])
+@app.post("/automation/test/whatsapp", tags=["Automation - Testing"])
 async def test_send_whatsapp(
     request: WhatsAppTestRequest = None,
     phone: Optional[str] = None,
@@ -571,7 +575,7 @@ async def test_send_whatsapp(
             ph = request.phone
             msg = request.message or message
         else:
-            ph = phone or "+919284967526"
+            ph = phone
             msg = message
         
         result = await comm_manager.send_whatsapp(ph, msg)
@@ -583,7 +587,7 @@ class TelegramTestRequest(BaseModel):
     chat_id: str
     message: Optional[str] = "Test message from BHIV HR Platform"
 
-@app.post("/test/send-telegram", tags=["Communication Tools"])
+@app.post("/automation/test/telegram", tags=["Automation - Testing"])
 async def test_send_telegram(
     request: TelegramTestRequest = None,
     chat_id: Optional[str] = None,
@@ -607,7 +611,7 @@ async def test_send_telegram(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/test/send-whatsapp-buttons", tags=["Communication Tools"])
+@app.post("/automation/test/whatsapp-buttons", tags=["Automation - Testing"])
 async def test_send_whatsapp_buttons(
     phone: str,
     message: str = "📅 Interview Scheduled for Software Engineer. Please confirm!",
@@ -622,11 +626,11 @@ async def test_send_whatsapp_buttons(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/test/send-automated-sequence", tags=["Communication Tools"])
+@app.post("/automation/test/sequence", tags=["Automation - Testing"])
 async def test_send_automated_sequence(
     candidate_name: str = "John Doe",
-    candidate_email: str = "test@example.com",
-    candidate_phone: str = "9284967526",
+    candidate_email: str = "blackhole@gmail.com",
+    candidate_phone: str = "70******42",
     job_title: str = "Software Engineer",
     sequence_type: str = "interview_scheduled",
     api_key: str = Depends(get_api_key)
@@ -662,7 +666,7 @@ class WorkflowAutomationRequest(BaseModel):
     event_type: str
     payload: dict
 
-@app.post("/automation/trigger-workflow", tags=["Communication Tools"])
+@app.post("/automation/workflows/trigger", tags=["Automation - Workflows"])
 async def trigger_workflow_automation(
     request: WorkflowAutomationRequest = None,
     event_type: Optional[str] = None,
@@ -696,7 +700,7 @@ class BulkNotificationRequest(BaseModel):
     sequence_type: str
     job_data: dict
 
-@app.post("/automation/bulk-notifications", tags=["Communication Tools"])
+@app.post("/automation/notifications/bulk", tags=["Automation - Notifications"])
 async def send_bulk_notifications(
     request: BulkNotificationRequest = None,
     candidates: Optional[List[dict]] = None,
@@ -728,7 +732,7 @@ async def send_bulk_notifications(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/webhook/whatsapp", tags=["Communication Tools"])
+@app.post("/automation/webhooks/whatsapp", tags=["Automation - Webhooks"])
 async def whatsapp_webhook(request: dict, api_key: str = Depends(get_api_key)):
     """Handle WhatsApp Interactive Button Responses"""
     try:

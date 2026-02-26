@@ -406,13 +406,13 @@ def create_fixed_postman_collection():
              "body": {"mode": "raw", "raw": json.dumps({"chat_id": "123456"})}}},
             {"name": "WhatsApp Buttons", "request": {"method": "POST", "url": "{{lg}}/test/send-whatsapp-buttons",
              "body": {"mode": "raw", "raw": json.dumps({"phone": "+1234567890"})}}},
-            {"name": "Automated Sequence", "request": {"method": "POST", "url": "{{lg}}/test/send-automated-sequence",
+            {"name": "Send Notification", "request": {"method": "POST", "url": "{{lg}}/automation/notifications/send",
              "body": {"mode": "raw", "raw": json.dumps({"candidate_name": "John"})}}},
-            {"name": "Trigger Workflow", "request": {"method": "POST", "url": "{{lg}}/automation/trigger-workflow",
+            {"name": "Trigger Workflow", "request": {"method": "POST", "url": "{{lg}}/automation/workflows/trigger",
              "body": {"mode": "raw", "raw": json.dumps({"event_type": "application", "payload": {}})}}},
-            {"name": "Bulk Notifications", "request": {"method": "POST", "url": "{{lg}}/automation/bulk-notifications",
+            {"name": "Bulk Notifications", "request": {"method": "POST", "url": "{{lg}}/automation/notifications/bulk",
              "body": {"mode": "raw", "raw": json.dumps({"candidates": [], "sequence_type": "application", "job_data": {}})}}},
-            {"name": "WhatsApp Webhook", "request": {"method": "POST", "url": "{{lg}}/webhook/whatsapp",
+            {"name": "WhatsApp Webhook", "request": {"method": "POST", "url": "{{lg}}/automation/webhooks/whatsapp",
              "body": {"mode": "raw", "raw": json.dumps({})}}}
         ]},
         {"name": "LangGraph-RL (8)", "item": [

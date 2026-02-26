@@ -1312,7 +1312,7 @@ class ComprehensiveEndpointTester:
             {
                 "name": "LG-TriggerWorkflow",
                 "method": "POST",
-                "url": f"{self.config['langgraph_url']}/automation/trigger-workflow",
+                "url": f"{self.config['langgraph_url']}/automation/workflows/trigger",
                 "headers": None,
                 "data": {"workflow_type": "candidate_application", "candidate_id": "test_candidate"},
                 "expected_status": 200,
@@ -1324,7 +1324,7 @@ class ComprehensiveEndpointTester:
             {
                 "name": "LG-BulkNotifications",
                 "method": "POST",
-                "url": f"{self.config['langgraph_url']}/automation/bulk-notifications",
+                "url": f"{self.config['langgraph_url']}/automation/notifications/bulk",
                 "headers": None,
                 "data": {"candidate_ids": ["test_candidate1", "test_candidate2"], "message": "Test"},
                 "expected_status": 200,

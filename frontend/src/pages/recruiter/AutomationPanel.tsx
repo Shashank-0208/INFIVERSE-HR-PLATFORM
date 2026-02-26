@@ -147,7 +147,8 @@ export default function AutomationPanel() {
       const API_KEY = import.meta.env.VITE_API_KEY || 'prod_api_key_XUqM2msdCa4CYIaRywRNXRVc477nlI3AQ-lr6cgTB2o'
       const langgraphUrl = import.meta.env.VITE_LANGGRAPH_URL || 'https://bhiv-hr-langgraph-luy9.onrender.com'
       
-      const response = await fetch(`${langgraphUrl}/tools/send-notification`, {
+      // Use new consistent endpoint path
+      const response = await fetch(`${langgraphUrl}/automation/notifications/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -193,7 +194,7 @@ export default function AutomationPanel() {
         sequence_type: sequenceType
       }
 
-      const response = await fetch(`${langgraphUrl}/test/send-automated-sequence`, {
+      const response = await fetch(`${langgraphUrl}/automation/test/sequence`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

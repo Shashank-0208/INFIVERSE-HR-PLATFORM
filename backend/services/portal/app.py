@@ -1032,7 +1032,7 @@ elif menu == "🎯 Step 4: AI Shortlist & Matching":
                                 "job_title": f"Job ID {job_id}",
                                 "matching_score": "High"
                             }
-                            response = http_client.post(f"{langgraph_url}/automation/bulk-notifications", json=bulk_payload, headers=UNIFIED_HEADERS, timeout=30.0)
+                            response = http_client.post(f"{langgraph_url}/automation/notifications/bulk", json=bulk_payload, headers=UNIFIED_HEADERS, timeout=30.0)
                             if response.status_code == 200:
                                 result = response.json()
                                 success_count = result.get('bulk_result', {}).get('success_count', 0)
@@ -1681,7 +1681,7 @@ elif menu == "📁 Batch Operations":
                     "matching_score": "High"
                 }
                 
-                response = http_client.post(f"{langgraph_url}/automation/bulk-notifications", 
+                response = http_client.post(f"{langgraph_url}/automation/notifications/bulk", 
                                           json=bulk_payload, headers=UNIFIED_HEADERS, timeout=30.0)
                 if response.status_code == 200:
                     result = response.json()

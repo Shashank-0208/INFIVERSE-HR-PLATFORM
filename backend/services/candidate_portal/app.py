@@ -503,7 +503,7 @@ def profile_management_page():
                 # Trigger profile update notification to HR
                 try:
                     langgraph_url = config.LANGGRAPH_SERVICE_URL
-                    requests.post(f"{langgraph_url}/automation/trigger-workflow",
+                    requests.post(f"{langgraph_url}/automation/workflows/trigger",
                                 json={
                                     "event_type": "candidate_profile_updated",
                                     "payload": {

@@ -67,7 +67,8 @@ export default function BatchOperations() {
       const jobTitle = selectedJob?.title || 'Position'
       const jobIdForNotification = selectedJob?.id || null
       
-      const response = await fetch(`${langgraphUrl}/automation/bulk-notifications`, {
+      // Use new consistent endpoint path
+      const response = await fetch(`${langgraphUrl}/automation/notifications/bulk`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
